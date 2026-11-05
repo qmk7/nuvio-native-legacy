@@ -61,7 +61,7 @@ DSC=$(valor DISCORD_CLIENT_ID)
 # a versao. O binario recebe -DNV_VERSAO e a conferencia do arm.sh exige
 # encontrar o valor dentro dele, como com as demais chaves.
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
-VER=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$RAIZ/deploy/app/appinfo.json" | head -1)
+VER=$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' "$RAIZ/deploy/app/appinfo.json" | head -1) 
 
 
 # Release unificada: conta, Trakt, Simkl e TMDB obrigatorios; demais opcionais.
