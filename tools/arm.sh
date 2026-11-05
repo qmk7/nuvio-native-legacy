@@ -37,7 +37,7 @@ cd "$(dirname "$0")/.." && source tools/ctr.sh
 
 TV_IP="${NUVIO_TV_IP:-192.168.1.32}"
 TV_PASS="${NUVIO_TV_PASS:-alpine}"
-APP_ID="space.nuvio.native.legacy"
+APP_ID="com.qrtime.app"
 ARES="${NUVIO_ARES_PACKAGE:-../NuvioWeb-0.3.38-beta/node_modules/.bin/ares-package}"
 # Use ctr_run / ctr_build helpers instead (see tools/ctr.sh)
 BUILD_PLATFORM="${NUVIO_BUILD_PLATFORM:-linux/arm64}"
