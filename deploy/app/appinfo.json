@@ -1,16 +1,16 @@
 {
-  "id": "space.nuvio.native.legacy",
-  "version": "2.0.8",
-  "vendor": "iqui27",
+  "id": "com.qrtime.app",
+  "version": "1.0.0",
+  "vendor": "QR TIME",
   "type": "native",
   "main": "nuvio-proto",
-  "title": "Nuvio Legacy",
+  "title": "QR TIME",
   "icon": "icon-20.png",
   "largeIcon": "icon-large-20.png",
   "splashBackground": "splash.png",
   "resolution": "1920x1080",
-  "bgColor": "#0E0F12",
-  "iconColor": "#0D101E",
+  "bgColor": "#0D1B35",
+  "iconColor": "#0D1B35",
   "disableBackHistoryAPI": true,
   "requiredPermissions": [
     "all"
