@@ -25,7 +25,7 @@
 set -eo pipefail
 cd "$(dirname "$0")/.."
 
-# Impressao SHA-256 do certificado da chave de release (gerada em 30/09/2026,
+# Impressao SHA-256 do certificado da chave de release (gerada em 30/09/2026, 
 # copia de seguranca no Vaultwarden). Trocar a chave = ninguem atualiza por
 # cima; so mude isto junto de um aviso para desinstalar e reinstalar.
 CERT_SHA256=c3c967d4fac138de15126da01ea3ae43b52e6aa23106e336c2acc607ae0f2add
