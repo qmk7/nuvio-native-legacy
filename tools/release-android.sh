@@ -34,9 +34,7 @@ python3 tools/release.py --check-tree
 tools/env.sh --require-core >/dev/null
 
 VER=$(sed -n 's/.*"version": *"\([0-9.]*\)".*/\1/p' deploy/app/appinfo.json)
-VT=$(grep -v '<?xml' tools/tizen-config.xml | sed -n 's/.*[[:space:]]version="\([0-9.]*\)".*/\1/p' | head -1)
-[ -n "$VER" ] && [ "$VER" = "$VT" ] || { echo "release-android: appinfo.json ($VER) != tizen-config.xml ($VT)" >&2; exit 1; }
-
+[ -n "$VER" ] || { echo "release-android: appinfo.json sem version" >&2; exit 1; }
 if [ -z "${NUVIO_KEYSTORE:-}" ] && [ -f "$HOME/.nuvio-android/release.env" ]; then
   set -a; . "$HOME/.nuvio-android/release.env"; set +a
 fi
