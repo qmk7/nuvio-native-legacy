@@ -352,6 +352,8 @@ void dados_sincronizar_logo(void) {
 }
 
 static char dir[512];
+static char dirsLegados[4][512];
+static int nDirsLegados;
 static char clienteId[64];
 
 // Tenta criar a pasta e escrever nela. Criar nao basta: em varios pontos do
@@ -370,6 +372,19 @@ static int serve(const char *candidato) {
   remove(teste);
   return 1;
 }
+static void legado_adicionar(const char *caminho) {
+  int i;
+
+  if (!caminho  !*caminho  nDirsLegados >= 4) return;
+
+  for (i = 0; i < nDirsLegados; i++) {
+    if (strcmp(dirsLegados[i], caminho) == 0) return;
+  }
+
+  snprintf(dirsLegados[nDirsLegados],
+           sizeof dirsLegados[0], "%s", caminho);
+  nDirsLegados++;
+}
 
 void dados_iniciar(const char *dirArte) {
   char lar[512], envLar[512], arteLar[512];
@@ -378,7 +393,26 @@ void dados_iniciar(const char *dirArte) {
   const char *home = getenv("HOME");
   const char *candidatos[5];
   int n = 0, i;
+nDirsLegados = 0;
+#ifndef __EMSCRIPTEN__
+  if (isolado) { 
+  if (env && *env) { 
+  legado_adicionar(env); 
+}
+if (home && *home) {
+  int tam = snprintf(lar, sizeof lar, "%s/.nuvio", home);
+  if (tam > 0 && tam < (int)sizeof lar) {
+    legado_adicionar(lar);
+  }
+}
 
+legado_adicionar("/media/developer/temp/nuvio");
+
+if (dirArte && *dirArte) {
+  legado_adicionar(dirArte);
+}
+} 
+#endif
 #ifdef __EMSCRIPTEN__
   // Primeiro candidato, e nao mais um da fila: no navegador todos os outros
   // caminhos existem e aceitam escrita (MEMFS aceita tudo), entao qualquer um
@@ -585,11 +619,23 @@ char *dados_ler(const char *nome) {
   char caminho[600];
   FILE *f;
   long n;
+  int j;
   char *buf;
   if (!dados_caminho(caminho, sizeof caminho, nome)) return NULL;
   NV_FS_TRAVAR();
   f = fopen(caminho, "rb");
-  if (!f) { NV_FS_LIBERAR(); return NULL; }
+  if (!f) { 
+    for (j = 0; j < nDirsLegados; j++) { 
+      int tam = snprintf(caminho, sizeof caminho, 
+      "%s/%s", dirsLegados[j], nome);
+  if (tam > 0 && tam < (int)sizeof caminho) {
+  f = fopen(caminho, "rb");
+    if (f) break;
+  }
+}
+}
+
+if (!f) { NV_FS_LIBERAR(); return NULL; }
 #ifdef NV_ANDROID
   if (nv_android_cache_name(nome)) nv_android_cache_touch(caminho);
 #endif
