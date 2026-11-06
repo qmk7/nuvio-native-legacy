@@ -375,7 +375,7 @@ static int serve(const char *candidato) {
 static void legado_adicionar(const char *caminho) {
   int i;
 
-  if (!caminho  !*caminho  nDirsLegados >= 4) return;
+  if (!caminho ||  !*caminho ||  nDirsLegados >= 4) return;
 
   for (i = 0; i < nDirsLegados; i++) {
     if (strcmp(dirsLegados[i], caminho) == 0) return;
