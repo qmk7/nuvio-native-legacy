@@ -373,7 +373,7 @@ static int serve(const char *candidato) {
 
 void dados_iniciar(const char *dirArte) {
   char lar[512], envLar[512], arteLar[512];
-  int isolado = strcmp(NV_APP_ID, NV_APP_ID_PRODUCTION) != 0;
+  int isolado = strcmp(NV_APP_ID, NV_APP_ID_LEGACY) != 0;
   const char *env = getenv("NUVIO_DADOS");
   const char *home = getenv("HOME");
   const char *candidatos[5];
