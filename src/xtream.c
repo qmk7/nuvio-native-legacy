@@ -438,6 +438,42 @@ static XtCat *lerCategorias(int *quantos, NvPerfilSessao sessao) {
   return cats;
 }
 
+int xtream_vod_cb(XtreamVodCb cb, void *u, int *total) { int st = 0, n = 0; char *corpo; const char *p; NvPerfilSessao sessao = nv_perfil_sessao_ler();
+ultimaFalha = XT_OK; ultimoHttp = 0; ultimoTotal = 0; if (total) *total = 0;
+if (!nv_perfil_sessao_atual(sessao) ||
+    !xtream_configurado() || !cb) return 0;
+corpo = chamarSt("get_vod_streams", XT_PRAZO_LISTA_S, &st, sessao); ultimoHttp = st;
+if (!corpo || st == 0 ||  st >= 400) { ultimaFalha = st == 0 ? XT_SEM_RESPOSTA : XT_HTTP; free(corpo); return 0; }
+p = js_raiz_array(corpo); if (!p) { free(corpo); ultimaFalha = XT_PAGINA; return 0; }
+while (nv_perfil_sessao_atual(sessao) && p && *p) { const char *fim = js_fim(p); XtreamVodItem item = {0};
+if (!fim) break;
+
+if (campoTextoOuNumero(p, fim, "stream_id",
+                       item.id, sizeof item.id) &&
+                           js_texto(p, fim, "name", item.nome, sizeof item.nome) &&
+                               item.nome[0]) {
+
+                                 js_texto(p, fim, "stream_icon",
+                                            item.poster, sizeof item.poster);
+
+                                              if (!item.poster[0])
+                                                  js_texto(p, fim, "cover",
+                                                               item.poster, sizeof item.poster);
+
+                                                                 campoTextoOuNumero(p, fim, "category_id",
+                                                                                      item.categoria, sizeof item.categoria);
+
+                                                                                        js_texto(p, fim, "container_extension",
+                                                                                                   item.extensao, sizeof item.extensao);
+
+                                                                                                     n++;
+                                                                                                       if (!cb(&item, u)) break;
+                                                                                                       }
+
+                                                                                                       p = js_prox(fim);
+                                                                                                       }
+                                                                                                       free(corpo); ultimoTotal = n; if (total) *total = n; return n; }
+
 // Escrito so pelo fio do guia (o unico que chama xtream_canais) e lido pelo
 // mesmo fio antes de publicar: nao precisa de trava.
 

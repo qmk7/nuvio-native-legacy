@@ -70,6 +70,7 @@ typedef struct {
   int semCategoria;  // category id absent/unknown; preserve a real provider group named Outros
   int arquivo, arquivoDias;   // tv_archive (catch-up, v2)
 } XtreamItem;
+
 typedef int (*XtreamCb)(const XtreamItem *c, void *u);
 int xtream_canais_cb(void (*cat)(const char *nome, int ordem, int n, void *u),
                      XtreamCb cb, void *u, int *total);
@@ -94,6 +95,19 @@ int xtream_ultimo_http(void);
 // Quantos canais o servidor mandou na ULTIMA xtream_canais, mesmo os que nao
 // couberam em `max` (o guia usa para dizer "Mostrando N de M").
 int xtream_ultimo_total(void);
+
+// ----------------------------------------------------------------- filmes
+typedef struct {
+  char id[80];
+    char nome[160];
+      char poster[480];
+        char categoria[64];
+          char extensao[16];
+          } XtreamVodItem;
+
+          typedef int (*XtreamVodCb)(const XtreamVodItem *item, void *u);
+
+          int xtream_vod_cb(XtreamVodCb cb, void *u, int *total);
 
 // ----------------------------------------------------------------- conta
 // user_info do player_api.php (#158). Tudo opcional: -1/0/"" = nao veio.
