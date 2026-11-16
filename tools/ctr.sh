@@ -33,7 +33,50 @@ ctr_check_system() {
 # --pull → not mapped
 # --user → not supported, warn
 # --entrypoint → not supported, must be handled differently
+# NUVIO_CTR=local: no container. Runs the same command on this host with a
+# locally extracted webOS SDK (QRT_WEBOS_SDK=<sdk root>, the folder holding
+# bin/ and arm-webos-linux-gnueabi/sysroot). For hosts where Docker cannot reach
+# package mirrors. Only the /work volume (the repository itself) is supported;
+# extra mounts (P2P engine, Rust core) must be disabled for a local build.
+ctr_run_local() {
+  local i=0 args=("$@") envs=() cmd=()
+  [ -n "${QRT_WEBOS_SDK:-}" ] && [ -d "$QRT_WEBOS_SDK/bin" ] || {
+    echo "ctr_run (local): set QRT_WEBOS_SDK to the extracted webOS SDK root" >&2; return 1; }
+  while [ $i -lt ${#args[@]} ]; do
+    local arg="${args[$i]}"
+    case "$arg" in
+      --rm) i=$((i+1));;
+      --platform|-w|--workdir|--network|--user|--memory|--cpus|--pull|--entrypoint) i=$((i+2));;
+      -e|--env) envs+=("${args[$((i+1))]}"); i=$((i+2));;
+      --env-file)
+        while IFS= read -r line; do
+          [ -z "$line" ] || [[ "$line" =~ ^# ]] && continue
+          envs+=("$line")
+        done < "${args[$((i+1))]}"
+        i=$((i+2));;
+      -v|--volume)
+        local vol="${args[$((i+1))]}" host target
+        host="${vol%%:*}"; target="${vol#*:}"; target="${target%%:*}"
+        if [ "$target" != /work ] || [ "$(cd "$host" && pwd)" != "$PWD" ]; then
+          echo "ctr_run (local): volume $vol not supported; disable the feature that needs it" >&2
+          return 1
+        fi
+        i=$((i+2));;
+      -*) echo "ctr_run (local): unknown flag $arg" >&2; return 1;;
+      *) cmd=("${args[@]:$((i+1))}"); break;;
+    esac
+  done
+  (
+    for e in "${envs[@]}"; do export "$e"; done
+    export PATH="$QRT_WEBOS_SDK/bin:$PATH"
+    export NUVIO_SYSROOT="$QRT_WEBOS_SDK/arm-webos-linux-gnueabi/sysroot"
+    export NUVIO_ASS_ROOT="${NUVIO_ASS_ROOT:-$QRT_WEBOS_SDK/../nuvio-ass}"
+    "${cmd[@]}"
+  )
+}
+
 ctr_run() {
+  [ "$NUVIO_CTR" = local ] && { ctr_run_local "$@"; return; }
   ctr_check_system || return 1
   [ "$NUVIO_CTR" = container ] || { "$NUVIO_CTR" run "$@"; return; }
 
@@ -169,6 +212,7 @@ ctr_image_exists() {
 # Returns image info; if FORMAT given, tries to apply it
 ctr_image_inspect() {
   local image="$1" format="${2:-{{.Id}}}"
+  if [ "$NUVIO_CTR" = local ]; then echo "local:${QRT_WEBOS_SDK:-}"; return 0; fi
   
   if [ "$NUVIO_CTR" != container ]; then
     "$NUVIO_CTR" image inspect --format "$format" "$image"

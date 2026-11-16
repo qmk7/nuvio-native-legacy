@@ -1,0 +1,41 @@
+#!/bin/bash
+# Linux shim for the macOS-only test scripts in tests/*.sh.
+#
+# About 455 test scripts call `cc ... -framework OpenGL -I/opt/homebrew/...`.
+# They are plain C tests; only the link line is macOS-specific. Rather than
+# editing every script, tools/qrtime/run-tests.sh puts this directory first in
+# PATH. When the arguments look like a macOS link line, this wrapper:
+#   - drops `-framework X` and /opt/homebrew include/lib paths,
+#   - adds -DNV_LINUX_DESKTOP (the same desktop stubs the Mac build uses),
+#   - adds SDL2/GLES2/EGL/zlib flags from pkg-config, plus -ldl -pthread -lm.
+# Any other invocation is passed through untouched.
+set -u
+REAL_CC="${QRT_REAL_CC:-/usr/bin/cc}"
+
+mac=0
+for a in "$@"; do
+  case "$a" in -framework|/opt/homebrew*|-I/opt/homebrew*|-L/opt/homebrew*) mac=1;; esac
+done
+if [ "$mac" = 0 ]; then exec "$REAL_CC" "$@"; fi
+
+args=()
+link=1
+skip=0
+for a in "$@"; do
+  if [ "$skip" = 1 ]; then skip=0; continue; fi
+  case "$a" in
+    -framework) skip=1; continue;;
+    -I/opt/homebrew*|-L/opt/homebrew*) continue;;
+    -Wl,-dead_strip) args+=(-Wl,--gc-sections); continue;;
+    -c|-E|-M|-MM) link=0;;
+  esac
+  args+=("$a")
+done
+
+read -r -a cflags <<< "$(pkg-config --cflags sdl2 SDL2_image SDL2_ttf glesv2 egl zlib)"
+extra=()
+if [ "$link" = 1 ]; then
+  read -r -a extra <<< "$(pkg-config --libs sdl2 SDL2_image SDL2_ttf glesv2 egl zlib)"
+  extra+=(-ldl -pthread -lm)
+fi
+exec "$REAL_CC" -DNV_LINUX_DESKTOP "${cflags[@]}" "${args[@]}" "${extra[@]}"

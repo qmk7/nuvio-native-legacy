@@ -1,0 +1,19 @@
+# QR TIME build-time configuration. Copy to local.properties (never commit it;
+# it is in .gitignore) and fill in the keys registered for QR TIME.
+# Empty values are allowed: the matching feature stays off.
+
+# Account backend (optional; empty = no Nuvio account login)
+NUVIO_SUPABASE_URL=
+NUVIO_SUPABASE_ANON_KEY=
+TV_LOGIN_WEB_BASE_URL=
+
+# Metadata and tracking (register QR TIME's own apps)
+TMDB_API_KEY=
+TRAKT_CLIENT_ID=
+TRAKT_CLIENT_SECRET=
+SIMKL_CLIENT_ID=
+SIMKL_APP_NAME=
+
+# Optional services
+NUVIO_REC_URL=
+DISCORD_CLIENT_ID=

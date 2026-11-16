@@ -1,0 +1,29 @@
+# QR TIME gate: tests/*.sh names that must pass on a Linux host before any
+# QR TIME change is pushed. Run with: bash tools/qrtime/run-tests.sh
+#
+# Known pre-existing failures that are NOT in this list (documented in
+# docs/qrtime/PHASE0-REPORT.md): musica (duplicate mus_alternar_guardado),
+# stalker_scheduler (stale stubs for app.c), atualizacao_android (relies on
+# macOS -dead_strip).
+
+# Live TV / IPTV
+iptv_accounts
+ltv
+m3u
+aovivo
+xtepg
+epg_accounts
+epg_streaming
+guiaepg
+stalker_portal
+ajustes_iptv
+
+# Identity: updater and notices must never point upstream
+atualizacao
+atualizacao_agenda
+avisos_corte
+
+# Agenda / settings scope
+agenda
+ajustes_escopo
+ajustes_perfil
