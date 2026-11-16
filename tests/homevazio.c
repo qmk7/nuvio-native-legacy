@@ -13,6 +13,8 @@ int desc_montando(void) { return montando; }
 SyncEstado sync_estado(void) { return estado; }
 unsigned sync_ultimo_ok(void) { return ultimo; }
 int sync_manual_addons(void) { pedidos++; return 1; }
+static int convidado;   // QR TIME guest mode (convidado.h)
+int convidado_ativo(void) { return convidado; }
 int main(void) {
   SDL_Event e = {0}; Qr q;
   assert(qr_gerar(&q, HOMEVAZIO_URL));
@@ -34,6 +36,16 @@ int main(void) {
   e.type = SDL_KEYUP; assert(homevazio_evento(&e) && pedidos == 1);
   e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_LEFT;
   assert(!homevazio_evento(&e));
+  // Guest (no session, guest mode): OK asks for the IPTV settings instead of
+  // an account sync, and the request is read once.
+  logada = 0; convidado = 1;
+  e.type = SDL_KEYDOWN; e.key.keysym.sym = SDLK_RETURN; e.key.repeat = 0;
+  assert(homevazio_evento(&e) && pedidos == 1);
+  assert(homevazio_pediu_iptv() && !homevazio_pediu_iptv());
+  // A signed-in account never takes the guest path, even with the flag left on.
+  logada = 1;
+  assert(homevazio_evento(&e) && pedidos == 2 && !homevazio_pediu_iptv());
   puts("homevazio: state, sync action and QR capacity passed");
+  puts("homevazio: guest OK opens IPTV settings, accounts still sync");
   return 0;
 }

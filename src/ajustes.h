@@ -71,6 +71,9 @@ void ajustes_abrir_no_vidro(void);
 // O "Reconectar" do modal do Trakt na ilha (02/10): pousa na linha do Trakt,
 // onde o OK comeca o pareamento.
 void ajustes_abrir_no_trakt(void);
+// QR TIME guest card on an empty Home: lands on "Add Xtream account" in the
+// Live TV section, the first step for someone with only an IPTV subscription.
+void ajustes_abrir_no_iptv(void);
 // Fontes e addons > Escolha da fonte, na linha "Espera pelos add-ons": o destino
 // do OK na explicacao da espera na ilha do player (#202).
 void ajustes_abrir_na_espera_fonte(void);

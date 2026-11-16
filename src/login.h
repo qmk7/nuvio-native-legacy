@@ -24,5 +24,8 @@ void login_desenhar(Uint32 agora);
 
 // 1 quando a tela terminou o trabalho dela (ha sessao) e o app deve seguir.
 int  login_concluido(void);
+// QR TIME: 1 (once) when the person chose "Continue without an account"
+// (guest mode, convidado.h). The router then opens Home without a session.
+int  login_pediu_convidado(void);
 
 #endif

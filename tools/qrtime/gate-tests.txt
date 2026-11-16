@@ -36,3 +36,9 @@ ajustes_nuvem
 ajustes_escala_migra
 ajustes_idioma_disco
 ajustes_memoria_migra
+
+# Guest mode (QR TIME)
+convidado
+convidado_ajustes
+homevazio
+i18n

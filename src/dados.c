@@ -372,7 +372,10 @@ static int serve(const char *candidato) {
 }
 
 void dados_iniciar(const char *dirArte) {
-  char lar[512], envLar[512], arteLar[512];
+  char lar[512], arteLar[512];
+#ifdef NV_DTS_DEBUG
+  char envLar[512];   // candidatos[] keeps a pointer: function scope
+#endif
   int isolado = strcmp(NV_APP_ID, NV_APP_ID_PRODUCTION) != 0;
   const char *env = getenv("NUVIO_DADOS");
   const char *home = getenv("HOME");

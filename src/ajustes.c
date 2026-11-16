@@ -54,6 +54,7 @@
 #include "anim.h"
 #include "layout.h"
 #include "sessao.h"
+#include "convidado.h"
 #include "contalib.h"
 #include "sync.h"
 #include "perfis.h"
@@ -2631,12 +2632,13 @@ static int focoItem = 0;
 static int focoOp = -1;
 // Pedido do cartao de novidades ("Experimentar a cor viva"): a proxima
 // abertura pousa na linha da cor, dentro de Aparencia (ver ajustes_iniciar).
-static int abrirNaCor, abrirNaFonte, abrirNoLayout, abrirNoVidro, abrirNoTrakt, abrirNaEspera;
+static int abrirNaCor, abrirNaFonte, abrirNoLayout, abrirNoVidro, abrirNoTrakt, abrirNaEspera, abrirNoIptv;
 void ajustes_abrir_na_cor(void) { abrirNaCor = 1; }
 void ajustes_abrir_na_fonte(void) { abrirNaFonte = 1; }
 void ajustes_abrir_no_layout(void) { abrirNoLayout = 1; }
 void ajustes_abrir_no_vidro(void) { abrirNoVidro = 1; }
 void ajustes_abrir_no_trakt(void) { abrirNoTrakt = 1; }
+void ajustes_abrir_no_iptv(void) { abrirNoIptv = 1; }
 void ajustes_abrir_na_espera_fonte(void) { abrirNaEspera = 1; }
 static int abrirNoGuia, guiaDaNovidades, pediuNovidades;
 void ajustes_abrir_no_guia(int daNovidades) { abrirNoGuia = 1; guiaDaNovidades = daNovidades ? 1 : 0; }
@@ -2668,8 +2670,11 @@ int ajustes_foco_no_indice(void) { return focoIndice; }
 // `sairArmado` guarda QUAL linha esta armada (0 = nenhuma; nenhuma das tres
 // e a opcao 0 do enum).
 static int sairArmado;
+// QR TIME guest mode (convidado.h): the account row signs IN instead of out.
+static int ajConvidado(void) { return !sessao_logada() && convidado_ativo(); }
 static int pedeConfirmacao(int op) {
-  return op == AJ_SAIR || op == AJ_IPTV_REMOVER || op == AJ_STALKER_LIMPAR || op == AJ_XTREAM_LIMPAR || op == AJ_M3U_LIMPAR || op == AJ_JF_SAIR ||
+  // Leaving guest mode erases nothing, so it needs no second OK.
+  return (op == AJ_SAIR && !ajConvidado()) || op == AJ_IPTV_REMOVER || op == AJ_STALKER_LIMPAR || op == AJ_XTREAM_LIMPAR || op == AJ_M3U_LIMPAR || op == AJ_JF_SAIR ||
          op == AJ_EM_SAIR || op == AJ_PX_SAIR;
 }
 
@@ -6870,6 +6875,7 @@ int ajustes_iniciar(void) {
   if (abrirNoLayout) { abrirNoLayout = 0; focarOpcao(AJ_HOME_LAYOUT); }
   if (abrirNoVidro) { abrirNoVidro = 0; focarOpcao(AJ_VIDRO); }
   if (abrirNoTrakt) { abrirNoTrakt = 0; focarOpcao(AJ_TRAKT); }
+  if (abrirNoIptv) { abrirNoIptv = 0; focarOpcao(AJ_IPTV_ADD_XTREAM); }
   // #202: o OK da explicacao de espera na ilha do player cai na linha que manda
   // nela, dentro de Fontes e addons > Escolha da fonte.
   if (abrirNaEspera) { abrirNaEspera = 0; focarOpcao(AJ_FONTE_PRAZO); }
@@ -6948,6 +6954,7 @@ static const char *rotuloNovo(int op) {
   }
 }
 static const char *rotuloOpcao(int op) {
+  if (op == AJ_SAIR && ajConvidado()) return "Entrar com uma conta";
   if(op==AJ_IPTV_ACOES)return iptvAlvo.nome;
   if(op==AJ_IPTV_CANCELAR && !iptvForm.nova)return "Voltar";
   if (op == AJ_FALHA_ADDON_LIMITE && faAddonEditar[0]) return faAddonTitulo;
@@ -8092,7 +8099,10 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_TRAKT: return "Conecta a sua conta do Trakt para marcar o que assistiu e usar a sua lista.";
     case AJ_SIMKL: return "Conecta a sua conta do Simkl, uma alternativa ao Trakt para acompanhar séries.";
     case AJ_DISCORD: return "Mostra no seu perfil do Discord o que você está assistindo, com o cartaz e o tempo. Só sai alguma coisa enquanto um vídeo toca neste perfil.";
-    case AJ_SAIR: return "Sai da conta nesta TV e apaga daqui a sessão, os addons e o progresso guardados.";
+    case AJ_SAIR:
+      if (ajConvidado())
+        return "Volta para a tela de entrada para conectar uma conta. As listas de IPTV e os ajustes desta TV ficam guardados.";
+      return "Sai da conta nesta TV e apaga daqui a sessão, os addons e o progresso guardados.";
     case AJ_LIMPAR_CACHE: return "Remove arquivos temporários. Mantém perfis, contas, progresso e addons.";
     case AJ_ESPACO: return "Uso atual de memória pelo cache de imagens, não espaço ocupado no armazenamento da TV.";
     case AJ_TEX_MB: return "Quanta memória o cache de imagens pode usar. Automático escolhe pela RAM da TV. Um valor acima do que esta TV suporta é reduzido ao máximo dela — o painel ao lado mostra o teto em vigor.";
@@ -8244,6 +8254,7 @@ static const char *efeitoOpcao(int op) {
     case AJ_STALKER_LIMPAR: case AJ_XTREAM_LIMPAR:
       return "Pede o OK duas vezes. Para voltar a usar é preciso digitar tudo de novo.";
     case AJ_SAIR:
+      if (ajConvidado()) return NULL;
       return "Pede o OK duas vezes. Para voltar é preciso entrar de novo pelo QR.";
     case AJ_SALVOS_DEST:
       return "Escolhe de onde vem a Biblioteca e para onde o + também publica. A lista desta TV recebe o título em todos os casos.";
@@ -10006,6 +10017,12 @@ static void eventoTela(const SDL_Event *e) {
     }
     if (focoOp == AJ_DISCORD) {
       if (discord_estado() == DIS_LIGADO) discord_esquecer(); else discord_comecar();
+      return;
+    }
+    if (focoOp == AJ_SAIR && ajConvidado()) {
+      // Guest -> login screen. Local data (IPTV, settings) stays on this TV.
+      convidado_sair();
+      sair = 1;   // the router sees no session and no guest: login screen
       return;
     }
     if (focoOp == AJ_SAIR) {

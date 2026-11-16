@@ -3,6 +3,7 @@
 #include "homevazio.h"
 #include "addons.h"
 #include "sessao.h"
+#include "convidado.h"
 #include "sync.h"
 #include "gfx.h"
 #include "text.h"
@@ -30,7 +31,36 @@ static GLuint qrTextura(void) {
   return texQr;
 }
 
-static void ok(int a, int b) { (void)a; (void)b; sync_manual_addons(); }
+// Guest: no account behind this TV, so no add-ons to sync and no phone guide.
+static int modoConvidado(void) { return !sessao_logada() && convidado_ativo(); }
+static int pediuIptv;
+int homevazio_pediu_iptv(void) { int v = pediuIptv; pediuIptv = 0; return v; }
+
+static void ok(int a, int b) {
+  (void)a; (void)b;
+  if (modoConvidado()) pediuIptv = 1;
+  else sync_manual_addons();
+}
+
+static void desenharConvidado(float alfa) {
+  GfxRect p = { (NV_TELA_W - HV_W) * 0.5f, (NV_TELA_H - HV_H) * 0.5f + 40.0f, HV_W, HV_H };
+  float tx = p.x + 64.0f, tw = p.w - 128.0f, y = p.y + 72.0f;
+  TxtLinha l;
+  GfxRect b;
+  gfx_vidro_material(p, 0.06f, GFX_VIDRO_DENS, alfa);
+  l = txt_linha_corta(TXT_HEADLINE, "Sua Home está vazia", 255, 255, 255, 255, tw);
+  txt_desenhar_alpha(l, tx, y, alfa);
+  y += l.h + 22.0f;
+  y += txt_bloco(TXT_BODY, "Adicione uma lista de IPTV (Xtream, M3U ou Stalker) para ver seus canais. Add-ons também podem ser instalados pelo endereço, nos Ajustes.",
+                200, 203, 210, tx, y, tw, 40, alfa, 3) + 14.0f;
+  txt_bloco(TXT_CAPTION, "Você está usando o app sem conta. Canais e ajustes ficam guardados nesta TV.",
+            160, 163, 172, tx, y, tw, 34, alfa, 2);
+  l = txt_linha(TXT_BODY, i18n("Adicionar IPTV"), 24, 24, 26, 255);
+  b = (GfxRect){ tx, p.y + p.h - 64.0f - 76.0f, (float)l.w + 88.0f, 76.0f };
+  gfx_vidro_pilula_cheia(b, 0.5f, 1.0f, alfa);   // the only target, always focused
+  txt_desenhar_alpha(l, b.x + (b.w - l.w) * 0.5f, b.y + (b.h - l.h) * 0.5f, alfa);
+  ponteiro_alvo(b.x, b.y, b.w, b.h, NULL, ok, 0, 0);
+}
 
 void homevazio_desenhar(float alfa) {
   GfxRect p = { (NV_TELA_W - HV_W) * 0.5f, (NV_TELA_H - HV_H) * 0.5f + 40.0f, HV_W, HV_H };
@@ -41,6 +71,7 @@ void homevazio_desenhar(float alfa) {
   GLuint t;
   TxtLinha l;
   if (alfa <= 0.003f) return;
+  if (modoConvidado()) { desenharConvidado(alfa); return; }
   gfx_vidro_material(p, 0.06f, GFX_VIDRO_DENS, alfa);
   l = txt_linha_corta(TXT_HEADLINE, "Sua Home está vazia", 255, 255, 255, 255, tw);
   txt_desenhar_alpha(l, tx, y, alfa);

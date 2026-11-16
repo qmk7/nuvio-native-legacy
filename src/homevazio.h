@@ -13,5 +13,9 @@ int  homevazio_ativo(int fileiras);
 void homevazio_desenhar(float alfa);
 // OK no botao "Sincronizar addons". 1 se consumiu a tecla.
 int  homevazio_evento(const SDL_Event *e);
+// QR TIME guest mode (convidado.h): the card has no account to sync, so it
+// offers "Add IPTV" instead. 1 (once) after that OK; the router then opens
+// Settings on the IPTV rows (ajustes_abrir_no_iptv).
+int  homevazio_pediu_iptv(void);
 
 #endif

@@ -31,6 +31,8 @@
 #include "pluginsui.h"
 #include "login.h"
 #include "sessao.h"
+#include "convidado.h"
+#include "nuvem.h"
 #include "perfis.h"
 #include "fontevolta.h"
 #include "cacheboost.h"
@@ -135,6 +137,7 @@
 #include "amigoperfil.h"
 #include "amigosfil.h"
 #include "ajustes.h"
+#include "homevazio.h"
 #include "ajustes_ux.h"
 #include "anim.h"
 #include "diagnostico.h"
@@ -3715,6 +3718,27 @@ static void perfilAbrirSessao(int antes) {
   perfilSessaoAplicada = sessao;
 }
 
+// Someone is INSIDE the app: a signed-in account or a guest (convidado.h).
+// Local features (guide reminders, notices, the clock island) follow this;
+// account features (sync, cloud lists, social) keep asking sessao_logada().
+static int dentroDoApp(void) {
+  return sessao_logada() || convidado_ativo();
+}
+
+// QR TIME guest mode: Home on the local profile 1, with no sync cycle. Every
+// profile-owned store (IPTV accounts, favourites, settings) is opened exactly as
+// for an account, so nothing below the router needs to know about guests.
+static void entrarConvidado(void) {
+  convidado_entrar();
+  printf("[app] guest mode: home without an account (server %s)\n",
+         nuvem_pronta() ? "configured" : "not configured");
+  fflush(stdout);
+  tela = TELA_HOME;
+  perfilAntes = perfis_ativo();
+  perfilAbrirSessao(perfilAntes);
+  perfilsel_continuar_ativo();
+}
+
 int app_iniciar(const char *dirArte) {
   // #415: MemAvailable abaixo do piso -> despeja texturas, mkvass, texto,
   // libass e heap; sem isto o aviso so rodava malloc_trim.
@@ -3856,6 +3880,9 @@ int app_iniciar(const char *dirArte) {
       arranque_etapa("app_iniciar/perfilsel_continuar_ativo");
       perfilsel_continuar_ativo();
     }
+  } else if (convidado_deve_entrar(0, nuvem_pronta(), convidado_ativo())) {
+    arranque_etapa("app_iniciar/convidado");
+    entrarConvidado();
   } else {
     tela = TELA_LOGIN;
     arranque_etapa("app_iniciar/login_iniciar");
@@ -4940,7 +4967,13 @@ void app_atualizar(float dt, Uint32 agora) {
     // A troca so acontece AQUI, quando a sessao existe de verdade — nao no
     // instante em que o servidor respondeu. Assim a home nunca abre com uma
     // sessao pela metade.
+    if (login_pediu_convidado()) {
+      login_soltar();
+      entrarConvidado();
+      return;
+    }
     if (login_concluido()) {
+      convidado_sair();   // an account replaces guest mode on this TV
       // Logo apos entrar, o primeiro ciclo de sync: e ele que descobre quantos
       // perfis a conta tem, e sem isso a tela de escolha nao teria o que
       // mostrar.
@@ -4960,7 +4993,7 @@ void app_atualizar(float dt, Uint32 agora) {
   // Sessao perdida no meio do uso (renovacao recusada): voltar ao login e a
   // unica saida honesta. Continuar na home mostraria o catalogo de exemplo do
   // pacote como se fosse o da pessoa.
-  if (!sessao_logada()
+  if (!dentroDoApp()
 #ifdef NV_LINUX_DESKTOP
       && !uiPreview
 #endif
@@ -5502,6 +5535,12 @@ void app_atualizar(float dt, Uint32 agora) {
   // "Ver tudo" da fileira da Biblioteca (#672) abre a Biblioteca inteira.
   if (tela == TELA_HOME && home_pediu_biblioteca()) {
     trocarTela(TELA_BIBLIOTECA); menu_definir_destino(MENU_BIBLIOTECA);
+  }
+  // QR TIME guest card on an empty Home: "Add IPTV" opens Settings on the
+  // Live TV account rows (homevazio.h, ajustes_abrir_no_iptv).
+  if (tela == TELA_HOME && homevazio_pediu_iptv()) {
+    ajustes_abrir_no_iptv();
+    trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES);
   }
   // A lista de addons foi aberta DE Ajustes, entao o Back dela volta para
   // Ajustes. Cair na home aqui faria a pessoa refazer o caminho inteiro so
@@ -6921,7 +6960,7 @@ void app_atualizar(float dt, Uint32 agora) {
   avisos_atualizar(dt, agora);
   // Lembretes de programa: so com alguem dentro do app (nao no login nem na
   // escolha de perfil), uma conferencia por segundo no maximo.
-  if (sessao_logada() && tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL) {
+  if (dentroDoApp() && tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL) {
     char lid[80], lnome[120], lbase[600];
     CatItem it;
     glem_passo(dt, agora);
@@ -7416,7 +7455,7 @@ void app_desenhar(Uint32 agora) {
   // no primeiro quadro em que ele pode ser visto (ver avisos.c).
   // (perfilsel_concluido NAO serve de guarda: "Voltar: continuar como X" sai
   // da escolha com `sair`, nunca com `concluido`, e a central ficaria muda.)
-  if (!registro_aberto() && !player_aberto() && sessao_logada() &&
+  if (!registro_aberto() && !player_aberto() && dentroDoApp() &&
       tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL)
     avisos_desenhar(agora);
   // A ILHA DO RELOGIO (ilha.h): mesmas guardas da central — com a pessoa
@@ -7463,7 +7502,7 @@ void app_desenhar(Uint32 agora) {
     } else ilha_atividade_detalhes(NULL, NULL);
   } else ilha_atividade_detalhes(NULL, NULL);
   if (guia_atualizando_lista()) ilha_atividade(i18n("Atualizando a lista de canais…"), -1.0f);
-  if (!registro_aberto() && !player_aberto() && sessao_logada() &&
+  if (!registro_aberto() && !player_aberto() && dentroDoApp() &&
       tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL) {
     ilha_relogio_visivel(relogioCabe() && ajustes_relogio_ligado());
     ilha_posicionar(1);
@@ -7482,7 +7521,7 @@ void app_desenhar(Uint32 agora) {
   }
   // O cartao do lembrete fica acima do player e da tela: e um aviso com hora.
   CAMADA_SE(glem_cartao_aberto());
-  if (!registro_aberto() && sessao_logada() && tela != TELA_LOGIN &&
+  if (!registro_aberto() && dentroDoApp() && tela != TELA_LOGIN &&
       tela != TELA_ESCOLHA_PERFIL)
     glem_desenhar(agora);
   CAMADA_SE(recenviar_aberto());
@@ -7512,7 +7551,7 @@ void app_desenhar(Uint32 agora) {
   CAMADA_SE(registro_aberto());
   registro_desenhar();
   // A ilha do relogio fica acima do painel de registro, no canto de sempre.
-  if (registro_aberto() && sessao_logada()) {
+  if (registro_aberto() && dentroDoApp()) {
     ilha_relogio_visivel(ajustes_relogio_ligado());
     ilha_posicionar(1);
 #ifdef NV_TOUCH_UI

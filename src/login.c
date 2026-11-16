@@ -50,7 +50,7 @@ static int modo, foco, focoQr;
 static int campoAberto = -1;
 static char email[TECLADO_LONGO + 1], senha[TECLADO_LONGO + 1];
 static char aviso[160];          // erro local ("preencha..."), traduzido no desenho
-static float animFoco[LE_N], animFocoQr[2];
+static float animFoco[LE_N], animFocoQr[3];
 static int esperando;            // pedido de e-mail saiu, resposta ainda nao veio
 static int senhaVisivel;         // "Mostrar" na senha (campo e modal)
 
@@ -72,6 +72,16 @@ static int qrTemRetry(void) {
 static int qrN(void) { return nuvem_pronta() ? (qrTemRetry() ? 2 : 1) : 0; }
 // Indice do botao "e-mail" na tela do QR.
 static int qrEmail(void) { return qrTemRetry() ? 1 : 0; }
+// QR TIME guest mode: "Continue without an account" is always the LAST button,
+// after the account buttons (convidado.h). Not offered while the code is being
+// exchanged for a token: the account is about to open.
+static int pediuConvidado;
+static int qrConvidadoVisivel(void) {
+  SesEstado st = sessao_estado();
+  return st != SES_TROCANDO && st != SES_LOGADO;
+}
+static int qrTotal(void) { return qrN() + (qrConvidadoVisivel() ? 1 : 0); }
+static int qrConvidado(void) { return qrN(); }
 
 static void abrirEmail(void) {
   modo = LG_EMAIL; foco = email[0] ? LE_SENHA : LE_EMAIL; aviso[0] = 0;
@@ -186,6 +196,7 @@ void login_iniciar(void) {
   animBotao = 0.0f;
   pulso = 0.0f;
   modo = LG_QR; foco = LE_EMAIL; focoQr = 0; campoAberto = -1; aviso[0] = 0; esperando = 0;
+  pediuConvidado = 0;
   senhaVisivel = 0;
   apagarTexto(senha, sizeof senha);
   // Pedir o codigo JA, sem esperar o OK: a pessoa que acabou de instalar o app
@@ -216,9 +227,10 @@ void login_evento(const SDL_Event *e) {
     return;
   }
   if (k == SDLK_UP && focoQr > 0) focoQr--;
-  else if (k == SDLK_DOWN && focoQr + 1 < qrN()) focoQr++;
-  else if (ok && qrN()) {
-    if (focoQr >= qrN()) focoQr = qrN() - 1;
+  else if (k == SDLK_DOWN && focoQr + 1 < qrTotal()) focoQr++;
+  else if (ok && qrTotal()) {
+    if (focoQr >= qrTotal()) focoQr = qrTotal() - 1;
+    if (qrConvidadoVisivel() && focoQr == qrConvidado()) { pediuConvidado = 1; return; }
     if (focoQr == qrEmail()) { abrirEmail(); return; }
     // "Tentar de novo". OK so faz sentido quando ha o que refazer. Com o
     // codigo na tela o unico botao e o do e-mail: reiniciar o fluxo trocaria o
@@ -261,11 +273,11 @@ void login_atualizar(float dt, Uint32 agora) {
     esperando = 0;
     if (modo == LG_EMAIL && !sessao_logada()) foco = LE_SENHA;
   }
-  if (focoQr >= qrN() && qrN()) focoQr = qrN() - 1;
+  if (focoQr >= qrTotal() && qrTotal()) focoQr = qrTotal() - 1;
   for (i = 0; i < LE_N; i++)
     animFoco[i] = anim_mola(animFoco[i], modo == LG_EMAIL && foco == i && !teclado_aberto() ? 1.0f : 0.0f,
                             dt, NV_MOLA_FOCO);
-  for (i = 0; i < 2; i++)
+  for (i = 0; i < 3; i++)
     animFocoQr[i] = anim_mola(animFocoQr[i], modo == LG_QR && focoQr == i ? 1.0f : 0.0f, dt, NV_MOLA_FOCO);
 }
 
@@ -394,14 +406,18 @@ void login_desenhar(Uint32 agora) {
     linhaCentrada(TXT_BODY,
                   "Quem gerou o .ipk precisa informar a URL e a chave do projeto.",
                   176, 178, 186, y + 62.0f, 1.0f);
+    pilula(NV_TELA_W * 0.5f, y + 170.0f, LG_EMAIL_PILL_W, "Continuar sem conta",
+           animFocoQr[0], 1.0f, ptFocoQr, 0);
     return;
   }
+  float yConvidado = -1.0f;
 
   switch (st) {
     case SES_PEDINDO:
       linhaCentrada(TXT_HEADLINE, "Preparando o código…", 210, 212, 220, y, 1.0f);
       pilula(NV_TELA_W * 0.5f, y + 110.0f, LG_EMAIL_PILL_W, "Entrar com e-mail e senha",
              animFocoQr[0], 1.0f, ptFocoQr, 0);
+      yConvidado = y + 110.0f + LG_PILL_H + 24.0f;
       break;
 
     case SES_AGUARDANDO: {
@@ -442,6 +458,7 @@ void login_desenhar(Uint32 agora) {
       y += 64.0f;
       pilula(NV_TELA_W * 0.5f, y, LG_EMAIL_PILL_W, "Entrar com e-mail e senha",
              animFocoQr[0], 1.0f, ptFocoQr, 0);
+      yConvidado = y + LG_PILL_H + 24.0f;
       break;
     }
 
@@ -464,9 +481,19 @@ void login_desenhar(Uint32 agora) {
              animFocoQr[0], animBotao, ptFocoQr, 0);
       pilula(NV_TELA_W * 0.5f, y + LG_PILL_H + 24.0f, LG_EMAIL_PILL_W, "Entrar com e-mail e senha",
              animFocoQr[1], animBotao, ptFocoQr, 1);
+      yConvidado = y + 2.0f * (LG_PILL_H + 24.0f);
       break;
     }
   }
+  if (yConvidado >= 0.0f && qrConvidadoVisivel())
+    pilula(NV_TELA_W * 0.5f, yConvidado, LG_EMAIL_PILL_W, "Continuar sem conta",
+           animFocoQr[qrConvidado()], 1.0f, ptFocoQr, qrConvidado());
 }
 
 int login_concluido(void) { return sessao_logada(); }
+
+int login_pediu_convidado(void) {
+  int v = pediuConvidado;
+  pediuConvidado = 0;
+  return v;
+}
