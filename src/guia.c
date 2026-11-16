@@ -2896,7 +2896,8 @@ int guia_canais_para_teste(GuiaVariante *out, char bases[][600], int max, char *
       if (!ja_) { snprintf(out[n].id, sizeof out[n].id, "%s", g2->id);              \
         snprintf(out[n].nome, sizeof out[n].nome, "%s", g2->nome);                  \
         out[n].altura = nv_res_do_texto(g2->nome);                                  \
-        if (bases) snprintf(bases[n], 600, "%s", g2->base); n++; } } while (0)
+        if (bases) snprintf(bases[n], 600, "%s", g2->base);                       \
+        n++; } } while (0)
   for (k = 0; k < total && n < max && n < 3; k++) {
     GCanal *g1 = linhaItem(l, (c0 + k) % total);
     if (g1) POE(g1);
