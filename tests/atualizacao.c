@@ -80,10 +80,10 @@ int main(int argc, char **argv) {
     const char *j =
       "{\"assets\":["
       "{\"digest\":\"sha256:aaaa\",\"browser_download_url\":\"https://x/a.wgt\"},"
-      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/b_arm.ipk\"}]}";
+      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/com.qrtime.tv_b_arm.ipk\"}]}";
     { int achou = acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO);
       CONFERE(achou, "achou o ipk");
-      CONFERE(!strcmp(url, "https://x/b_arm.ipk"), "url do ipk: [%s]", url);
+      CONFERE(!strcmp(url, "https://x/com.qrtime.tv_b_arm.ipk"), "url do ipk: [%s]", url);
       CONFERE(!strcmp(hash, "bbbb"), "digest do MESMO anexo, sem o prefixo: [%s]", hash); }
   }
 
@@ -98,33 +98,52 @@ int main(int argc, char **argv) {
     const char *j =
       "{\"assets\":["
       "{\"digest\":\"sha256:1111\",\"browser_download_url\":\"https://x/NuvioTV-1.1.3-tizen.wgt\"},"
-      "{\"digest\":\"sha256:2222\",\"browser_download_url\":\"https://x/space.nuvio_1.1.3_arm-highcache.ipk\"},"
-      "{\"digest\":\"sha256:3333\",\"browser_download_url\":\"https://x/space.nuvio_1.1.3_arm.ipk\"}]}";
+      "{\"digest\":\"sha256:2222\",\"browser_download_url\":\"https://x/com.qrtime.tv_1.1.3_arm-highcache.ipk\"},"
+      "{\"digest\":\"sha256:3333\",\"browser_download_url\":\"https://x/com.qrtime.tv_1.1.3_arm.ipk\"}]}";
     CONFERE(acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO), "achou o anexo da variante");
     CONFERE(strstr(url, AT_SUFIXO) != NULL, "e o sufixo desta build (%s): [%s]", AT_SUFIXO, url);
     CONFERE(strstr(url, "highcache") == NULL, "build NAO leva a highcache, nem a de cache grande: [%s]", url);
     CONFERE(!strcmp(hash, "3333"), "digest do anexo normal: [%s]", hash);
   }
 
-  // OS NOMES DAS RELEASES 1.3.1/1.3.2 ("NuvioTV-1.3.2-webos.ipk"): a LG normal
-  // ficou duas versoes sem botao porque "-webos.ipk" nao termina em "_arm.ipk".
-  // Agora os dois nomes valem, e a normal continua sem pegar a highcache.
+  // "-webos.ipk" names still count as this build's variant, but only when the
+  // file carries QR TIME's package id; the normal one never picks highcache.
   { char url[160], hash[80];
     const char *j =
       "{\"assets\":["
       "{\"digest\":\"sha256:aaaa\",\"browser_download_url\":\"https://x/NuvioTV-1.3.2-tizen.wgt\"},"
-      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/NuvioTV-1.3.2-webos-highcache.ipk\"},"
-      "{\"digest\":\"sha256:cccc\",\"browser_download_url\":\"https://x/NuvioTV-1.3.2-webos.ipk\"}]}";
-    CONFERE(acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO), "nome NuvioTV-*-webos: achou a variante");
-    CONFERE(!strcmp(hash, "cccc") && !strstr(url, "highcache"), "normal pelo nome novo, sem highcache: [%s]", url);
+      "{\"digest\":\"sha256:bbbb\",\"browser_download_url\":\"https://x/com.qrtime.tv_1.3.2-webos-highcache.ipk\"},"
+      "{\"digest\":\"sha256:cccc\",\"browser_download_url\":\"https://x/com.qrtime.tv_1.3.2-webos.ipk\"}]}";
+    CONFERE(acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO), "-webos name: found the variant");
+    CONFERE(!strcmp(hash, "cccc") && !strstr(url, "highcache"), "normal by -webos name, no highcache: [%s]", url);
   }
+
+  // QR TIME: a package of ANOTHER app is never offered, even in a release that
+  // has nothing else. Upstream Nuvio Legacy names (both styles) are refused, so
+  // "Update now" cannot replace QR TIME with Nuvio.
+  { char url[200], hash[80];
+    const char *j =
+      "{\"assets\":["
+      "{\"digest\":\"sha256:1111\",\"browser_download_url\":\"https://github.com/iqui27/nuvio-native-legacy/releases/download/v2.0.8/space.nuvio.native.legacy_2.0.8_arm.ipk\"},"
+      "{\"digest\":\"sha256:2222\",\"browser_download_url\":\"https://x/NuvioTV-1.3.2-webos.ipk\"},"
+      "{\"digest\":\"sha256:3333\",\"browser_download_url\":\"https://x/com.qrtime.tvX_1.0_arm.ipk\"}]}";
+    CONFERE(!acharIpk(j, url, sizeof url, hash, sizeof hash, AT_SUFIXO), "upstream/foreign packages refused");
+    CONFERE(url[0] == 0 && hash[0] == 0, "url and digest stay empty: [%s]", url);
+  }
+
+  // QR TIME: release endpoints belong to QR TIME's repository, not upstream.
+  CONFERE(!strstr(AT_URL, "iqui27") && strstr(AT_URL, QRT_UPDATE_REPO) != NULL,
+          "AT_URL is QR TIME's: [%s]", AT_URL);
+  CONFERE(!strstr(AT_PAGINA, "iqui27"), "AT_PAGINA is QR TIME's: [%s]", AT_PAGINA);
+  CONFERE(!strcmp(NV_APP_ID, "com.qrtime.tv") && strcmp(NV_APP_ID, NV_APP_ID_PRODUCTION) != 0,
+          "package id is isolated from upstream: [%s]", NV_APP_ID);
 
   // RELEASE SO COM A HIGHCACHE (so acontece em release antiga ou de teste): a
   // build nao instala nada, porque o .ipk normal nao existe nela. Trocar de
   // variante calada e o defeito; mandar para a pagina e a saida honesta.
   { char url[160], hash[80];
     const char *so_highcache =
-      "{\"assets\":[{\"browser_download_url\":\"https://x/space.nuvio_1.1.3_arm-highcache.ipk\"}]}";
+      "{\"assets\":[{\"browser_download_url\":\"https://x/com.qrtime.tv_1.1.3_arm-highcache.ipk\"}]}";
     CONFERE(!acharIpk(so_highcache, url, sizeof url, hash, sizeof hash, AT_SUFIXO),
             "so a highcache devolve 0");
     CONFERE(url[0] == 0, "e a url fica vazia"); }

@@ -129,9 +129,11 @@ static void at_sha256_hex(const unsigned char *buf, size_t n, char *hex65) {
 }
 #endif
 
-#define AT_URL   "https://api.github.com/repos/iqui27/nuvio-native-legacy/releases/latest"
+// QR TIME: releases come from QR TIME's own repository (qrtime_brand.h), never
+// from upstream Nuvio Legacy, whose package would replace this app.
+#define AT_URL   QRT_RELEASES_API
 #define AT_ARQ   "atualizacao-vista.txt"
-#define AT_PAGINA "https://github.com/iqui27/nuvio-native-legacy/releases"
+#define AT_PAGINA QRT_RELEASES_PAGE
 #define AT_APPID  NV_APP_ID
 #define AT_LUNA_PUB "/usr/bin/luna-send-pub"
 #define AT_LOG_INST "/tmp/nuvio-instalar.log"
@@ -369,6 +371,18 @@ static int textoJson(const char *corpo, const char *chave, char *dst, size_t tam
 #define AT_SUFIXO "_arm.ipk"
 #define AT_SUFIXO2 "-webos.ipk"
 
+// QR TIME: the .ipk file name must start with this app's package id
+// ("com.qrtime.tv_<version>_arm.ipk", the name ares-package produces). Any
+// other package in a release, including an upstream Nuvio one, is ignored, so
+// "Update now" can never install a different app over this one.
+static int ipkDesteApp(const char *url, size_t n) {
+  const char *nome = url;
+  size_t i, k = strlen(NV_APP_ID);
+  for (i = 0; i < n; i++) if (url[i] == '/') nome = url + i + 1;
+  n -= (size_t)(nome - url);
+  return n > k && !strncmp(nome, NV_APP_ID, k) && nome[k] == '_';
+}
+
 static int terminaEm(const char *s, size_t n, const char *sufixo) {
   size_t k = strlen(sufixo);
   if (n >= k && !strncmp(s + n - k, sufixo, k)) return 1;
@@ -417,7 +431,7 @@ static int acharIpk(const char *corpo, char *dst, size_t tam,
     ini = ++p;
     while (*p && *p != '"') p++;
     n = (size_t)(p - ini);
-    if (n > 4 && n < tam && terminaEm(ini, n, sufixo)) {
+    if (n > 4 && n < tam && terminaEm(ini, n, sufixo) && ipkDesteApp(ini, n)) {
       memcpy(dst, ini, n); dst[n] = 0;
       // O SHA-256 DO MESMO ANEXO, e ele e obrigatorio na pratica: sem ele o
       // instalador do Homebrew Channel compara o hash calculado contra

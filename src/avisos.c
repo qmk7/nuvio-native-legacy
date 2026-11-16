@@ -1,3 +1,4 @@
+#include "qrtime_brand.h"
 #include "arranque.h"
 #include "avisos.h"
 #include "queda.h"
@@ -62,7 +63,8 @@
 #ifdef AV_CANAL_HOST
 #define AV_CANAL_URL "http://" NV_STR(AV_CANAL_HOST) "/avisos.json"
 #else
-#define AV_CANAL_URL "https://raw.githubusercontent.com/iqui27/nuvio-native-legacy/master/avisos.json"
+// QR TIME notices, never upstream Nuvio ones (qrtime_brand.h).
+#define AV_CANAL_URL QRT_NOTICES_URL
 #endif
 #define AV_CANAL_INTERVALO_MS (30u * 60u * 1000u)
 #define AV_MAX        40
