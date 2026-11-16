@@ -15,6 +15,7 @@ int main(int argc,char **argv) {
   snprintf(expected,sizeof(expected),!strcmp(argv[2],"env")?"%s/%s":"%s/.%s",root,NV_APP_ID);
 #else
   if(!strcmp(argv[2],"env")) snprintf(expected,sizeof(expected),"%s",root);
+  else if(strcmp(NV_APP_ID,NV_APP_ID_PRODUCTION)) snprintf(expected,sizeof(expected),"%s/.%s",root,NV_APP_ID);
   else snprintf(expected,sizeof(expected),"%s/.nuvio",root);
 #endif
   char production[600]; snprintf(production,sizeof(production),"%s/sessao.txt",root);

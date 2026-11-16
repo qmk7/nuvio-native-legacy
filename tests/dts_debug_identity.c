@@ -17,8 +17,10 @@ int main(void) {
   assert(strcmp(NV_APP_ID,NV_APP_ID_PRODUCTION));
   assert(strstr(NV_LS_MEDIA_CLIENT,NV_APP_ID));
 #else
-  assert(!strcmp(NV_APP_ID,"space.nuvio.native.legacy"));
-  assert(!strcmp(NV_LS_MEDIA_CLIENT,"com.webos.media.client.nuvio"));
+  /* QR TIME: the regular package is com.qrtime.tv, isolated from upstream. */
+  assert(!strcmp(NV_APP_ID,"com.qrtime.tv"));
+  assert(strcmp(NV_APP_ID,NV_APP_ID_PRODUCTION));
+  assert(!strcmp(NV_LS_MEDIA_CLIENT,"com.webos.media.client.com.qrtime.tv"));
 #endif
   assert(dts_playback_enabled()==supported);
   /* Launch-variable opt-in is no longer required, including on production. */

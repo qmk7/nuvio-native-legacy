@@ -407,11 +407,17 @@ void dados_iniciar(const char *dirArte) {
   }
 #endif
   if (env && *env) {
-    if (!isolado) candidatos[n++] = env;
-    else {
-      int size = snprintf(envLar, sizeof envLar, "%s/%s", env, NV_APP_ID);
-      if (size > 0 && size < (int)sizeof envLar) candidatos[n++] = envLar;
-    }
+    // NUVIO_DADOS is an explicit folder (developer, tests): used as given.
+    // Only the DTS debug package nests its own subfolder inside it, so a debug
+    // run can never touch the data of the regular app pointed at the same
+    // folder. QR TIME's own isolation is HOME/.<app id> and the developer
+    // folder below.
+#ifdef NV_DTS_DEBUG
+    int size = snprintf(envLar, sizeof envLar, "%s/%s", env, NV_APP_ID);
+    if (size > 0 && size < (int)sizeof envLar) candidatos[n++] = envLar;
+#else
+    candidatos[n++] = env;
+#endif
   }
   if (home && *home) {
     int size = snprintf(lar, sizeof lar, isolado ? "%s/.%s" : "%s/.nuvio", home, NV_APP_ID);
