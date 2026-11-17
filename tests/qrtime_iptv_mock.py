@@ -147,6 +147,56 @@ def vod_m3u():
             "#EXTINF:-1 group-title=\"Series\",Breaking Bad S01E02\n" + BASE + "/m3uvod/bb102.mp4\n"
             "#EXTINF:-1 group-title=\"Live\",Live News HD\n" + BASE + "/m3u/live1.m3u8\n").encode()
 
+# ---- ESPN-shaped scoreboards (Sport Center): times relative to NOW ----
+def _iso(dt):
+    return time.strftime("%Y-%m-%dT%H:%MZ", time.gmtime(dt))
+def _team(i, name, short, abbr, home, score=None, winner=None):
+    c = {"homeAway": "home" if home else "away",
+         "team": {"id": i, "displayName": name, "shortDisplayName": short, "abbreviation": abbr,
+                  "logo": "http://a.espncdn.com/i/teamlogos/%s.png" % i}}
+    if score is not None: c["score"] = score
+    if winner is not None: c["winner"] = winner
+    return c
+def _ev(eid, start, state, detail, comps, clock="", name="STATUS_X", bcast=None, venue="Stadium"):
+    comp = {"id": eid, "date": _iso(start), "competitors": comps, "venue": {"fullName": venue}}
+    if bcast: comp["broadcasts"] = [{"market": "national", "names": [b]} for b in bcast]
+    return {"id": eid, "date": _iso(start), "name": "x",
+            "status": {"displayClock": clock, "type": {"state": state, "shortDetail": detail, "name": name}},
+            "competitions": [comp]}
+def espn(path):
+    now = int(time.time())
+    if path == "soccer/ksa.1":
+        return {"leagues": [{"id": "1", "name": "Saudi Pro League"}], "events": [
+            _ev("700001", now - 30 * 60, "in", "67'", [_team("11", "Al Hilal", "Al Hilal", "HIL", True, "2"),
+                _team("12", "Al Nassr", "Al Nassr", "NAS", False, "1")], clock="67'", name="STATUS_SECOND_HALF",
+                bcast=["SSC"], venue="Kingdom Arena"),
+            _ev("700002", now + 2 * 3600, "pre", "Today 8:00 PM", [_team("13", "Al Ittihad", "Al Ittihad", "ITT", True),
+                _team("14", "Al Ahli", "Al Ahli", "AHL", False)], name="STATUS_SCHEDULED", bcast=["SSC"]),
+            _ev("700003", now - 2 * 86400, "post", "FT", [_team("11", "Al Hilal", "Al Hilal", "HIL", True, "3", True),
+                _team("14", "Al Ahli", "Al Ahli", "AHL", False, "0", False)], name="STATUS_FULL_TIME"),
+            _ev("700004", now + 86400, "pre", "Postponed", [_team("15", "Al Shabab", "Al Shabab", "SHB", True),
+                _team("16", "Al Fateh", "Al Fateh", "FAT", False)], name="STATUS_POSTPONED"),
+        ]}
+    if path == "basketball/nba":
+        # US sports list the AWAY team first.
+        return {"events": [_ev("800001", now + 5 * 3600, "pre", "Tonight", [
+            _team("2", "Boston Celtics", "Celtics", "BOS", False), _team("13", "Los Angeles Lakers", "Lakers", "LAL", True)],
+            bcast=["ESPN"])]}
+    if path == "tennis/atp":
+        g = {"grouping": {"slug": "mens-singles"}, "competitions": [
+            {"id": "900001", "date": _iso(now - 3600), "status": {"type": {"state": "in", "shortDetail": "Set 2"}},
+             "competitors": [{"homeAway": "home", "athlete": {"id": "a1", "displayName": "Carlos Alcaraz",
+                              "shortDisplayName": "C. Alcaraz", "flag": {"href": "https://a.espncdn.com/f/esp.png"}}},
+                             {"homeAway": "away", "athlete": {"id": "a2", "displayName": "Jannik Sinner",
+                              "shortDisplayName": "J. Sinner"}}]}]}
+        return {"events": [{"id": "T1", "date": _iso(now - 86400), "name": "ATP Finals",
+                            "status": {"type": {"state": "in"}}, "groupings": [g]}]}
+    if path == "soccer/eng.1":
+        return {"events": []}
+    if path == "soccer/esp.1":
+        return "<html>gateway error</html>"
+    return {"events": []}
+
 ST_GENRES = [{"id": "1", "title": "Stalker Movies"}, {"id": "2", "title": "Stalker Kids"}]
 ST_CHANS = [
     {"id": "501", "name": "Stalker Cinema", "number": "1", "cmd": "ffmpeg %s/st/501" % BASE,
@@ -245,6 +295,11 @@ class H(BaseHTTPRequestHandler):
                               "server_info": {"url": "127.0.0.1", "port": str(PORT),
                                               "server_protocol": "http", "timezone": "Europe/Istanbul",
                                               "timestamp_now": int(time.time())}})
+        if p.startswith("/espn/") and p.endswith("/scoreboard"):
+            body = espn(p[len("/espn/"):-len("/scoreboard")])
+            if isinstance(body, str):
+                return self.send(body.encode(), "text/html", 502)
+            return self.send(body)
         if p.startswith("/3/"):
             if q.get("api_key") != "QRTKEY":
                 return self.send({"status_code": 7}, code=401)
