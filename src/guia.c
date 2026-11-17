@@ -3429,6 +3429,19 @@ static void acaoOk(void) {
 
 // O CANAL DE UM LEMBRETE, para o "Assistir" do cartao: o CatItem do guia
 // quando a lista ja esta carregada; senao so a identidade guardada.
+// Sport Center (esporteui.c): the published channels, read on the UI thread.
+// Pointers stay valid until the next publication (the caller copies or uses
+// them within the frame). Returns how many were written.
+int guia_canais_resumo(GuiaCanalResumo *out, int max) {
+  int n = 0;
+  for (int i = 0; out && i < nCanais && n < max; i++) {
+    out[n].id = canais[i].id;
+    out[n].nome = canais[i].nome;
+    out[n].categoria = canais[i].cat >= 0 && canais[i].cat < nCats ? cats[canais[i].cat].nome : "";
+    n++;
+  }
+  return out ? n : nCanais;
+}
 int guia_item_do_canal(const char *id, const char *nome, const char *base, CatItem *it) {
   GCanal *c = canalPorIdBase(id, base);
   if (c) { canalParaItem(c, it); snprintf(pedidoBase, sizeof pedidoBase, "%s", c->base); snprintf(pedidoTipo, sizeof pedidoTipo, "%s", c->tipo); return 1; }

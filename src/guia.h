@@ -163,6 +163,9 @@ void guia_fonte_gravar_diag(const char *id, int formato, int modo, int proxy);
 int  guia_proxy_do_canal(const char *id, int padrao);
 int  guia_modo_do_canal(const char *id, int padrao);   // VERDE no guia completo
 int  guia_item_do_canal(const char *id, const char *nome, const char *base, CatItem *it);
+// Published channels (UI thread): id, name, category. NULL `out` = count.
+typedef struct { const char *id, *nome, *categoria; } GuiaCanalResumo;
+int  guia_canais_resumo(GuiaCanalResumo *out, int max);
 
 // --- A CARA DO CANAL FORA DO GUIA (29/09/2026) -------------------------------
 // O player ao vivo (aovivoui.c) desenha a marca, o selo AO VIVO e a etiqueta

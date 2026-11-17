@@ -35,7 +35,7 @@ static void gravarLocked(void) {
   for (int i = 0; i < nTimes; i++) k += (size_t)snprintf(t + k, cap - k, "time\t%s\t%s\t%s\n", times[i].liga, times[i].id, times[i].nome);
   for (int i = 0; i < nLigas; i++) k += (size_t)snprintf(t + k, cap - k, "liga\t%s\t%d\n", ligas[i].liga, ligas[i].on);
   for (int i = 0; i < nLigs; i++) k += (size_t)snprintf(t + k, cap - k, "canal\t%s\t%s\t%s\n", ligs[i].evento, ligs[i].canal, ligs[i].nome);
-  for (int i = 0; i < nNaos; i++) k += (size_t)snprintf(t + k, cap - k, "nao\t%s\t%s\n", naos[i].evento, naos[i].canal);
+  for (int i = 0; i < nNaos; i++) k += (size_t)snprintf(t + k, cap - k, "refused\t%s\t%s\n", naos[i].evento, naos[i].canal);
   arquivo(nome, sizeof nome);
   if (nv_perfil_sessao_travar(sessaoLida)) { dados_gravar(nome, t); nv_perfil_sessao_destravar(); }
   free(t);
@@ -69,7 +69,7 @@ static void garantirLocked(void) {
       snprintf(ligs[nLigs].canal, sizeof ligs[0].canal, "%s", c[2]);
       snprintf(ligs[nLigs].nome, sizeof ligs[0].nome, "%s", c[3]);
       nLigs++;
-    } else if (!strcmp(c[0], "nao") && nc >= 3 && nNaos < NAO_MAX) {
+    } else if (!strcmp(c[0], "refused") && nc >= 3 && nNaos < NAO_MAX) {
       snprintf(naos[nNaos].evento, sizeof naos[0].evento, "%s", c[1]);
       snprintf(naos[nNaos].canal, sizeof naos[0].canal, "%s", c[2]);
       nNaos++;

@@ -858,6 +858,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "servidores.h"
 #include "iptvvod.h"
 #include "addonslocal.h"
+#include "esporteui.h"
 #include "jfid.h"
 #include "partes.h"
 #include "logrede.h"
@@ -1059,6 +1060,7 @@ static void trocarTela(Tela nova) {
     case TELA_BUSCA:      busca_iniciar();      break;
     case TELA_BIBLIOTECA: biblioteca_iniciar(); break;
     case TELA_AGENDA:     agendaui_iniciar();   break;
+    case TELA_ESPORTES:   esporteui_abrir();    break;
     case TELA_PERFIL:     perfil_abrir(); pedirPerfil(); break;
     case TELA_AJUSTES:    ajustes_iniciar();    break;
     case TELA_DIAGNOSTICO: diagnostico_iniciar(); break;
@@ -3705,6 +3707,7 @@ static void perfilAbrirSessao(int antes) {
   // All hooks reset live state or reload profile-owned files. They neither
   // reload artwork nor wait for the old profile's network requests.
   addons_abrir_sessao();
+  esporteui_perfil_trocou();   // Sport Center: this profile's follows and links
   // QR TIME guest: this profile's add-ons are the ones saved on this TV.
   if (!sessao_logada() && convidado_ativo()) addonslocal_carregar();
   trakt_abrir_sessao();
@@ -4331,6 +4334,7 @@ static int relogioPedidoPagina(void) {
     case TELA_BUSCA: return busca_pediu_relogio();
     case TELA_BIBLIOTECA: return biblioteca_pediu_relogio();
     case TELA_AGENDA: return agendaui_pediu_relogio();
+    case TELA_ESPORTES: return 0;
     case TELA_PERFIL: return perfil_pediu_relogio();
     case TELA_SOCIAL: return amigoperfil_pediu_relogio();
     case TELA_ADDONS: return addonsui_pediu_relogio();
@@ -4785,6 +4789,7 @@ void app_evento(const SDL_Event *e) {
     case TELA_BUSCA:      busca_evento(e);      break;
     case TELA_BIBLIOTECA: biblioteca_evento(e); break;
     case TELA_AGENDA:     agendaui_evento(e);   break;
+    case TELA_ESPORTES:   esporteui_evento(e);  break;
     case TELA_PERFIL:     perfil_evento(e);     break;
     case TELA_SOCIAL:     amigoperfil_evento(e); break;
     case TELA_ADDONS:     addonsui_evento(e);   break;
@@ -5750,6 +5755,7 @@ void app_atualizar(float dt, Uint32 agora) {
               || (tela == TELA_BUSCA      && busca_quer_sair())
               || (tela == TELA_BIBLIOTECA && biblioteca_quer_sair())
               || (tela == TELA_AGENDA     && agendaui_quer_sair())
+              || (tela == TELA_ESPORTES   && esporteui_quer_sair())
               || (tela == TELA_PERFIL      && perfil_quer_sair())
               || (tela == TELA_SOCIAL      && amigoperfil_quer_sair())
               || (tela == TELA_AJUSTES    && ajustes_quer_sair())
@@ -5822,9 +5828,7 @@ void app_atualizar(float dt, Uint32 agora) {
         }
         break; }
       case MENU_ESPORTES:
-        // Interim Sport Center: the TV guide, focused on its sports section.
-        trocarTela(TELA_GUIA);
-        guia_focar_secao("esportes");
+        trocarTela(TELA_ESPORTES);
         break;
       case MENU_YOUTUBE: {
         // Not a tab: launch the TV's YouTube app (or its store page) and keep
@@ -5837,6 +5841,7 @@ void app_atualizar(float dt, Uint32 agora) {
         menu_definir_destino(tela == TELA_HOME ? MENU_INICIO : tela == TELA_GUIA ? MENU_GUIA :
                              tela == TELA_BUSCA ? MENU_BUSCAR : tela == TELA_BIBLIOTECA ? MENU_BIBLIOTECA :
                              tela == TELA_AGENDA ? MENU_AGENDA : tela == TELA_AJUSTES ? MENU_AJUSTES :
+                             tela == TELA_ESPORTES ? MENU_ESPORTES :
                              tela == TELA_ADDONS ? MENU_ADDONS : MENU_INICIO);
         break; }
       case MENU_ADDONS:
@@ -7061,6 +7066,11 @@ void app_atualizar(float dt, Uint32 agora) {
     case TELA_BUSCA:      busca_atualizar(dt, agora);      break;
     case TELA_BIBLIOTECA: biblioteca_atualizar(dt, agora); break;
     case TELA_AGENDA:     agendaui_atualizar(dt, agora);   break;
+    case TELA_ESPORTES: {
+      CatItem it;
+      esporteui_atualizar(dt, agora);
+      if (esporteui_pediu_canal(&it)) { if (player_mini_ativo()) player_fechar_mini(); tocarCanal(&it); }
+      break; }
     case TELA_PERFIL:     break;
     case TELA_AJUSTES:    ajustes_atualizar(dt, agora);    break;
     case TELA_DIAGNOSTICO: diagnostico_atualizar(dt, agora); break;
@@ -7114,10 +7124,16 @@ void app_atualizar(float dt, Uint32 agora) {
     glem_passo(dt, agora);
     // "Assistir" no cartao: o canal em tela cheia, de onde a pessoa estiver.
     if (aguardandoFonte != 2 && glem_pediu_assistir(lid, sizeof lid, lnome, sizeof lnome,
-                                                     lbase, sizeof lbase) &&
-        guia_item_do_canal(lid, lnome, lbase, &it)) {
-      if (player_mini_ativo()) player_fechar_mini();
-      tocarCanal(&it);
+                                                     lbase, sizeof lbase)) {
+      if (!strncmp(lid, "esporte:", 8)) {
+        // A match reminder with no channel linked yet: the match page.
+        trocarTela(TELA_ESPORTES);
+        menu_definir_destino(MENU_ESPORTES);
+        esporteui_abrir_evento(lid + 8);
+      } else if (guia_item_do_canal(lid, lnome, lbase, &it)) {
+        if (player_mini_ativo()) player_fechar_mini();
+        tocarCanal(&it);
+      }
     }
   }
   pipintro_atualizar(dt, agora);
@@ -7169,6 +7185,7 @@ static void desenharAtrasDoPainel(void *ctx) {
       case TELA_BUSCA:      busca_desenhar(agora);      break;
       case TELA_BIBLIOTECA: biblioteca_desenhar(agora); break;
       case TELA_AGENDA:     agendaui_desenhar(agora);   break;
+      case TELA_ESPORTES:   esporteui_desenhar(agora);  break;
       case TELA_PERFIL:     perfil_desenhar(agora);     break;
       case TELA_SOCIAL:     amigoperfil_desenhar(agora);     break;
       case TELA_ADDONS:     addonsui_desenhar(agora);   break;

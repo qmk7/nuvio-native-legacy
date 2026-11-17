@@ -58,3 +58,4 @@ qrtime_iptvvod
 contapend
 qrtime_addonslocal
 qrtime_esporte
+qrtime_sportcenter:900

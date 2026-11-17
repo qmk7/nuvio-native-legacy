@@ -6,7 +6,7 @@
 //   liga  <league>  <0|1>                 league followed or not (overrides the default)
 //   spoiler <0|1>                         hide scores
 //   canal <event id> <channel id> <name>  linked channel (first = main, the rest alternates)
-//   nao   <event id> <channel id>         a suggestion the user said is wrong
+//   refused <event id> <channel id>       a suggestion the user said is wrong
 //
 // CHANNEL SUGGESTIONS (esporte_sugerir) read the user's own channels and their
 // programme guide around kick-off, best evidence first:

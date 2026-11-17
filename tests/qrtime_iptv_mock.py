@@ -223,8 +223,11 @@ def xmltv():
     for cid, name in ids.items():
         for k in range(4):
             a, b = start + k * 1800, start + (k + 1) * 1800
-            out.append('<programme start="%s" stop="%s" channel="%s"><title>%s show %d</title>'
-                       '<desc>Test programme %d of %s.</desc></programme>' % (fmt(a), fmt(b), cid, name, k, k, name))
+            # The sports channel carries the live Sport Center match (espn()):
+            # its programme names both teams, so the match page suggests it.
+            title = "Roshn Saudi League: Al Hilal vs Al Nassr" if cid == "qrt.sports" else "%s show %d" % (name, k)
+            out.append('<programme start="%s" stop="%s" channel="%s"><title>%s</title>'
+                       '<desc>Test programme %d of %s.</desc></programme>' % (fmt(a), fmt(b), cid, title, k, name))
     out.append("</tv>")
     return "\n".join(out).encode()
 

@@ -145,10 +145,10 @@ vai 3; foto series
 grep -qE "\[nav\] qrtime_series: [1-9]" "$LOG" && ok "Series opens a grid of series catalogs" || erro "Series grid ($(grep -m1 '\[nav\] qrtime_series' "$LOG"))"
 fecha_grade qrtime_series && ok "Back from Series returns Home" || erro "Back from Series"
 
-# 4 Sport Center -> guide (no IPTV list here: the "no sports section" path)
-a=$(transicao 4); vai 4; foto sport
-[ "$(transicao 4)" -gt "$a" ] && ok "Sport Center opens the TV guide" || erro "Sport Center"
-volta_home 4 && ok "Back from Sport Center returns Home" || erro "Back from Sport Center"
+# 4 Sport Center -> its own screen (TELA_ESPORTES = 16, esporteui.c)
+a=$(transicao 16); vai 4; foto sport
+[ "$(transicao 16)" -gt "$a" ] && ok "Sport Center opens its screen" || erro "Sport Center"
+volta_home 16 && ok "Back from Sport Center returns Home" || erro "Back from Sport Center"
 
 # 5 YouTube -> launcher (desktop: information only), stays on Home
 a=$(conta "\[transicao\] tela 2 -> ")
