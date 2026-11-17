@@ -857,6 +857,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "segurar.h"
 #include "servidores.h"
 #include "iptvvod.h"
+#include "addonslocal.h"
 #include "jfid.h"
 #include "partes.h"
 #include "logrede.h"
@@ -3704,6 +3705,8 @@ static void perfilAbrirSessao(int antes) {
   // All hooks reset live state or reload profile-owned files. They neither
   // reload artwork nor wait for the old profile's network requests.
   addons_abrir_sessao();
+  // QR TIME guest: this profile's add-ons are the ones saved on this TV.
+  if (!sessao_logada() && convidado_ativo()) addonslocal_carregar();
   trakt_abrir_sessao();
   simkl_abrir_sessao();
   traktauth_trocar_perfil(perfis_ativo());

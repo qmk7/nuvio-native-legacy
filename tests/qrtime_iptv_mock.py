@@ -238,6 +238,14 @@ class H(BaseHTTPRequestHandler):
                 m = TMDB_MOVIE.get(p[len("/3/movie/"):])
                 return self.send(m) if m else self.send({"status_code": 34}, code=404)
             return self.send({"status_code": 34}, code=404)
+        # ---- Stremio-style add-ons for the guest add-on list ----
+        if p in ("/addon/manifest.json", "/addon2/manifest.json"):
+            n = "QRT Test Addon" if p.startswith("/addon/") else "QRT Second Addon"
+            return self.send({"id": "org.qrt." + p.split("/")[1], "name": n, "version": "1.0.0",
+                              "resources": ["catalog", "stream"], "types": ["movie"],
+                              "catalogs": [{"type": "movie", "id": "top", "name": "Top"}]})
+        if p == "/notaddon/manifest.json":
+            return self.send(b"<html>not an add-on</html>", "text/html")
         if p == "/vod.m3u":
             return self.send(vod_m3u(), "audio/x-mpegurl")
         if p == "/list.m3u":

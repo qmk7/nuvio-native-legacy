@@ -1640,22 +1640,30 @@ static void ajDesenharAddons(int foco) {
   for (i = 0; i < n; i++) if (live ? addonsui_addon_ao_vivo(i) : addons_ativo(i)) lig++;
   ajFundoPagina();
   snprintf(val, sizeof val, i18n("%d de %d"), lig, n);
-  snprintf(sub, sizeof sub, "%s", n ? i18n(live ? "TV ao vivo" : "Ligados nesta TV") : i18n("Nenhum addon nesta conta."));
+  int conv = addonsui_convidado();
+  snprintf(sub, sizeof sub, "%s", n ? i18n(live ? "TV ao vivo" : "Ligados nesta TV")
+                                    : i18n(conv ? "Nenhum addon nesta TV." : "Nenhum addon nesta conta."));
   ajSubCabecalho("aj_puzzle", "Fontes e addons", live ? "TV ao vivo" : "Addons", n ? val : "", sub);
-  if (foco > (live ? n - 1 : n + 1)) foco = live ? n - 1 : n + 1;
+  if (foco > (live ? n - 1 : n + 1 + conv)) foco = live ? n - 1 : n + 1 + conv;
   if (foco < 0) foco = 0;
   { static char apoio[128][96];
     for (i = 0; i < n; i++) {
       snprintf(apoio[i], sizeof apoio[i], "%s", ajAddonFornece(i));   // ajAddonFornece devolve um buffer so
       L[i] = (AjSubLinha){ addons_nome(i), apoio[i], NULL, live ? addonsui_addon_ao_vivo(i) : addons_ativo(i), 0, 0 };
     } }
-  L[n] = (AjSubLinha){ "Sincronizar addons", ajSyncAddonsApoio(), "aj_rotate-cw", -1, 0, 1 };
+  L[n] = conv ? (AjSubLinha){ "Adicionar addon pelo endereço", "O endereço do manifest.json do addon.", "aj_plus", -1, 0, 1 }
+              : (AjSubLinha){ "Sincronizar addons", ajSyncAddonsApoio(), "aj_rotate-cw", -1, 0, 1 };
   L[n + 1] = (AjSubLinha){ "TV ao vivo", "Os addons selecionados ignoram os filtros de fontes.", "aj_tv-minimal-play", -1, 0, 1 };
-  { AjDica d[3] = { { "OK", !live && foco == n ? "Sincronizar addons" : "Mudar" }, { "↑ ↓", "Navegar" }, { "Voltar", "Fontes e addons" } };
-    ajSubLista(L, live ? n : n + 2, foco, d, 3, NULL, addonsui_ponteiro); }
+  if (conv) L[n + 2] = (AjSubLinha){ "Remover addons desligados", "Apaga desta TV os addons que você desligou.", "aj_link-2-off", -1, 0, 1 };
+  { AjDica d[3] = { { "OK", !live && foco == n ? (conv ? "Adicionar" : "Sincronizar addons") : "Mudar" }, { "↑ ↓", "Navegar" }, { "Voltar", "Fontes e addons" } };
+    ajSubLista(L, live ? n : n + 2 + conv, foco, d, 3, NULL, addonsui_ponteiro); }
   snprintf(k, sizeof k, "%s · %s", i18n("Fontes e addons"), i18n("Addons"));
   if (live) ajSubInspetor(AJ_ADDONS, k, n ? addons_nome(foco) : "TV ao vivo", i18n("Os addons selecionados ignoram os filtros de fontes."));
   else if (foco == n + 1) ajSubInspetor(AJ_ADDONS, k, "TV ao vivo", i18n("Os addons selecionados ignoram os filtros de fontes."));
+  else if (foco == n && conv) ajSubInspetor(AJ_ADDONS, k, "Adicionar addon pelo endereço",
+                                            i18n("Digite o endereço do manifest.json. O addon é conferido antes de entrar e fica só nesta TV, neste perfil."));
+  else if (foco == n + 2 && conv) ajSubInspetor(AJ_ADDONS, k, "Remover addons desligados",
+                                                i18n("Desligue com OK o addon que não quer mais e escolha esta linha para apagá-lo desta TV."));
   else if (foco == n) ajSubInspetor(AJ_ADDONS, k, "Sincronizar addons", i18n(ajSyncAddonsApoio()));
   else if (n > 0) {
     const char *base0 = addons_base(foco);
@@ -1668,13 +1676,14 @@ static void ajDesenharAddons(int foco) {
       snprintf(host, sizeof host, "%.*s", (int)strcspn(p, "/"), p);
     }
     snprintf(forn, sizeof forn, "%s", ajAddonFornece(foco));
-    y = ajSubInspetor(AJ_ADDONS, k, addons_nome(foco), i18n("Os addons vêm da sua conta Nuvio. Ligar e desligar aqui vale só nesta TV, até a próxima sincronização."));
+    y = ajSubInspetor(AJ_ADDONS, k, addons_nome(foco), i18n(conv ? "Este addon está só nesta TV, neste perfil. OK liga ou desliga."
+                                                             : "Os addons vêm da sua conta Nuvio. Ligar e desligar aqui vale só nesta TV, até a próxima sincronização."));
     if (y + 3 * 57.0f <= ir.y + ir.h) {
       y += aj2Meta(i18n("Fornece"), forn, ir.x, y, ir.w, 1);
       y += aj2Meta(i18n("Nesta TV"), i18n(addons_ativo(foco) ? "Ligado" : "Desligado"), ir.x, y, ir.w, 1);
       aj2Meta(i18n("Endereço"), host, ir.x, y, ir.w, 1);
     }
-  } else ajSubInspetor(AJ_ADDONS, k, "Addons", i18n("Nenhum addon nesta conta."));
+  } else ajSubInspetor(AJ_ADDONS, k, "Addons", i18n(conv ? "Nenhum addon nesta TV." : "Nenhum addon nesta conta."));
 }
 
 // PONTEIRO (#99) NAS FOLHAS "PERMITIDOS" E "ORDEM": a linha (e, na ordem, o

@@ -23,5 +23,7 @@ void addonsui_ponteiro(int i, int b);
 int  addonsui_foco(void);
 int  addonsui_ao_vivo(void);
 int  addonsui_addon_ao_vivo(int i);
+// QR TIME guest mode: the list is this TV's (add by address, remove).
+int  addonsui_convidado(void);
 
 #endif

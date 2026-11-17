@@ -12,6 +12,9 @@
 #include "sessao.h"
 #include "fontefalha.h"
 #include "streams.h"
+#include "addonslocal.h"
+#include "convidado.h"
+#include "teclado.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -29,8 +32,16 @@ static int   foco, sair, pediuRelogio, aoVivo;
 static int   mexeu;
 static float scrollY;
 static float animFoco[128];
+// QR TIME guest: the add-on list is this TV's (addonslocal.h). Row n adds by
+// address (keyboard), row n + 2 removes the add-ons switched off.
+static int tecladoAberto;
+static int ehConvidado(void) { return convidado_ativo() && !sessao_logada(); }
+int addonsui_convidado(void) { return ehConvidado(); }
+static const char *ALFA_ADDON =
+  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.:-/?=&%~_+,@!$";
 
 void addonsui_abrir(void) {
+  tecladoAberto = 0;
   aoVivo = 0; foco = 0; sair = 0; pediuRelogio = 0; mexeu = 0; scrollY = 0.0f;
   // Sonda aqui e nao no arranque: sao N viagens de rede, e elas so interessam
   // a quem abriu esta tela. Quem ja respondeu nao e consultado de novo.
@@ -90,7 +101,8 @@ static void alternarAoVivo(int i) {
 }
 void addonsui_evento(const SDL_Event *e) {
   int n = addons_n();
-  int ultimo = aoVivo ? (n > 0 ? n - 1 : 0) : n + 1;
+  int ultimo = aoVivo ? (n > 0 ? n - 1 : 0) : n + 1 + (ehConvidado() ? 1 : 0);
+  if (tecladoAberto) { teclado_evento(e); return; }
   if (foco > ultimo) foco = ultimo;
   pediuRelogio = 0;
   if (e->type != SDL_KEYDOWN) return;
@@ -99,9 +111,22 @@ void addonsui_evento(const SDL_Event *e) {
     case SDLK_DOWN:   if (foco < ultimo) foco++; break;
     case SDLK_RETURN: case SDLK_KP_ENTER:
       if (aoVivo) { if (foco < n) alternarAoVivo(foco); break; }
+      if (foco == n && ehConvidado()) {
+        tecladoAberto = 1;
+        teclado_abrir_com("Endereço do addon", "O endereço do manifest.json (https://…/manifest.json ou stremio://…).",
+                          TECLADO_LONGO, ALFA_ADDON, NULL);
+        break;
+      }
       if (foco == n) { sincronizar(); break; }
       if (foco == n + 1) { aoVivo = 1; foco = 0; scrollY = 0; break; }
-      if (n > 0) { addons_alternar(foco); mexeu = 1; }
+      if (foco == n + 2 && ehConvidado()) {
+        int k = addonslocal_remover_desligados();
+        ilha_avisar("addon-local", ILHA_INFO, "aj_puzzle",
+                    i18n(k ? "Addons desligados removidos desta TV." : "Desligue um addon (OK) para poder removê-lo."), 4000u, 0);
+        if (k) { mexeu = 1; foco = 0; }
+        break;
+      }
+      if (n > 0) { addons_alternar(foco); mexeu = 1; if (ehConvidado()) addonslocal_salvar(); }
       break;
     case SDLK_AC_BACK: case SDLK_ESCAPE: case SDLK_BACKSPACE: case SDLK_LEFT:
       if (aoVivo) { aoVivo = 0; foco = n + 1; scrollY = 0; }
@@ -115,7 +140,7 @@ void addonsui_evento(const SDL_Event *e) {
 // setas). O desenho mora em ajustes_ux_ilha.inc (ajSubLista).
 void addonsui_ponteiro(int i, int b) {
   (void)b;
-  int n = addons_n(), ultimo = aoVivo ? n - 1 : n + 1;
+  int n = addons_n(), ultimo = aoVivo ? n - 1 : n + 1 + (ehConvidado() ? 1 : 0);
   if (sair || i < 0 || i > ultimo || i == foco) return;
   foco = i;
 }
@@ -124,7 +149,31 @@ int addonsui_foco(void) { return foco; }
 void addonsui_atualizar(float dt, Uint32 agora) {
   int i, n = addons_n();
   float alvo;
-  (void)agora;
+  if (tecladoAberto) {
+    int r;
+    teclado_atualizar(dt, agora);
+    r = teclado_resultado();
+    if (r == TECLADO_PRONTO) {
+      if (!addonslocal_adicionar(teclado_texto()))
+        ilha_avisar("addon-local", ILHA_INFO, "aj_puzzle",
+                    i18n("Endereço inválido: use https://…/manifest.json"), 4000u, 0);
+      teclado_esquecer();
+      tecladoAberto = 0;
+    } else if (r == TECLADO_CANCELOU) tecladoAberto = 0;
+  }
+  {
+    char nome[64], msg[160];
+    int e = addonslocal_estado(nome, sizeof nome);
+    if (e == ADL_OK) {
+      snprintf(msg, sizeof msg, "%s: %s", i18n("Addon adicionado"), nome);
+      ilha_avisar("addon-local", ILHA_INFO, "aj_puzzle", msg, 4000u, 0);
+      mexeu = 1;
+    } else if (e == ADL_FALHOU)
+      ilha_avisar("addon-local", ILHA_INFO, "aj_puzzle",
+                  i18n("Não deu para adicionar: o endereço não respondeu com um manifesto de addon."), 5000u, 0);
+    else if (e == ADL_REPETIDO)
+      ilha_avisar("addon-local", ILHA_INFO, "aj_puzzle", i18n("Este addon já está na lista."), 4000u, 0);
+  }
   for (i = 0; i < n && i < 128; i++)
     animFoco[i] = anim_mola(animFoco[i], i == foco ? 1.0f : 0.0f, dt, NV_MOLA_FOCO);
   // Rolagem que mantem a linha focada dentro da area util, como em Ajustes.
@@ -158,8 +207,8 @@ static const char *capacidades(int i) {
 // A TELA DE ADDONS NO GLASS UI (mockup de Ajustes, quadro "addons"): o mesmo
 // arranjo de ilhas de Ajustes, desenhado por ajustes.c (que tem as pecas).
 void addonsui_desenhar(Uint32 agora) {
-  (void)agora;
   ajustes_desenhar_addons(foco);
+  if (tecladoAberto) teclado_desenhar(agora);
 }
 
 #ifdef AJUSTES_TESTE
