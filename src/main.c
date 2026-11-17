@@ -340,6 +340,9 @@ static SDL_Keycode codigoDaTecla(const char *nome) {
   if (!strcmp(nome, "right")) return SDLK_RIGHT;
   if (!strcmp(nome, "ok"))    return SDLK_RETURN;
   if (!strcmp(nome, "back"))  return SDLK_AC_BACK;
+  // CH+/CH- (zap in Live TV), same keycodes remapCanal produces on the TV.
+  if (!strcmp(nome, "chup"))   return SDLK_PAGEUP;
+  if (!strcmp(nome, "chdown")) return SDLK_PAGEDOWN;
   // "log" abre/fecha o painel de registro na tela. Sem isto, exercitar o painel
   // exigia a tecla vermelha de um controle de TV — e no Mac ela nao existe.
   if (!strcmp(nome, "log"))   return SDLK_F9;

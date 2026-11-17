@@ -45,3 +45,7 @@ i18n
 
 # Main navigation, end to end (Xvfb)
 qrtime_nav
+
+# Live TV / IPTV end to end (Xvfb + local IPTV fixtures)
+qrtime_xmltv_tz
+qrtime_livetv
