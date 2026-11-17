@@ -106,6 +106,17 @@ grep -q "action=create_link" "$W/requests.log" && ok "Stalker create_link reques
 n=$(grep -c "action=create_link" "$W/requests.log")
 [ "$n" -le 4 ] && ok "Stalker link renewal is capped ($n requests)" || erro "Stalker renewal not capped ($n)"
 
+# ---- 3b. recently watched channels: most recent first, no duplicates ---------
+R="$W/a/guia-ltv-recentes-p1.txt"
+if [ -f "$R" ]; then
+  rec=$(cut -f2 "$R" | tr '\n' ' ')
+  case "$rec" in
+    "stalker:@00000003:501 xtream:@00000001:101 xtream:@00000001:102 nvm3u:@00000002:"*" nvm3u:@00000002:"*" ")
+      ok "recent channels: most recent first, replay moves to front, no duplicates" ;;
+    *) erro "recent channels order: $rec" ;;
+  esac
+else erro "recent channels file missing"; fi
+
 # ---- 4. favorite via the channel options (hold OK), persisted ----------------
 tecla back 3
 tecla ok:hold 2; tecla ok 3
@@ -114,6 +125,7 @@ fechar
 abrir "$W/a" "$W/a2.log"
 guia || erro "guide (restart) did not load"
 grep -qE "\[guia\] 7 canais .*\(1 favoritos\)" "$LOG" && ok "favorite survives a restart" || erro "favorite after restart"
+[ "$(wc -l < "$R")" = 5 ] && ok "recent channels survive a restart (5 kept)" || erro "recent channels after restart"
 fechar
 
 # ---- 5. wrong Xtream password is a refusal, not "no answer" ------------------

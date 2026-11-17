@@ -3575,6 +3575,7 @@ static void tocarCanal(const CatItem *it) {
   // channel start or a zap.
   printf("[canal] tocar id=%s titulo=%s\n", it->imdb, it->titulo);
   fflush(stdout);
+  guia_canal_assistido(it->imdb);
 }
 
 // O CANAL NO AR VAI PARA O GUIA, sem recarregar (25/09/2026). O mesmo fluxo

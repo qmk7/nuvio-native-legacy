@@ -78,6 +78,10 @@ int  guia_numero_canal(int numero, CatItem *saida, char *fonte, size_t nf, int a
 // Para o OSD do canal ao vivo (aovivo.h): posicao na ordem do guia, categoria,
 // favorito e o programa no ar de QUALQUER canal da lista (banner do zapping).
 int  guia_info_canal(const char *id, int *numero, int *total, char *cat, size_t n);
+// QR TIME: a channel started playing (app.c tocarCanal). Moves it to the front
+// of this profile's recently watched list (a "Recentes" row in the guide).
+void guia_canal_assistido(const char *id);
+int  guia_recentes_n(void);
 int  guia_e_favorito(const char *id);
 void guia_alternar_favorito(const char *id);
 int  guia_programa_faixa(const char *id, time_t de, time_t ate, EpgProg *out, int cap);

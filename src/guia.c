@@ -818,6 +818,63 @@ static void favAlternar(GCanal *c) {
   vistaMontar();
 }
 
+// --- recently watched channels (QR TIME) --------------------------------------
+// The last G_MAX_RCN channels this profile played, most recent first, in
+// guia-ltv-recentes-p<N>.txt as "chave TAB id" (the favorites format: the
+// same id can exist in two providers). Shown as a "Recentes" row after
+// Favoritos in the All view; it is not part of CH+/CH- (that follows the
+// guide order). Recorded by guia_canal_assistido when a channel starts.
+#define G_MAX_RCN 12
+static GFav rcn[G_MAX_RCN]; static int nRcn, rcnLido;
+static int  rcnOrd[G_MAX_RCN]; static int nRcnOrd;
+
+static void rcnLer(void) {
+  char nome[48];
+  arquivoPerfil("ltv-recentes", nome, sizeof nome);
+  char *t = dados_ler(nome), *q;
+  rcnLido = 1; nRcn = 0;
+  for (q = t; q && *q && nRcn < G_MAX_RCN; ) {
+    char *fim = q + strcspn(q, "\n"), *tab;
+    char linha[200];
+    size_t k = (size_t)(fim - q);
+    if (k < sizeof linha) {
+      memcpy(linha, q, k); linha[k] = 0;
+      tab = strchr(linha, '\t');
+      if (tab && tab[1]) {
+        *tab = 0;
+        snprintf(rcn[nRcn].chave, sizeof rcn[nRcn].chave, "%s", linha);
+        snprintf(rcn[nRcn].id, sizeof rcn[nRcn].id, "%s", tab + 1);
+        nRcn++;
+      }
+    }
+    q = *fim ? fim + 1 : fim;
+  }
+  free(t);
+}
+static void rcnGravar(void) {
+  char buf[G_MAX_RCN * 110], nome[48];
+  size_t n = 0;
+  for (int i = 0; i < nRcn && n + 110 < sizeof buf; i++)
+    n += (size_t)snprintf(buf + n, sizeof buf - n, "%s\t%s\n", rcn[i].chave, rcn[i].id);
+  buf[n] = 0;
+  arquivoPerfil("ltv-recentes", nome, sizeof nome);
+  dados_gravar(nome, buf);
+}
+static int fonteVisivel(int f);
+static int categoriaOculta(int cat);
+// Channel indices of the recent list that the current view can show.
+static void rcnOrdenar(void) {
+  int i, j;
+  nRcnOrd = 0;
+  for (i = 0; i < nRcn && nRcnOrd < G_MAX_RCN; i++)
+    for (j = 0; j < nCanais; j++)
+      if (!strcmp(canais[j].id, rcn[i].id) && !strcmp(chaveDo(&canais[j]), rcn[i].chave) &&
+          fonteVisivel(canais[j].fonte) && !categoriaOculta(canais[j].cat)) {
+        rcnOrd[nRcnOrd++] = j;
+        break;
+      }
+}
+
 // --- modo de exibicao ------------------------------------------------------------
 // 1 = lista, 0 = cartoes. Persistido por perfil: quem escolheu lista
 // espera reabrir em lista, senao a escolha vira um gesto a repetir por sessao.
@@ -1051,14 +1108,19 @@ static int *zapL; static int nZapL, capZapL;
 static int mostraFav(void) {
   return nFavOrd > 0 && (filtro == G_FILTRO_TODAS || filtro == G_FILTRO_FAV);
 }
-static int nLinhas(void) { return nVis + (mostraFav() ? 1 : 0); }
+static int mostraRcn(void) { return nRcnOrd > 0 && filtro == G_FILTRO_TODAS; }
+static int linhasFixas(void) { return (mostraFav() ? 1 : 0) + (mostraRcn() ? 1 : 0); }
+static int nLinhas(void) { return nVis + linhasFixas(); }
 static int linhaEhFav(int l) { return mostraFav() && l == 0; }
-static int linhaCatDe(int l) {  // indice em cats[], -1 = favoritos
-  return linhaEhFav(l) ? -1 : vis[l - (mostraFav() ? 1 : 0)];
+static int linhaEhRcn(int l) { return mostraRcn() && l == (mostraFav() ? 1 : 0); }
+static int linhaCatDe(int l) {  // indice em cats[], -1 = favoritos ou recentes
+  return (linhaEhFav(l) || linhaEhRcn(l)) ? -1 : vis[l - linhasFixas()];
 }
 static int linhaN(int l) {
   if (l < 0 || l >= nLinhas()) return 0;
-  return linhaEhFav(l) ? nFavOrd : catN[linhaCatDe(l)];
+  if (linhaEhFav(l)) return nFavOrd;
+  if (linhaEhRcn(l)) return nRcnOrd;
+  return catN[linhaCatDe(l)];
 }
 // "Esportes · Xtream" em Todas quando ha mais de uma fonte (decisao 2: grupos
 // de mesmo nome de fontes diferentes sao linhas diferentes, e a tela diz qual).
@@ -1066,6 +1128,7 @@ static const char *linhaNome(int l) {
   static char buf[200];
   int c;
   if (linhaEhFav(l)) return i18n("Favoritos");
+  if (linhaEhRcn(l)) return i18n("Recentes");
   c = linhaCatDe(l);
   if (filtro == G_FILTRO_TODAS && nLtvF > 1 && cats[c].fonte >= 0 && cats[c].fonte < nLtvF) {
     snprintf(buf, sizeof buf, "%s  \xc2\xb7  %s", i18n(cats[c].nome), ltvF[cats[c].fonte].nome);
@@ -1076,6 +1139,7 @@ static const char *linhaNome(int l) {
 static GCanal *linhaItem(int l, int c) {
   if (c < 0 || c >= linhaN(l)) return NULL;
   if (linhaEhFav(l)) return &canais[favOrd[c]];
+  if (linhaEhRcn(l)) return &canais[rcnOrd[c]];
   return &canais[catIni[linhaCatDe(l)] + c];
 }
 
@@ -1098,6 +1162,8 @@ static void vistaMontar(void) {
   nFavOrd=0;
   for(i=0;i<nCanais && nFavOrd<G_MAX_FAV;i++)
     if(canais[i].fav && fonteVisivel(canais[i].fonte) && !categoriaOculta(canais[i].cat))favOrd[nFavOrd++]=i;
+  if (!rcnLido) rcnLer();
+  rcnOrdenar();
   nVis = 0; nZapL = 0;
   if (!vetorCabe(&vis, &capVis, nCats) || !vetorCabe(&zapL, &capZapL, nCanais)) return;
   if (filtro != G_FILTRO_FAV)
@@ -3097,7 +3163,7 @@ static int secaoCasa(const char *nome, const char *pedido) {
 static int focarSecaoAgora(const char *pedido) {
   int l;
   for (l = 0; l < nLinhas(); l++) {
-    if (linhaEhFav(l) || !linhaN(l)) continue;
+    if (linhaCatDe(l) < 0 || !linhaN(l)) continue;
     if (secaoCasa(cats[linhaCatDe(l)].nome, pedido)) {
       focoLin = l; focoCol = 0; focoTopo = 0;
       return 1;
@@ -3458,6 +3524,25 @@ int guia_info_canal(const char *id, int *numero, int *total, char *cat, size_t n
   if (cat && n) snprintf(cat, n, "%s", canais[i].cat >= 0 ? cats[canais[i].cat].nome : "");
   return 1;
 }
+
+void guia_canal_assistido(const char *id) {
+  int i, j;
+  GCanal *c = NULL;
+  if (!id || !id[0]) return;
+  if (!rcnLido) rcnLer();
+  for (j = 0; j < nCanais; j++) if (!strcmp(canais[j].id, id)) { c = &canais[j]; break; }
+  if (!c) return;                           // not a guide channel (addon title, unknown)
+  for (i = 0; i < nRcn; i++)
+    if (!strcmp(rcn[i].id, id) && !strcmp(rcn[i].chave, chaveDo(c))) break;
+  if (i == nRcn && nRcn == G_MAX_RCN) i = G_MAX_RCN - 1;   // full: drop the oldest
+  else if (i == nRcn) nRcn++;
+  memmove(&rcn[1], &rcn[0], (size_t)i * sizeof rcn[0]);
+  snprintf(rcn[0].chave, sizeof rcn[0].chave, "%s", chaveDo(c));
+  snprintf(rcn[0].id, sizeof rcn[0].id, "%s", id);
+  rcnGravar();
+  rcnOrdenar();
+}
+int guia_recentes_n(void) { if (!rcnLido) rcnLer(); return nRcn; }
 
 int guia_e_favorito(const char *id) {
   if (!favLido) favLer();
@@ -7885,6 +7970,7 @@ void guia_abrir_sessao(void) {
   cargaCancelada = 1;
   estado = G_PARADO; recarregarPend = 0; recargaDoPainel = 0;
   nCanais = nCats = nFontes = nSabe = nFav = nFavOrd = 0;
+  nRcn = nRcnOrd = rcnLido = 0;
   fontesOk = cacheLido = favLido = modoLido = previewLido = 0;
   modoLista = previewLigado = 0; assinaturaPublicada = 0;
   falhas = xtFalha = xtHttp = 0;
