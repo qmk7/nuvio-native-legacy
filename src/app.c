@@ -3539,7 +3539,13 @@ static void tocarCanal(const CatItem *it) {
   snprintf(atualCanalBase, sizeof atualCanalBase, "%s", guia_canal_origem());
   ni = cat_indice_por_imdb(it->imdb);
   if (ni < 0) ni = cat_acrescentar(it);
-  if (ni < 0) return;
+  if (ni < 0) {
+    // Never a silent no-op on OK: say it in the log and on screen.
+    printf("[canal] nao abriu id=%s: catalogo recusou o item\n", it->imdb);
+    fflush(stdout);
+    ilha_avisar("qrt-canal-falhou", ILHA_INFO, NULL, i18n("Não foi possível abrir o canal."), 5000u, 0);
+    return;
+  }
   limparFonteVOD();
   if (player_aberto() || player_retido()) player_encerrar();
   diagnostico_cancelar_vazao();
@@ -3564,6 +3570,11 @@ static void tocarCanal(const CatItem *it) {
   }
   aguardandoFonte = 1;
   marco("guia: buscando fontes do canal");
+  // Channel ids carry no credential (xtream:/stalker:/nvm3u: + ids), so this
+  // line is safe in shared logs; it is what tests and TV logs use to see a
+  // channel start or a zap.
+  printf("[canal] tocar id=%s titulo=%s\n", it->imdb, it->titulo);
+  fflush(stdout);
 }
 
 // O CANAL NO AR VAI PARA O GUIA, sem recarregar (25/09/2026). O mesmo fluxo

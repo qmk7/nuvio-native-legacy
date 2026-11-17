@@ -3408,6 +3408,7 @@
   T("Não foi enviado", "Ikke sendt"),
   T("Não foi possível abrir a fonte", "Kilden kunne ikke åbnes"),
   T("Não foi possível abrir este arquivo", "Filen kunne ikke åbnes"),
+  T("Não foi possível abrir o canal.", "Kanalen kunne ikke åbnes."),
   T("Não foi possível abrir os ajustes desse perfil.", "Den profils indstillinger kunne ikke åbnes."),
   T("Não foi possível adicionar. Tente novamente.", "Kunne ikke tilføjes. Prøv igen."),
   T("Não foi possível agora. Tente novamente.", "Det lykkedes ikke nu. Prøv igen."),

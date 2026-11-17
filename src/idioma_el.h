@@ -3408,6 +3408,7 @@
   T("Não foi enviado", "Δεν στάλθηκε"),
   T("Não foi possível abrir a fonte", "Δεν ήταν δυνατό να ανοίξει η πηγή"),
   T("Não foi possível abrir este arquivo", "Δεν ήταν δυνατό να ανοίξει αυτό το αρχείο"),
+  T("Não foi possível abrir o canal.", "Δεν ήταν δυνατό το άνοιγμα του καναλιού."),
   T("Não foi possível abrir os ajustes desse perfil.", "Δεν ήταν δυνατό το άνοιγμα των ρυθμίσεων αυτού του προφίλ."),
   T("Não foi possível adicionar. Tente novamente.", "Δεν ήταν δυνατή η προσθήκη τους. Δοκίμασε ξανά."),
   T("Não foi possível agora. Tente novamente.", "Δεν ήταν δυνατό τώρα. Δοκίμασε ξανά."),

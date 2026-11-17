@@ -3408,6 +3408,7 @@
   T("Não foi enviado", "未傳送"),
   T("Não foi possível abrir a fonte", "無法開啟片源"),
   T("Não foi possível abrir este arquivo", "無法開啟此檔案"),
+  T("Não foi possível abrir o canal.", "無法開啟頻道。"),
   T("Não foi possível abrir os ajustes desse perfil.", "無法開啟該個人檔案的設定。"),
   T("Não foi possível adicionar. Tente novamente.", "無法新增。請重試。"),
   T("Não foi possível agora. Tente novamente.", "目前無法完成，請再試一次。"),

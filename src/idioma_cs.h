@@ -3408,6 +3408,7 @@
   T("Não foi enviado", "Neodesláno"),
   T("Não foi possível abrir a fonte", "Zdroj se nepodařilo otevřít"),
   T("Não foi possível abrir este arquivo", "Tento soubor se nepodařilo otevřít"),
+  T("Não foi possível abrir o canal.", "Kanál se nepodařilo otevřít."),
   T("Não foi possível abrir os ajustes desse perfil.", "Nastavení tohoto profilu se nepodařilo otevřít."),
   T("Não foi possível adicionar. Tente novamente.", "Nepodařilo se je přidat. Zkuste to znovu."),
   T("Não foi possível agora. Tente novamente.", "Teď to nešlo. Zkuste to znovu."),

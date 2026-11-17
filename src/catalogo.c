@@ -2406,11 +2406,14 @@ int cat_acrescentar(const CatItem *item) {
   // Mesma regra de cat_acrescentar_lote: `n` so com a trava.
   CAT_TESTE_ANTES_TRAVA();
   catTravar();
-  if (n < 1 || n >= CAT_MAX) { pthread_mutex_unlock(&pubTrava); return -1; }
+  // An EMPTY catalog accepts the item too. QR TIME guest with only IPTV (no
+  // add-on, so no catalog at all): refusing here made tocarCanal return in
+  // silence and no channel could ever play. n == 0 only skips the copy.
+  if (n < 0 || n >= CAT_MAX) { pthread_mutex_unlock(&pubTrava); return -1; }
   novoN = n + 1;
   novo = malloc(sizeof(CatItem) * (size_t)novoN);
   if (!novo) { pthread_mutex_unlock(&pubTrava); return -1; }
-  memcpy(novo, itens, sizeof(CatItem) * (size_t)n);
+  if (n > 0) memcpy(novo, itens, sizeof(CatItem) * (size_t)n);
   memcpy(&novo[n], item, sizeof(CatItem));
   aposentar(itens);
   __atomic_store_n(&itens, novo, __ATOMIC_RELEASE);

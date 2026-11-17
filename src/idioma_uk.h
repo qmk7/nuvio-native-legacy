@@ -3407,6 +3407,7 @@
   T("Não foi enviado", "Не надіслано"),
   T("Não foi possível abrir a fonte", "Не вдалося відкрити джерело"),
   T("Não foi possível abrir este arquivo", "Не вдалося відкрити цей файл"),
+  T("Não foi possível abrir o canal.", "Не вдалося відкрити канал."),
   T("Não foi possível abrir os ajustes desse perfil.", "Не вдалося відкрити налаштування цього профілю."),
   T("Não foi possível adicionar. Tente novamente.", "Не вдалося додати. Спробуйте ще раз."),
   T("Não foi possível agora. Tente novamente.", "Зараз не вдалося. Спробуйте ще раз."),

@@ -3407,6 +3407,7 @@
   T("Não foi enviado", "Non envoyé"),
   T("Não foi possível abrir a fonte", "Impossible d'ouvrir la source"),
   T("Não foi possível abrir este arquivo", "Impossible d’ouvrir ce fichier"),
+  T("Não foi possível abrir o canal.", "Impossible d'ouvrir la chaîne."),
   T("Não foi possível abrir os ajustes desse perfil.", "Impossible d'ouvrir les réglages de ce profil."),
   T("Não foi possível adicionar. Tente novamente.", "Impossible de l'ajouter. Réessayez."),
   T("Não foi possível agora. Tente novamente.", "Impossible pour le moment. Réessayez."),

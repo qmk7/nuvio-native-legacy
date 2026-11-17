@@ -3408,6 +3408,7 @@
   T("Não foi enviado", "Ni poslano"),
   T("Não foi possível abrir a fonte", "Vira ni bilo mogoče odpreti"),
   T("Não foi possível abrir este arquivo", "Te datoteke ni bilo mogoče odpreti"),
+  T("Não foi possível abrir o canal.", "Kanala ni bilo mogoče odpreti."),
   T("Não foi possível abrir os ajustes desse perfil.", "Nastavitev tega profila ni bilo mogoče odpreti."),
   T("Não foi possível adicionar. Tente novamente.", "Dodajanje ni uspelo. Poskusite znova."),
   T("Não foi possível agora. Tente novamente.", "Zdaj ni šlo. Poskusite znova."),

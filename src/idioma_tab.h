@@ -3407,6 +3407,7 @@
   { "Não foi enviado", "Not sent" },
   { "Não foi possível abrir a fonte", "Could not open the source" },
   { "Não foi possível abrir este arquivo", "Couldn't open this file" },
+  { "Não foi possível abrir o canal.", "Could not open the channel." },
   { "Não foi possível abrir os ajustes desse perfil.", "Could not open that profile's settings." },
   { "Não foi possível adicionar. Tente novamente.", "Could not add them. Try again." },
   { "Não foi possível agora. Tente novamente.", "Couldn't do that now. Try again." },

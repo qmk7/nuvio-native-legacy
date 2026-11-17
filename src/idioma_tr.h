@@ -3408,6 +3408,7 @@
   T("Não foi enviado", "Gönderilmedi"),
   T("Não foi possível abrir a fonte", "Kaynak açılamadı"),
   T("Não foi possível abrir este arquivo", "Bu dosya açılamadı"),
+  T("Não foi possível abrir o canal.", "Kanal açılamadı."),
   T("Não foi possível abrir os ajustes desse perfil.", "O profilin ayarları açılamadı."),
   T("Não foi possível adicionar. Tente novamente.", "Eklenemedi. Tekrar dene."),
   T("Não foi possível agora. Tente novamente.", "Şu an yapılamadı. Tekrar dene."),
