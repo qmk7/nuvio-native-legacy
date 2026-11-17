@@ -97,6 +97,21 @@ def vod_info(acct, vid):
                                    "container_extension": m["container_extension"]}}
     return {"info": [], "movie_data": []}
 
+# ---- TMDB (only the calls the IPTV library makes for addon titles) ----
+TMDB_FIND = {
+    "tt0133093": {"movie_results": [{"id": 603, "title": "The Matrix", "original_title": "The Matrix",
+                                     "release_date": "1999-03-30"}], "tv_results": []},
+    "tt1375666": {"movie_results": [{"id": 27205, "title": "Inception", "original_title": "Inception",
+                                     "release_date": "2010-07-15"}], "tv_results": []},
+    "tt0903747": {"movie_results": [], "tv_results": [{"id": 1396, "name": "Breaking Bad",
+                                     "original_name": "Breaking Bad", "first_air_date": "2008-01-20"}]},
+    # A trap: TMDB says 603 is a different film, so a panel hint of 603 is wrong.
+    "tt9999999": {"movie_results": [{"id": 603, "title": "Totally Different Film",
+                                     "original_title": "Totally Different Film", "release_date": "1987-01-01"}]},
+    "tt0000404": {"movie_results": [], "tv_results": []},
+}
+TMDB_MOVIE = {"27205": {"id": 27205, "title": "Inception", "original_title": "Inception", "release_date": "2010-07-15"}}
+
 ST_GENRES = [{"id": "1", "title": "Stalker Movies"}, {"id": "2", "title": "Stalker Kids"}]
 ST_CHANS = [
     {"id": "501", "name": "Stalker Cinema", "number": "1", "cmd": "ffmpeg %s/st/501" % BASE,
@@ -154,6 +169,8 @@ class H(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path)
         q = dict(urllib.parse.parse_qsl(u.query))
         safe = self.path.replace(PASS2, "***").replace(PASS, "***")
+        if "api_key=" in safe:
+            safe = safe.split("api_key=")[0] + "api_key=***"
         with open(WORK + "/requests.log", "a") as f:
             f.write(safe + "\n")
         p = u.path
@@ -193,6 +210,15 @@ class H(BaseHTTPRequestHandler):
                               "server_info": {"url": "127.0.0.1", "port": str(PORT),
                                               "server_protocol": "http", "timezone": "Europe/Istanbul",
                                               "timestamp_now": int(time.time())}})
+        if p.startswith("/3/"):
+            if q.get("api_key") != "QRTKEY":
+                return self.send({"status_code": 7}, code=401)
+            if p.startswith("/3/find/"):
+                return self.send(TMDB_FIND.get(p[len("/3/find/"):], {"movie_results": [], "tv_results": []}))
+            if p.startswith("/3/movie/"):
+                m = TMDB_MOVIE.get(p[len("/3/movie/"):])
+                return self.send(m) if m else self.send({"status_code": 34}, code=404)
+            return self.send({"status_code": 34}, code=404)
         if p == "/list.m3u":
             return self.send(m3u(), "audio/x-mpegurl")
         if p == "/epg.xml" or p == "/xmltv.php":

@@ -64,6 +64,22 @@ int  iptvvod_ficha(CatItem *item, CatEp *eps, int maxEps);
 int  iptvvod_fontes_pedir(const char *alvo);
 int  iptvvod_fontes_colher(const char *alvo, struct Stream **lista, int *n);
 
+// ---- matching addon titles (resolved ids only) ----
+// Sources of the IPTV library for a catalogue title that came from an addon:
+// "tt0133093", "tt0903747:1:2", "tmdb:603", "tmdb:1396:1:2". The id is a
+// real IMDb/TMDB id; it is resolved with TMDB (title, original title, year)
+// and only groups whose provider TMDB hint matches AND whose title agrees
+// (or, with no hint, title and year agree) contribute sources. Provider ids
+// never leave this TV. Registered as an extra source of addons.c.
+// Returns sources (>= 0, *saida malloc'd) or -1.
+int  iptvvod_origem(const char *id, const char *tipo, int (*cancelado)(void *), void *ctx,
+                    void *aviso, void *avisoU, void *saida);
+int  iptvvod_origem_ativa(void);        // library loaded and a TMDB key
+void iptvvod_ligar_aos_addons(void);   // iptvvodaddons.c
+// The TMDB key in use (descoberta.c). Tests point the base URL at a fixture.
+void iptvvod_definir_chave_tmdb(const char *(*chave)(void));
+void iptvvod_teste_tmdb_base(const char *base);
+
 // Tests: wait for the current load (ms). 1 when idle.
 int  iptvvod_teste_esperar(int ms);
 #endif

@@ -22,6 +22,7 @@ int ajustes_livetv_formato(void) { return 0; }
 const char *i18n(const char *s) { return s; }
 
 static int falhas;
+static const char *chaveTeste(void) { return "QRTKEY"; }
 #define CONFERE(c, o) do { int ok_ = (c); printf("%s: %s\n", ok_ ? "PASS" : "FAIL", o); if (!ok_) falhas++; } while (0)
 
 static CatItem itens[64];
@@ -54,7 +55,7 @@ static void carregar(void) {
 }
 
 int main(int argc, char **argv) {
-  if (argc != 3) { fprintf(stderr, "usage: %s <data dir> online|offline\n", argv[0]); return 2; }
+  if (argc < 3) { fprintf(stderr, "usage: %s <data dir> online|offline [base url]\n", argv[0]); return 2; }
   setenv("NUVIO_DADOS", argv[1], 1);
   dados_iniciar(NULL);
 
@@ -145,6 +146,42 @@ int main(int argc, char **argv) {
     CONFERE(c && strstr(c, "Breaking Bad") && !strstr(c, "qrtpass") && !strstr(c, "qrtuser"),
             "cache written, without credentials");
     free(c);
+  }
+
+  // ---- addon titles: real ids resolved through TMDB (fixture) ----
+  if (argc > 3) {
+    char base[200];
+    Stream *l = NULL;
+    int n;
+    snprintf(base, sizeof base, "%s/3", argv[3]);
+    iptvvod_teste_tmdb_base(base);
+    CONFERE(iptvvod_origem("tt0133093", "movie", NULL, NULL, NULL, NULL, &l) < 0 ||
+            (free(l), l = NULL, 1), "no TMDB key: nothing is asked");
+    iptvvod_definir_chave_tmdb(chaveTeste);
+    n = iptvvod_origem("tt0133093", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 2 && temUrl(l, n, "/movie/qrtuser/") && temUrl(l, n, "/movie/qrtuser2/"),
+            "addon title tt0133093 (The Matrix): both providers' copies");
+    free(l); l = NULL;
+    n = iptvvod_origem("tt1375666", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 2 && temUrl(l, n, "/1003.mp4") && temUrl(l, n, "/2002.mkv"),
+            "Inception: hinted copy and title+year copy");
+    free(l); l = NULL;
+    n = iptvvod_origem("tmdb:27205", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 2, "tmdb:27205 resolves the same way");
+    free(l); l = NULL;
+    n = iptvvod_origem("tt0903747:2:1", "series", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 2 && temUrl(l, n, "/40011.mp4") && temUrl(l, n, "/50011.mp4"),
+            "addon episode tt0903747:2:1 -> each provider's own S2E1");
+    free(l); l = NULL;
+    n = iptvvod_origem("tt9999999", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 0, "a provider TMDB hint whose title disagrees with TMDB is refused");
+    free(l); l = NULL;
+    n = iptvvod_origem("tt0000404", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 0, "an addon title no provider has: no IPTV source");
+    n = iptvvod_origem("qv:0123456789abcdef.m", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 0, "a local id is never resolved through TMDB");
+    n = iptvvod_origem("kitsu:1", "series", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 0, "other addon namespaces are not guessed");
   }
 
   // ---- profile isolation ----

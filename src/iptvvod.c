@@ -7,6 +7,8 @@
 #include "perfis.h"
 #include "perfisessao.h"
 #include "streams.h"
+#include "js.h"
+#include "rede.h"
 #include <ctype.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -871,6 +873,184 @@ int iptvvod_fontes_colher(const char *alvo, Stream **lista, int *n) {
   pthread_mutex_unlock(&travaFontes);
   return e;
 }
+
+// ------------------------------------------------------------- addon titles
+static const char *(*chaveTmdbFn)(void);
+static char tmdbBase[160] = "https://api.themoviedb.org/3";
+void iptvvod_definir_chave_tmdb(const char *(*chave)(void)) { chaveTmdbFn = chave; }
+void iptvvod_teste_tmdb_base(const char *base) { snprintf(tmdbBase, sizeof tmdbBase, "%s", base ? base : ""); }
+
+typedef struct { long tmdb; char kind; char titulo[128], original[128]; int ano; } Resolvido;
+// "tt123[:S:E]" or "tmdb:123[:S:E]". 1 = parsed.
+static int idCatalogo(const char *id, char *imdb, size_t tam, long *tmdb, int *t, int *e) {
+  const char *p;
+  *tmdb = 0; *t = *e = 0; imdb[0] = 0;
+  if (!id) return 0;
+  if (id[0] == 't' && id[1] == 't' && isdigit((unsigned char)id[2])) {
+    size_t n = 2;
+    while (isdigit((unsigned char)id[n])) n++;
+    if (n >= tam || n > 12) return 0;
+    memcpy(imdb, id, n); imdb[n] = 0;
+    p = id + n;
+  } else if (!strncmp(id, "tmdb:", 5) && isdigit((unsigned char)id[5])) {
+    char *f;
+    *tmdb = strtol(id + 5, &f, 10);
+    if (*tmdb <= 0) return 0;
+    p = f;
+  } else return 0;
+  if (*p == ':') { if (sscanf(p, ":%d:%d", t, e) != 2 || *t < 0 || *e <= 0) return 0; }
+  else if (*p) return 0;
+  return 1;
+}
+static int anoDeData(const char *s) { int a = s ? atoi(s) : 0; return a >= 1888 && a <= 2100 ? a : 0; }
+// TMDB lookup of a REAL id (from an addon): never a provider id.
+// 1 resolved, 0 TMDB answered without a match, -1 could not ask (no key, no
+// answer): only definite answers are cached.
+static int resolver(const char *imdb, long tmdb, char kind, Resolvido *r) {
+  const char *chave = chaveTmdbFn ? chaveTmdbFn() : NULL;
+  char url[400], data[16];
+  char *corpo;
+  const char *v = NULL, *f;
+  memset(r, 0, sizeof *r);
+  if (!chave || !chave[0] || !tmdbBase[0]) return -1;
+  if (imdb[0])
+    snprintf(url, sizeof url, "%s/find/%s?api_key=%s&external_source=imdb_id", tmdbBase, imdb, chave);
+  else
+    snprintf(url, sizeof url, "%s/%s/%ld?api_key=%s", tmdbBase, kind == 's' ? "tv" : "movie", tmdb, chave);
+  corpo = rede_baixar_com(url, 15, NULL);
+  if (!corpo) return -1;
+  if (imdb[0]) {
+    v = js_array(corpo, NULL, kind == 's' ? "tv_results" : "movie_results");
+    if (!v || *v != '{') { free(corpo); return 0; }
+  } else v = corpo;
+  f = js_fim(v);
+  r->kind = kind;
+  r->tmdb = imdb[0] ? (long)js_num(v, f, "id", 0.0) : tmdb;
+  data[0] = 0;
+  if (kind == 's') {
+    js_texto(v, f, "name", r->titulo, sizeof r->titulo);
+    js_texto(v, f, "original_name", r->original, sizeof r->original);
+    js_texto(v, f, "first_air_date", data, sizeof data);
+  } else {
+    js_texto(v, f, "title", r->titulo, sizeof r->titulo);
+    js_texto(v, f, "original_title", r->original, sizeof r->original);
+    js_texto(v, f, "release_date", data, sizeof data);
+  }
+  r->ano = anoDeData(data);
+  free(corpo);
+  return r->tmdb > 0 && (r->titulo[0] || r->original[0]);
+}
+// Does this copy really carry the resolved title? Same normalized title, or
+// one containing the other with the year within one.
+static int copiaConfere(const Copia *c, const char *n1, const char *n2, int ano) {
+  if (!c->norm[0]) return 0;
+  if ((n1[0] && !strcmp(c->norm, n1)) || (n2[0] && !strcmp(c->norm, n2))) return !ano || !c->ano || abs(c->ano - ano) <= 1;
+  if (ano && c->ano && abs(c->ano - ano) <= 1 &&
+      ((n1[0] && (strstr(c->norm, n1) || strstr(n1, c->norm))) || (n2[0] && (strstr(c->norm, n2) || strstr(n2, c->norm)))))
+    return 1;
+  return 0;
+}
+// Groups matching the resolved title. Copied out under the lock.
+static int gruposDe(const Resolvido *r, Ref *out, int max, uint64_t *grupos, int maxG, int *nG) {
+  char n1[128], n2[128];
+  int n = 0;
+  *nG = 0;
+  iptvvod_normalizar(r->titulo, n1, sizeof n1);
+  iptvvod_normalizar(r->original, n2, sizeof n2);
+  pthread_mutex_lock(&trava);
+  if (bibValidaLocked()) for (int g = 0; g < bib.ng && *nG < maxG; g++) {
+    int dica = 0, confere = 0;
+    if (bib.g[g].kind != r->kind) continue;
+    for (int j = bib.g[g].primeira; j >= 0; j = bib.c[j].proximo) {
+      if (bib.c[j].tmdb == r->tmdb) dica = 1;
+      if (copiaConfere(&bib.c[j], n1, n2, r->ano)) confere = 1;
+    }
+    // A hint must agree with the title; without a hint, title AND year must.
+    if (dica && !confere) { printf("[iptvvod] dica TMDB do provedor recusada (titulo diferente)\n"); continue; }
+    if (!confere) continue;
+    if (!dica && !r->ano) continue;
+    grupos[(*nG)++] = bib.g[g].chave;
+    for (int j = bib.g[g].primeira; j >= 0 && n < max; j = bib.c[j].proximo) {
+      if (!copiaConfere(&bib.c[j], n1, n2, r->ano) && bib.c[j].tmdb != r->tmdb) continue;
+      out[n].conta = bib.c[j].conta;
+      snprintf(out[n].sid, sizeof out[n].sid, "%s", bib.c[j].sid);
+      snprintf(out[n].ext, sizeof out[n].ext, "%s", bib.c[j].ext);
+      snprintf(out[n].nome, sizeof out[n].nome, "%s", bib.c[j].nome);
+      n++;
+    }
+  }
+  pthread_mutex_unlock(&trava);
+  return n;
+}
+// Resolutions are reused for the session (one TMDB call per title opened).
+#define RESOLV_CACHE 64
+static struct { char id[24]; char kind; Resolvido r; int ok; } resolvCache[RESOLV_CACHE];
+static int nResolv;
+static pthread_mutex_t travaResolv = PTHREAD_MUTEX_INITIALIZER;
+int iptvvod_origem(const char *id, const char *tipo, int (*cancelado)(void *), void *ctx,
+                   void *aviso, void *avisoU, void *saida) {
+  Stream **lista = saida;
+  char imdb[16], chaveId[24];
+  long tmdb;
+  int t, e, ok = 0, i, nr, nG, n = 0;
+  char kind;
+  Resolvido r;
+  Ref refs[IPTVVOD_CONTAS_MAX * 2];
+  uint64_t grupos[4];
+  Stream *l;
+  (void)aviso; (void)avisoU;
+  if (lista) *lista = NULL;
+  if (!iptvvod_ativo() || !idCatalogo(id, imdb, sizeof imdb, &tmdb, &t, &e)) return 0;
+  kind = (tipo && (!strcmp(tipo, "series") || !strcmp(tipo, "tv"))) || e > 0 ? 's' : 'm';
+  if (imdb[0]) snprintf(chaveId, sizeof chaveId, "%s", imdb); else snprintf(chaveId, sizeof chaveId, "tmdb:%ld", tmdb);
+  pthread_mutex_lock(&travaResolv);
+  for (i = 0; i < nResolv; i++) if (resolvCache[i].kind == kind && !strcmp(resolvCache[i].id, chaveId)) {
+    r = resolvCache[i].r; ok = resolvCache[i].ok; break;
+  }
+  pthread_mutex_unlock(&travaResolv);
+  if (i == nResolv) {
+    if (cancelado && cancelado(ctx)) return -1;
+    ok = resolver(imdb, tmdb, kind, &r);
+    if (ok < 0) return 0;
+    pthread_mutex_lock(&travaResolv);
+    i = nResolv < RESOLV_CACHE ? nResolv++ : (int)((unsigned long)fnv(chaveId, 1469598103934665603ULL) % RESOLV_CACHE);
+    snprintf(resolvCache[i].id, sizeof resolvCache[i].id, "%s", chaveId);
+    resolvCache[i].kind = kind; resolvCache[i].r = r; resolvCache[i].ok = ok;
+    pthread_mutex_unlock(&travaResolv);
+  }
+  if (ok <= 0) return 0;
+  nr = gruposDe(&r, refs, IPTVVOD_CONTAS_MAX * 2, grupos, 4, &nG);
+  if (!nr) return 0;
+  if (cancelado && cancelado(ctx)) return -1;
+  l = calloc((size_t)nr, sizeof *l);
+  if (!l) return -1;
+  if (kind == 'm') {
+    for (i = 0; i < nr; i++) if (montarFonte(&l[n], refs[i].conta, 0, refs[i].sid, refs[i].ext, refs[i].nome)) n++;
+  } else {
+    // Episodes: each matching group's providers, by season/episode.
+    for (int g = 0; g < nG && n < nr; g++) {
+      Ref rg[IPTVVOD_CONTAS_MAX];
+      char gid[64];
+      int ng;
+      iptvvod_id_montar(gid, sizeof gid, grupos[g], 's', 0, 0);
+      ng = copiasDo(gid, 's', rg, IPTVVOD_CONTAS_MAX, NULL);
+      if (!ng || serieMesclar(rg, ng, grupos[g], NULL, NULL, 0) < 0) continue;
+      pthread_mutex_lock(&travaEp);
+      for (int k = 0; epCacheGrupo == grupos[g] && k < nEpCache && n < nr; k++)
+        if (epCache[k].t == t && epCache[k].e == e) {
+          char nome[160] = "";
+          for (int j = 0; j < ng; j++) if (rg[j].conta == epCache[k].conta) snprintf(nome, sizeof nome, "%s", rg[j].nome);
+          if (montarFonte(&l[n], epCache[k].conta, 1, epCache[k].sid, epCache[k].ext, nome)) n++;
+        }
+      pthread_mutex_unlock(&travaEp);
+    }
+  }
+  if (!n) { free(l); return 0; }
+  printf("[iptvvod] %d fonte(s) IPTV para um titulo de addon\n", n);
+  if (lista) *lista = l; else free(l);
+  return n;
+}
+int iptvvod_origem_ativa(void) { return iptvvod_ativo() && chaveTmdbFn && chaveTmdbFn() && chaveTmdbFn()[0]; }
 
 int iptvvod_teste_esperar(int ms) {
   for (int i = 0; i < ms / 20; i++) {

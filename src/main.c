@@ -100,6 +100,7 @@
 #include "catalogo.h"
 #include "iconeapp.h"
 #include "descoberta.h"
+#include "iptvvod.h"
 #include "trakt.h"
 #include "player.h"
 #include "retomamorna.h"
@@ -1756,6 +1757,9 @@ int main(int argc, char **argv) {
   plugins_iniciar();
   plugins_ligar_aos_addons();
   plex_ligar_aos_addons();   // Plex: server file as one more source on matching titles
+  // IPTV library: provider copies of a catalogue title, matched through TMDB.
+  iptvvod_definir_chave_tmdb(desc_chave_tmdb_reserva);
+  iptvvod_ligar_aos_addons();
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);
   ajustes_migrar_escopo();   // 2.1: cada perfil parte do que esta TV usa hoje (uma vez, com backup)

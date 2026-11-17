@@ -3058,7 +3058,7 @@ static void segundaChance(Consulta *c, int fios) {
 // uma no proprio fio: a consulta rapida ao Plex nao espera os scrapers e os
 // scrapers nao seguram a fonte do servidor. As listas se somam na ordem de
 // registro.
-#define ORIGENS_EXTRA_MAX 2
+#define ORIGENS_EXTRA_MAX 3   // Plex, plugins, IPTV library
 static OrigemExtra origensExtra[ORIGENS_EXTRA_MAX];
 static int (*origensExtraAtiva[ORIGENS_EXTRA_MAX])(void);
 static OrigemPreparoOps origensExtraPreparo[ORIGENS_EXTRA_MAX];

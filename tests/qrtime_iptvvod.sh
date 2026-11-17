@@ -18,12 +18,15 @@ sleep 1
 mkdir -p "$W/a"
 QRT_SEED_XT2=1 "$W/seed" "$W/a" "http://127.0.0.1:$PORT" >/dev/null || { echo "FAIL: seeding"; exit 1; }
 fail=0
-"$W/t" "$W/a" online > "$W/out" 2>&1 || fail=1
+"$W/t" "$W/a" online "http://127.0.0.1:$PORT" > "$W/out" 2>&1 || fail=1
 # Providers down and the cache stale: the library must survive.
 kill "$MOCK"; MOCK=""
 sed -i '1s/.*/v1\t1/' "$W/a/iptvvod-p1.tsv"
 "$W/t" "$W/a" offline >> "$W/out" 2>&1 || fail=1
 grep -E "^(PASS|FAIL)" "$W/out"
+if grep -q "/3/find/.*api_key=QRTKEY\|qv:" "$W/requests.log"; then echo "FAIL: key or local id reached the fixture log"; fail=1; fi
+if grep -q "/3/find/" "$W/requests.log" && ! grep -qE "/3/find/(tt0133093|tt1375666|tt0903747|tt9999999|tt0000404)" "$W/requests.log"; then echo "FAIL: unexpected TMDB lookup"; fail=1; fi
+if grep -qE "/3/(find|movie|tv)/[^t0-9]" "$W/requests.log"; then echo "FAIL: a non-TMDB id went to TMDB"; fail=1; fi
 if grep -qE "qrtpass" "$W/out"; then echo "FAIL: a password reached the output"; fail=1; fi
 [ "$fail" = 0 ] && echo "qrtime_iptvvod: ok"
 exit "$fail"
