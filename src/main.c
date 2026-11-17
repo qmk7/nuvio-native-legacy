@@ -1760,6 +1760,7 @@ int main(int argc, char **argv) {
   // IPTV library: provider copies of a catalogue title, matched through TMDB.
   iptvvod_definir_chave_tmdb(desc_chave_tmdb_reserva);
   iptvvod_ligar_aos_addons();
+  cat_definir_progresso_local(iptvvod_progresso_gravar);   // IPTV progress stays on this TV
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);
   ajustes_migrar_escopo();   // 2.1: cada perfil parte do que esta TV usa hoje (uma vez, com backup)

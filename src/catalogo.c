@@ -1816,6 +1816,8 @@ void cat_salvar_progresso(int indice, double posSeg, double durSeg) {
   cat_salvar_progresso_ep(indice,posSeg,durSeg,0,0,-1);
 }
 
+static int (*progressoLocal)(const char *id, int temporada, int episodio, double posSeg, double durSeg);
+void cat_definir_progresso_local(int (*f)(const char *, int, int, double, double)) { progressoLocal = f; }
 int cat_salvar_progresso_ep(int indice, double posSeg, double durSeg, int temporada, int episodio,
                              int tocou) {
   indice = normalizarIndice(indice);
@@ -1827,7 +1829,13 @@ int cat_salvar_progresso_ep(int indice, double posSeg, double durSeg, int tempor
   // server's own check-ins (jellyfin.c) are their authority, and an opaque
   // server id would sync to every device of the account. The card still
   // shows the new position in this session.
-  if (jfid_e(itens[indice].imdb)) { cat_aplicar_progresso(indice, posSeg, durSeg, temporada, episodio); return 1; }
+  if (jfid_e(itens[indice].imdb)) {
+    // The IPTV library has no server to remember progress: it keeps its own,
+    // per profile and on this TV only (iptvvod.c, through this hook).
+    if (progressoLocal) progressoLocal(itens[indice].imdb, temporada, episodio, posSeg, durSeg);
+    cat_aplicar_progresso(indice, posSeg, durSeg, temporada, episodio);
+    return 1;
+  }
   if (!prog_gravar_local(itens[indice].imdb, temporada, episodio, posSeg, durSeg, tocou)) return 0;
   cat_aplicar_progresso(indice, posSeg, durSeg, temporada, episodio);
   return 1;
@@ -1883,6 +1891,12 @@ int cat_id_stream(int indiceItem, int t, int e, char *dst, unsigned tam) {
         snprintf(dst, tam, "%s", ep->vid);
         return 1;
       }
+    }
+    // IPTV library series ("qv:<16 hex>.s"): its episode id is defined by
+    // season and episode, so it is known without the list (iptvvod.h).
+    if (!strncmp(c->imdb, "qv:", 3) && strlen(c->imdb) == 21 && c->imdb[19] == '.' && c->imdb[20] == 's') {
+      snprintf(dst, tam, "%.19s.e%dx%d", c->imdb, t, e);
+      return 1;
     }
     // Sem id publicado nao se inventa o endereco de um especial do addon.
     if (t == 0 && !idbase_e_imdb(c->imdb)) return 0;

@@ -588,8 +588,10 @@ void iptvvod_carregar(void) {
   }
   pthread_detach(t);
 }
+static void progEsquecer(void);
 void iptvvod_perfil_trocou(void) {
   atomic_fetch_add(&geracao, 1);
+  progEsquecer();
   pthread_mutex_lock(&trava);
   biblioLiberar(&bib);
   bibPerfil = -1;
@@ -656,6 +658,112 @@ int iptvvod_n_copias(const char *id) {
   return n;
 }
 
+// ------------------------------------------------------------- progress
+// "iptvvod-prog-p<N>.tsv": "<item id>\t<season>\t<episode>\t<pos>\t<dur>\t<epoch>".
+// One line per movie or episode watched; local ids only, never synced.
+#define PROG_MAX 4000
+typedef struct { char id[32]; int t, e; double pos, dur; long long quando; } Prog;
+static Prog progs[PROG_MAX];
+static int nProgs, progPerfil = -1;
+static uint64_t progSessao;
+static pthread_mutex_t travaProg = PTHREAD_MUTEX_INITIALIZER;
+static void progArquivo(char *dst, size_t tam, int perfil) { snprintf(dst, tam, "iptvvod-prog-p%d.tsv", perfil > 0 ? perfil : 1); }
+static void progGarantirLocked(void) {
+  int perfil = perfis_ativo();
+  uint64_t sessao = nv_perfil_sessao_ler();
+  char nome[48], *t, *p;
+  if (perfil == progPerfil && sessao == progSessao) return;
+  progPerfil = perfil; progSessao = sessao; nProgs = 0;
+  progArquivo(nome, sizeof nome, perfil);
+  t = dados_ler(nome);
+  for (p = t; p && *p && nProgs < PROG_MAX;) {
+    char *fim = strchr(p, '\n');
+    Prog r;
+    if (fim) *fim = 0;
+    memset(&r, 0, sizeof r);
+    if (sscanf(p, "%31[^\t]\t%d\t%d\t%lf\t%lf\t%lld", r.id, &r.t, &r.e, &r.pos, &r.dur, &r.quando) == 6 &&
+        iptvvod_id_ler(r.id, NULL, NULL, NULL, NULL) && r.dur > 0)
+      progs[nProgs++] = r;
+    p = fim ? fim + 1 : NULL;
+  }
+  free(t);
+}
+static void progGravarLocked(void) {
+  size_t cap = (size_t)nProgs * 96 + 1, k = 0;
+  char *t = malloc(cap), nome[48];
+  if (!t) return;
+  t[0] = 0;
+  for (int i = 0; i < nProgs && k < cap; i++)
+    k += (size_t)snprintf(t + k, cap - k, "%s\t%d\t%d\t%.1f\t%.1f\t%lld\n", progs[i].id, progs[i].t, progs[i].e,
+                          progs[i].pos, progs[i].dur, progs[i].quando);
+  progArquivo(nome, sizeof nome, progPerfil);
+  if (nv_perfil_sessao_travar(progSessao)) {
+    if (nProgs) dados_gravar(nome, t); else dados_apagar(nome);
+    nv_perfil_sessao_destravar();
+  }
+  free(t);
+}
+int iptvvod_progresso_gravar(const char *id, int temporada, int episodio, double posSeg, double durSeg) {
+  char k;
+  int i;
+  if (!iptvvod_id_ler(id, NULL, &k, NULL, NULL) || k == 'e' || strlen(id) >= sizeof progs[0].id || durSeg <= 1.0) return 0;
+  if (k == 'm') temporada = episodio = 0;
+  pthread_mutex_lock(&travaProg);
+  progGarantirLocked();
+  if (posSeg <= 0.0) {
+    // Unwatched: every record of the item goes.
+    int w = 0;
+    for (i = 0; i < nProgs; i++) if (strcmp(progs[i].id, id)) progs[w++] = progs[i];
+    nProgs = w;
+  } else {
+    for (i = 0; i < nProgs && !(!strcmp(progs[i].id, id) && progs[i].t == temporada && progs[i].e == episodio); i++) {}
+    if (i == nProgs) {
+      if (nProgs == PROG_MAX) {   // the oldest record makes room
+        int velho = 0;
+        for (int j = 1; j < nProgs; j++) if (progs[j].quando < progs[velho].quando) velho = j;
+        progs[velho] = progs[--nProgs];
+      }
+      i = nProgs++;
+      snprintf(progs[i].id, sizeof progs[i].id, "%s", id);
+      progs[i].t = temporada; progs[i].e = episodio;
+    }
+    progs[i].pos = posSeg; progs[i].dur = durSeg; progs[i].quando = (long long)time(NULL);
+  }
+  progGravarLocked();
+  pthread_mutex_unlock(&travaProg);
+  return 1;
+}
+static int progPct(const Prog *r) {
+  int p = r->dur > 0 ? (int)(r->pos * 100.0 / r->dur) : 0;
+  return p >= IPTVVOD_VISTO_PCT ? 100 : p < 0 ? 0 : p;
+}
+int iptvvod_progresso_de(const char *id, int *pct, int *temporada, int *episodio) {
+  int melhor = -1;
+  pthread_mutex_lock(&travaProg);
+  progGarantirLocked();
+  for (int i = 0; i < nProgs; i++)
+    if (!strcmp(progs[i].id, id) && (melhor < 0 || progs[i].quando > progs[melhor].quando)) melhor = i;
+  if (melhor >= 0) {
+    if (pct) *pct = progPct(&progs[melhor]);
+    if (temporada) *temporada = progs[melhor].t;
+    if (episodio) *episodio = progs[melhor].e;
+  }
+  pthread_mutex_unlock(&travaProg);
+  return melhor >= 0;
+}
+static void progEsquecer(void) {
+  pthread_mutex_lock(&travaProg);
+  progPerfil = -1; nProgs = 0;
+  pthread_mutex_unlock(&travaProg);
+}
+// The card shows (and the player resumes from) the latest position.
+static void progAplicar(CatItem *it) {
+  int pct = 0, t = 0, e = 0;
+  if (!iptvvod_progresso_de(it->imdb, &pct, &t, &e)) return;
+  it->progresso = pct;
+  if (!strcmp(it->tipo, "series") && e > 0) { it->temporada = t; it->episodio = e; }
+}
+
 // ------------------------------------------------------------- Home rows
 static void itemDoGrupo(const Biblio *b, int g, CatItem *it) {
   const Copia *c = &b->c[b->g[g].primeira];
@@ -691,9 +799,47 @@ static int topRecentes(const Biblio *b, char kind, int *out, int max) {
   return n;
 }
 int iptvvod_fileiras_copiar(CatItem *itens, int maxItens, CatFileira *fils, int maxFils, int *nItens) {
-  int nf = 0, ni = 0;
+  int nf = 0, ni = 0, nCont = 0;
+  char cont[IPTVVOD_POR_FILEIRA][32];
   if (nItens) *nItens = 0;
+  // Continue watching: items whose latest record is started and not finished,
+  // most recent first (a snapshot of the progress, then the library lock).
+  pthread_mutex_lock(&travaProg);
+  progGarantirLocked();
+  {
+    Prog *ord = malloc(sizeof(Prog) * (size_t)(nProgs ? nProgs : 1));
+    int no = 0;
+    if (ord) {
+      for (int i = 0; i < nProgs; i++) {
+        int j, dup = 0;
+        for (j = 0; j < no; j++) if (!strcmp(ord[j].id, progs[i].id)) { dup = 1; if (progs[i].quando > ord[j].quando) ord[j] = progs[i]; break; }
+        if (!dup) ord[no++] = progs[i];
+      }
+      for (int i = 1; i < no; i++) for (int j = i; j > 0 && ord[j].quando > ord[j - 1].quando; j--) { Prog t = ord[j]; ord[j] = ord[j - 1]; ord[j - 1] = t; }
+      for (int i = 0; i < no && nCont < IPTVVOD_POR_FILEIRA; i++) {
+        int pct = progPct(&ord[i]);
+        if (pct >= 1 && pct < 100) snprintf(cont[nCont++], 32, "%s", ord[i].id);
+      }
+      free(ord);
+    }
+  }
+  pthread_mutex_unlock(&travaProg);
   pthread_mutex_lock(&trava);
+  if (bibValidaLocked() && nCont && nf < maxFils) {
+    int n = 0;
+    for (int i = 0; i < nCont && ni + n < maxItens; i++) {
+      int g = grupoPorId(&bib, cont[i], NULL);
+      if (g >= 0) itemDoGrupo(&bib, g, &itens[ni + n++]);
+    }
+    if (n) {
+      memset(&fils[nf], 0, sizeof fils[nf]);
+      snprintf(fils[nf].chave, sizeof fils[nf].chave, "iptvvod_continuar");
+      snprintf(fils[nf].titulo, sizeof fils[nf].titulo, "%s · IPTV", i18n("Continuar assistindo"));
+      snprintf(fils[nf].tipo, sizeof fils[nf].tipo, "movie");
+      fils[nf].ini = ni; fils[nf].n = n;
+      ni += n; nf++;
+    }
+  }
   if (bibValidaLocked()) {
     for (int k = 0; k < 2 && nf < maxFils; k++) {
       int top[IPTVVOD_POR_FILEIRA], n = topRecentes(&bib, k ? 's' : 'm', top, IPTVVOD_POR_FILEIRA);
@@ -709,8 +855,31 @@ int iptvvod_fileiras_copiar(CatItem *itens, int maxItens, CatFileira *fils, int 
     }
   }
   pthread_mutex_unlock(&trava);
+  for (int i = 0; i < ni; i++) progAplicar(&itens[i]);
   if (nItens) *nItens = ni;
   return nf;
+}
+
+// ------------------------------------------------------------- search
+int iptvvod_buscar(const char *termo, char kind, CatItem *saida, int max) {
+  char q[128];
+  int n = 0, nivel;
+  iptvvod_normalizar(termo ? termo : "", q, sizeof q);
+  if (!q[0] || max <= 0) return 0;
+  pthread_mutex_lock(&trava);
+  // Three passes keep the best matches first without sorting the library.
+  for (nivel = 0; nivel < 3 && n < max && bibValidaLocked(); nivel++)
+    for (int g = 0; g < bib.ng && n < max; g++) {
+      const char *t = bib.c[bib.g[g].primeira].norm;
+      int casa;
+      if (bib.g[g].kind != kind || !t[0]) continue;
+      casa = nivel == 0 ? !strcmp(t, q) : nivel == 1 ? (!strncmp(t, q, strlen(q)) && strcmp(t, q))
+           : (strstr(t, q) && strncmp(t, q, strlen(q)));
+      if (casa) itemDoGrupo(&bib, g, &saida[n++]);
+    }
+  pthread_mutex_unlock(&trava);
+  for (int i = 0; i < n; i++) progAplicar(&saida[i]);
+  return n;
 }
 
 // ------------------------------------------------------------- title page

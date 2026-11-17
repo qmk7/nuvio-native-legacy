@@ -923,7 +923,7 @@ typedef struct {
   char id[96];
   char titulo[96];
   char addon[64];
-  int  nuvio;           // 1 = catalogo do Nuvio, com o Cinemeta de reserva
+  int  nuvio;           // 1 = catalogo do Nuvio, com o Cinemeta de reserva; 2 = biblioteca IPTV (local)
 } AlvoBusca;
 
 static AlvoBusca alvos[BUSCA_ALVOS];
@@ -960,6 +960,17 @@ void desc_alvos_busca_zerar(void) {
       snprintf(a->titulo,sizeof a->titulo,"%s", rot[t]);
       snprintf(a->addon, sizeof a->addon, "%s", "Nuvio");
       a->nuvio = 1;
+    } }
+  // QR TIME: the IPTV library (iptvvod.h), searched on this TV, no network.
+  { int t; const char *tt[2] = { "movie", "series" };
+    const char *rot[2] = { "Filmes", "Séries" };
+    for (t = 0; t < 2 && nAlvos < BUSCA_ALVOS; t++) {
+      AlvoBusca *a = &alvos[nAlvos++];
+      memset(a, 0, sizeof *a);
+      snprintf(a->tipo,  sizeof a->tipo,  "%s", tt[t]);
+      snprintf(a->titulo,sizeof a->titulo,"%s", rot[t]);
+      snprintf(a->addon, sizeof a->addon, "%s", "IPTV");
+      a->nuvio = 2;
     } }
   memset(resAlvo, 0, sizeof resAlvo);
   // ESQUECE O TERMO JA PEDIDO. Sem isto, depois que a lista de addons muda (um
@@ -1010,6 +1021,7 @@ static int consultarAlvo(const AlvoBusca *a, const char *termo,
   // estao la. O alvo do Nuvio tem 5 s e, se falhar, o Cinemeta mais 6.
   // #231: com "Buscar no Cinemeta" desligado, nem o add-on Cinemeta nem a reserva
   // do catalogo do Nuvio (seg_cine < 0) respondem.
+  if (a->nuvio == 2) return iptvvod_buscar(termo, !strcmp(a->tipo, "series") ? 's' : 'm', saida, max);
   if (a->nuvio && ajustes_busca_nuvio() == 2) return 0;   // #311: Nuvio fora da busca
   if (!a->nuvio && !ajustes_busca_cinemeta() &&
       (baseEhCinemeta(a->base) || desc_busca_base_oculta(a->base) ||
@@ -1174,7 +1186,7 @@ const char *desc_busca_alvo_addon(int alvo) {
 }
 
 int desc_busca_alvo_nuvio(int alvo) {
-  return (alvo >= 0 && alvo < nAlvos) ? alvos[alvo].nuvio : 0;
+  return (alvo >= 0 && alvo < nAlvos) ? alvos[alvo].nuvio == 1 : 0;
 }
 
 // #311: quantas FONTES (nomes de addon distintos) a busca consulta de fato, com
@@ -1186,7 +1198,8 @@ int desc_busca_n_fontes(void) {
   for (i = 0; i < nAlvos; i++) {
     const AlvoBusca *a = &alvos[i];
     int repetida = 0;
-    if (a->nuvio ? ajustes_busca_nuvio() == 2
+    if (a->nuvio == 2 ? !iptvvod_ativo()
+        : a->nuvio ? ajustes_busca_nuvio() == 2
                  : (!ajustes_busca_cinemeta() &&
                     (baseEhCinemeta(a->base) || desc_busca_base_oculta(a->base) ||
                      !strcasecmp(a->addon, "cinemeta")))) continue;

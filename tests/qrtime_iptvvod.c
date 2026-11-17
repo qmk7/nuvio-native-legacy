@@ -28,6 +28,7 @@ static const char *chaveTeste(void) { return "QRTKEY"; }
 #define CONFERE(c, o) do { int ok_ = (c); printf("%s: %s\n", ok_ ? "PASS" : "FAIL", o); if (!ok_) falhas++; } while (0)
 
 static CatItem itens[64];
+static char serieId[64];   // Breaking Bad's local id, kept across profile switches
 static CatFileira fils[4];
 static int nf, ni;
 static const CatItem *porTitulo(const char *t) {
@@ -209,12 +210,64 @@ int main(int argc, char **argv) {
     CONFERE(n == 0, "other addon namespaces are not guessed");
   }
 
+  // ---- search (local, no network) ----
+  {
+    CatItem r[8];
+    int n = iptvvod_buscar("MATRIX", 'm', r, 8);
+    CONFERE(n == 1 && !strcmp(r[0].titulo, "The Matrix") && !strncmp(r[0].imdb, "qv:", 3), "search: case-insensitive, one item for 4 copies");
+    n = iptvvod_buscar("in", 'm', r, 8);
+    CONFERE(n >= 2 && !strcmp(r[0].titulo, "Inception"), "search: prefix matches before inner matches");
+    CONFERE(iptvvod_buscar("breaking", 's', r, 8) == 1 && iptvvod_buscar("breaking", 'm', r, 8) == 0, "search: by kind");
+    CONFERE(iptvvod_buscar("stalker only", 'm', r, 8) == 1 && iptvvod_buscar("m3u only", 'm', r, 8) == 1,
+            "search: provider-only titles are found");
+    CONFERE(iptvvod_buscar("zzz", 'm', r, 8) == 0 && iptvvod_buscar("", 'm', r, 8) == 0, "search: nothing for no match");
+  }
+
+  // ---- progress, continue watching, watched/unwatched ----
+  {
+    char mid[64] = "", sid[64] = "";
+    const CatItem *m = porTitulo("The Matrix"), *bb = porTitulo("Breaking Bad"), *cw;
+    int pct = 0, t = 0, e = 0;
+    if (m) snprintf(mid, sizeof mid, "%s", m->imdb);
+    if (bb) snprintf(sid, sizeof sid, "%s", bb->imdb);
+    snprintf(serieId, sizeof serieId, "%s", sid);
+    CONFERE(!iptvvod_progresso_gravar("tt0133093", 0, 0, 10, 100), "progress: only local qv ids are kept");
+    CONFERE(iptvvod_progresso_gravar(mid, 0, 0, 600, 8160), "movie position recorded");
+    sleep(1);
+    CONFERE(iptvvod_progresso_gravar(sid, 1, 2, 1000, 2820), "episode position recorded");
+    nf = iptvvod_fileiras_copiar(itens, 64, fils, 4, &ni);
+    CONFERE(nf == 3 && !strcmp(fils[0].chave, "iptvvod_continuar") && fils[0].n == 2, "Continue Watching row first, 2 items");
+    cw = &itens[0];
+    CONFERE(!strcmp(cw->imdb, sid) && cw->temporada == 1 && cw->episodio == 2 && cw->progresso == 35,
+            "most recent first: Breaking Bad at S1E2, 35%");
+    CONFERE(!strcmp(itens[1].imdb, mid) && itens[1].progresso == 7, "The Matrix at 7%");
+    CONFERE(iptvvod_progresso_gravar(mid, 0, 0, 8000, 8160) && iptvvod_progresso_de(mid, &pct, NULL, NULL) && pct == 100,
+            "98% counts as watched");
+    nf = iptvvod_fileiras_copiar(itens, 64, fils, 4, &ni);
+    CONFERE(fils[0].n == 1 && !strcmp(itens[0].imdb, sid), "a watched movie leaves Continue Watching");
+    { const CatItem *mm = porTitulo("The Matrix");
+      int achou = 0;
+      for (int i = fils[0].n; i < ni; i++) if (!strcmp(itens[i].imdb, mid)) achou = itens[i].progresso == 100;
+      CONFERE(mm && achou, "its card elsewhere shows it watched"); }
+    CONFERE(iptvvod_progresso_gravar(mid, 0, 0, 0, 8160) && !iptvvod_progresso_de(mid, &pct, NULL, NULL),
+            "marked unwatched: its records are gone");
+    CONFERE(iptvvod_progresso_de(sid, &pct, &t, &e) && t == 1 && e == 2, "the series keeps its episode");
+    { char *f = dados_ler("iptvvod-prog-p1.tsv");
+      CONFERE(f && strstr(f, sid) && !strstr(f, "tt0") && !strstr(f, "qrt"), "stored per profile, local ids only");
+      free(f); }
+  }
+
   // ---- profile isolation ----
   perfil = 2;
   carregar();
   CONFERE(!iptvvod_ativo() && nf == 0 && iptvvod_n_itens('m') == 0, "profile 2 (no providers): nothing from profile 1");
+  { int pct = 0;
+    CONFERE(serieId[0] && !iptvvod_progresso_de(serieId, &pct, NULL, NULL),
+            "profile 2 sees none of profile 1's progress"); }
   perfil = 1;
   carregar();
   CONFERE(iptvvod_n_itens('m') == 5, "back to profile 1: its library again");
+  { int pct = 0, t = 0, e = 0;
+    CONFERE(iptvvod_progresso_de(serieId, &pct, &t, &e) && t == 1 && e == 2, "and its progress again"); }
   return falhas ? 1 : 0;
 }

@@ -856,6 +856,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "layout.h"
 #include "segurar.h"
 #include "servidores.h"
+#include "jfid.h"
 #include "partes.h"
 #include "logrede.h"
 #include <stdio.h>
@@ -4832,8 +4833,11 @@ static void marcarAssistidoSeSolicitado(void) {
       // progresso de 100% (que a conta ja entende como concluido), e o
       // historico do titulo — o que o menu do cartaz le para dizer "Desmarcar"
       // — nunca era escrito. Com Trakt quem escreve o historico e o 2xx dele.
-      visto_titulo(c->imdb, c->tipo, c->temporadas, c->nTemporadas, !visto,
-                   visto_destinos());
+      // A personal-library id (server or IPTV, jfid.h) is local to this TV:
+      // never sent to Trakt, Simkl or the Nuvio account.
+      if (!jfid_e(c->imdb))
+        visto_titulo(c->imdb, c->tipo, c->temporadas, c->nTemporadas, !visto,
+                     visto_destinos());
       // NA HORA, com ou sem Trakt (#212): o olho e o selo leem o historico, e
       // esperar o 2xx deixava o olho no estado velho por um ou dois segundos
       // — ou para sempre, se o historico conhecido dizia o contrario do

@@ -29,7 +29,7 @@
 struct Stream;
 
 #define IPTVVOD_PREFIXO "qv:"
-#define IPTVVOD_FIL_MAX 2           // Home rows: recent movies, recent series
+#define IPTVVOD_FIL_MAX 3           // Home rows: continue watching, recent movies, recent series
 #define IPTVVOD_POR_FILEIRA 24
 
 // ---- identity (pure; tests) ----
@@ -63,6 +63,20 @@ int  iptvvod_ficha(CatItem *item, CatEp *eps, int maxEps);
 // at once; colher (UI thread) answers JF_FONTES_* like the servers.
 int  iptvvod_fontes_pedir(const char *alvo);
 int  iptvvod_fontes_colher(const char *alvo, struct Stream **lista, int *n);
+
+// Search (no network): items whose normalized title contains the term's,
+// exact titles first, then prefixes, then the rest. Returns items written.
+int  iptvvod_buscar(const char *termo, char kind, CatItem *saida, int max);
+
+// ---- progress (this TV, this profile; never synced anywhere) ----
+// Records the position of a movie, or of an episode of a series item. The
+// id is the ITEM id ("qv:...m" / "qv:...s"); for series, season/episode say
+// which one. A position of 0 clears the item (marked unwatched).
+#define IPTVVOD_VISTO_PCT 90
+int  iptvvod_progresso_gravar(const char *id, int temporada, int episodio, double posSeg, double durSeg);
+// Latest record of an item: percent watched (100 = finished), and for a
+// series the episode. 0 when there is none.
+int  iptvvod_progresso_de(const char *id, int *pct, int *temporada, int *episodio);
 
 // ---- matching addon titles (resolved ids only) ----
 // Sources of the IPTV library for a catalogue title that came from an addon:

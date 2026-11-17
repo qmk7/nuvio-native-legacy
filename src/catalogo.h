@@ -206,6 +206,10 @@ typedef struct {
 // Le <dir>/catalogo.txt. Devolve quantos itens carregou (0 = nenhum, e quem
 // chama deve seguir com o que tiver).
 int  cat_carregar(const char *dirArte);
+// Progress of personal-library items that keep it on this TV (the IPTV
+// library, iptvvod.c). Set once at start; NULL keeps the session-only copy.
+void cat_definir_progresso_local(int (*f)(const char *id, int temporada, int episodio,
+                                          double posSeg, double durSeg));
 
 // --- CACHE EM DISCO DO CATALOGO MONTADO PELA REDE ----------------------------
 //
