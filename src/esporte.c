@@ -274,6 +274,20 @@ int esporte_time_em(const EspTime *t, const char *texto) {
   if (strlen(t->abrev) >= 3) { char a[16]; dobrar(t->abrev, a, sizeof a); if (palavraEm(a, d)) return 1; }
   return 0;
 }
+// Every word of a broadcaster's name ("bein sports 1") is a word of the
+// channel's name: numbers count ("beIN Sports 11" is not channel 1).
+static int canalNomeado(const char *broadcaster, const char *nomeCanal) {
+  char b[96], c[200], *w, *sp;
+  int algum = 0;
+  dobrar(broadcaster, b, sizeof b);
+  dobrar(nomeCanal, c, sizeof c);
+  for (w = strtok_r(b, " ", &sp); w; w = strtok_r(NULL, " ", &sp)) {
+    if (!strcmp(w, "hd") || !strcmp(w, "fhd") || !strcmp(w, "uhd") || !strcmp(w, "4k")) continue;
+    algum = 1;
+    if (!palavraEm(w, c)) return 0;
+  }
+  return algum;
+}
 static int cmpSug(const void *a, const void *b) {
   return ((const EspSugestao *)b)->pontos - ((const EspSugestao *)a)->pontos;
 }
@@ -304,6 +318,19 @@ int esporte_sugerir(const EspEvento *e, const EspCanalInfo *canais, int n, EspPr
     if (esporte_time_em(&e->casa, canais[i].nome) && esporte_time_em(&e->fora, canais[i].nome)) {
       s.pontos = 150; s.certeza = ESP_PASSA;
       snprintf(s.motivo, sizeof s.motivo, "%s", "nome do canal");
+    }
+    // TheSportsDB names this exact channel for the match (country-specific).
+    if (e->tvPais[0]) {
+      char t[512], *it, *sp;
+      snprintf(t, sizeof t, "%s", e->tvPais);
+      for (it = strtok_r(t, ";", &sp); it; it = strtok_r(NULL, ";", &sp)) {
+        char *bar = strchr(it, '|');
+        if (bar) *bar = 0;
+        if (canalNomeado(it, canais[i].nome) && 120 > s.pontos) {
+          s.pontos = 120; s.certeza = ESP_PASSA;
+          snprintf(s.motivo, sizeof s.motivo, "TheSportsDB: %s%s%s%s", it, bar ? " (" : "", bar ? bar + 1 : "", bar ? ")" : "");
+        }
+      }
     }
     // 1 / 3. Programmes on air at kick-off.
     if (progs) {

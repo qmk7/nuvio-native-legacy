@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · herkese açık profil"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt, Simkl ve Letterboxd tek kişi olur, tekrarlanan arkadaş olmaz. Social panelinde sekmeler başlığın yanındadır: Arkadaşlar, Etkinlik ve Takvim."),
   T("Transição do destaque", "Öne çıkan geçişi"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "Tarayıcının, uygulamanın dışında yaşayan tanılama panelini geri getirir."),
   T("Trilha", "Müzik"),
   T("Trilha original · Prévias de áudio", "Orijinal müzik · Ses önizlemeleri"),

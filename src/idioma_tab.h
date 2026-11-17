@@ -5490,6 +5490,7 @@
   { "Trakt · perfil público", "Trakt · public profile" },
   { "Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt, Simkl and Letterboxd become one person, with no duplicated friends. In the Social panel, tabs sit beside the title: Friends, Activity and Schedule." },
   { "Transição do destaque", "Hero transition" },
+  { "Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)" },
   { "Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "Brings back the browser's diagnostics panel, which lives outside the app." },
   { "Trilha", "Soundtrack" },
   { "Trilha original · Prévias de áudio", "Original score · Audio previews" },

@@ -41,7 +41,7 @@ Xvfb ":$D" -screen 0 1920x1080x24 >/dev/null 2>&1 &
 PIDS+=($!)
 sleep 1
 APP=""
-abrir() { QRT_ESPN_BASE="http://127.0.0.1:$PORT/espn" NUVIO_DADOS="$d" DISPLAY=":$D" "$ROOT/$BIN" "$ROOT/deploy/app/art" >"$1" 2>&1 &
+abrir() { QRT_ESPN_BASE="http://127.0.0.1:$PORT/espn" QRT_TSDB_BASE="http://127.0.0.1:$PORT/tsdb" NUVIO_DADOS="$d" DISPLAY=":$D" "$ROOT/$BIN" "$ROOT/deploy/app/art" >"$1" 2>&1 &
           APP=$!; LOG=$1; PIDS+=($APP); }
 fechar() { kill "$APP" 2>/dev/null; sleep 1; kill -9 "$APP" 2>/dev/null; }
 espera() { local i; for i in $(seq 1 "${2:-60}"); do grep -qE "$1" "$LOG" && return 0; sleep 1; done; return 1; }
@@ -63,6 +63,8 @@ grep -q "soccer/esp.1: o provedor nao respondeu" "$LOG" && ok "a failing league 
 tecla down 0.6; tecla down 0.6; tecla ok 3
 espera "grade publicada" 40 || erro "guide EPG did not load"
 sleep 6
+espera "TheSportsDB: [0-9]+ canal\(is\) para o evento 700001" 20 && grep -q "TheSportsDB: 3 canal(is) para o evento 700001" "$LOG" \
+  && ok "TheSportsDB channels fetched for the match (beIN / SSC)" || erro "TheSportsDB lookup"
 tecla ok 2      # first action: the suggestion "QRT Sports Arena · showing it"
 grep -q "canal	700001	xtream:@00000001:201	QRT Sports Arena" "$d/esporte-p1.txt" && ok "suggested channel (programme names both teams) linked to the match" \
   || erro "suggestion not linked: $(cat "$d/esporte-p1.txt" 2>/dev/null)"

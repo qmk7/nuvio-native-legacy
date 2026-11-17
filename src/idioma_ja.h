@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · 公開プロフィール"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt、Simkl、Letterboxd が一人にまとまり、友達の重複はありません。ソーシャルパネルではタイトルの横にタブ：友達、アクティビティ、スケジュール。"),
   T("Transição do destaque", "ヒーローの切り替え"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "アプリの外にあるブラウザの診断パネルを呼び戻します。"),
   T("Trilha", "音楽"),
   T("Trilha original · Prévias de áudio", "オリジナル音楽 · 試聴"),

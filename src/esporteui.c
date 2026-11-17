@@ -1,6 +1,7 @@
 #include "esporteui.h"
 #include "espn.h"
 #include "esporte.h"
+#include "tsdb.h"
 #include "guia.h"
 #include "epg.h"
 #include "xtepg.h"
@@ -301,10 +302,46 @@ static void montarAcoes(void) {
   }
   if (focoAcao >= nAcoes) focoAcao = nAcoes ? nAcoes - 1 : 0;
 }
+// TheSportsDB channels for the open match, looked up on a worker thread.
+static pthread_mutex_t travaTv = PTHREAD_MUTEX_INITIALIZER;
+static char tvEvento[24], tvResultado[512];
+static int tvPronto, tvFio;
+static void *fioTv(void *u) {
+  EspEvento e = *(EspEvento *)u;
+  TsdbTv tv[TSDB_TV_MAX];
+  char r[512] = "";
+  size_t k = 0;
+  int n;
+  free(u);
+  n = tsdb_canais(&e, tv, TSDB_TV_MAX);
+  for (int i = 0; i < n && k + 8 < sizeof r; i++)
+    k += (size_t)snprintf(r + k, sizeof r - k, "%s%s|%s", i ? ";" : "", tv[i].canal, tv[i].pais);
+  pthread_mutex_lock(&travaTv);
+  if (!strcmp(tvEvento, e.id)) { snprintf(tvResultado, sizeof tvResultado, "%s", r); tvPronto = 1; }
+  tvFio = 0;
+  pthread_mutex_unlock(&travaTv);
+  return NULL;
+}
+static void pedirTv(const EspEvento *e) {
+  pthread_t t;
+  EspEvento *c;
+  pthread_mutex_lock(&travaTv);
+  if (tvFio) { pthread_mutex_unlock(&travaTv); return; }
+  snprintf(tvEvento, sizeof tvEvento, "%s", e->id);
+  tvPronto = 0; tvResultado[0] = 0;
+  pthread_mutex_unlock(&travaTv);
+  c = malloc(sizeof *c);
+  if (!c) return;
+  *c = *e;
+  pthread_mutex_lock(&travaTv); tvFio = 1; pthread_mutex_unlock(&travaTv);
+  if (pthread_create(&t, NULL, fioTv, c) != 0) { free(c); pthread_mutex_lock(&travaTv); tvFio = 0; pthread_mutex_unlock(&travaTv); return; }
+  pthread_detach(t);
+}
 static void abrirDetalhe(const EspEvento *e) {
   atual = *e; temAtual = 1;
   zona = Z_DETALHE; focoAcao = 0;
   montarAcoes();
+  pedirTv(e);
 }
 static void assistir(const char *canal, const char *nome) {
   if (guia_item_do_canal(canal, nome, "", &pedido)) {
@@ -472,7 +509,13 @@ void esporteui_atualizar(float dt, Uint32 agora) {
   if (visto != revisao) {
     montar();
     // A newer score for the open match page.
-    if (temAtual) for (int i = 0; i < nVista; i++) if (!strcmp(vista[i].id, atual.id)) { atual = vista[i]; break; }
+    if (temAtual) for (int i = 0; i < nVista; i++) if (!strcmp(vista[i].id, atual.id)) {
+      char tp[512];
+      snprintf(tp, sizeof tp, "%s", atual.tvPais);
+      atual = vista[i];
+      snprintf(atual.tvPais, sizeof atual.tvPais, "%s", tp);
+      break;
+    }
   }
   // The guide's EPG only advances while someone drives it (the guide screen,
   // the player): the Sport Center does too, so suggestions have programmes.
@@ -494,6 +537,15 @@ void esporteui_atualizar(float dt, Uint32 agora) {
       else { int ns = 0; for (int i = 0; i < nAcoes; i++) ns += acoes[i].tipo == AC_SUGESTAO; if (!ns && nc > 0) montarAcoes(); }
       epgVisto = agora;
     }
+  }
+  // TheSportsDB answered for the open match: its channels join the page.
+  {
+    int pronto = 0;
+    char r[512];
+    pthread_mutex_lock(&travaTv);
+    if (tvPronto && temAtual && !strcmp(tvEvento, atual.id)) { pronto = 1; snprintf(r, sizeof r, "%s", tvResultado); tvPronto = 0; }
+    pthread_mutex_unlock(&travaTv);
+    if (pronto && strcmp(r, atual.tvPais)) { snprintf(atual.tvPais, sizeof atual.tvPais, "%s", r); montarAcoes(); }
   }
   if (abrirPend[0]) {
     for (int i = 0; i < nVista; i++) if (!strcmp(vista[i].id, abrirPend)) { abrirDetalhe(&vista[i]); abrirPend[0] = 0; break; }
@@ -573,6 +625,22 @@ void esporteui_desenhar(Uint32 agora) {
     estadoTexto(e, b, sizeof b);
     { TxtLinha l = txt_linha(TXT_CALLOUT, b, 255, 120, 110, 255); txt_desenhar_alpha(l, x + (w - (float)l.w) * 0.5f, y + 90, e->estado == ESP_AO_VIVO ? 1 : 0.7f); }
     y += 170;
+    if (e->tvPais[0]) {
+      char t[512], *it, *sp, lin[300] = "";
+      size_t k = 0;
+      int c = 0;
+      snprintf(t, sizeof t, "%s", e->tvPais);
+      for (it = strtok_r(t, ";", &sp); it && c < 4; it = strtok_r(NULL, ";", &sp), c++) {
+        char *bar = strchr(it, '|');
+        if (bar) *bar = 0;
+        k += (size_t)snprintf(lin + k, sizeof lin - k, "%s%s%s%s%s", c ? "  ·  " : "", it, bar && bar[1] ? " (" : "",
+                              bar && bar[1] ? bar + 1 : "", bar && bar[1] ? ")" : "");
+        if (k >= sizeof lin) break;
+      }
+      snprintf(b, sizeof b, "%s: %s", i18n("Transmissão (TheSportsDB)"), lin);
+      texto(TXT_CAPTION, b, x, y, 0.7f, 200, 202, 210);
+      y += 40;
+    }
     if (e->local[0] || e->tv[0]) {
       snprintf(b, sizeof b, "%s%s%s%s", e->local, e->local[0] && e->tv[0] ? "  ·  " : "", e->tv[0] ? "TV: " : "", e->tv);
       texto(TXT_CAPTION, b, x, y, 0.6f, 200, 202, 210);

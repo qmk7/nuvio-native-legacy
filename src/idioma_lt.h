@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · viešas profilis"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt, Simkl ir Letterboxd tampa vienu asmeniu, be pasikartojančių draugų. Social skydelyje skirtukai šalia pavadinimo: Draugai, Veikla ir Tvarkaraštis."),
   T("Transição do destaque", "Išskirto perėjimas"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "Grąžina naršyklės diagnostikos skydelį, kuris yra už programos ribų."),
   T("Trilha", "Muzika"),
   T("Trilha original · Prévias de áudio", "Originali muzika · Garso ištraukos"),

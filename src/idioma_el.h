@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · δημόσιο προφίλ"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt, Simkl και Letterboxd γίνονται ένα πρόσωπο, χωρίς διπλούς φίλους. Στο πάνελ Social οι καρτέλες είναι δίπλα στον τίτλο: Φίλοι, Δραστηριότητα και Πρόγραμμα."),
   T("Transição do destaque", "Μετάβαση προβολής"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "Επαναφέρει τον πίνακα διαγνωστικών του προγράμματος περιήγησης, που ζει έξω από την εφαρμογή."),
   T("Trilha", "Μουσική"),
   T("Trilha original · Prévias de áudio", "Πρωτότυπη μουσική · Ηχητικά αποσπάσματα"),

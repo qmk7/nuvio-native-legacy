@@ -5490,6 +5490,7 @@
   T("Trakt · perfil público", "Trakt · profil public"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt, Simkl și Letterboxd devin o singură persoană, fără prieteni dublați. În panoul Social, filele stau lângă titlu: Prieteni, Activitate și Agendă."),
   T("Transição do destaque", "Tranziție evidență"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "Readuce panoul de diagnosticare al browserului, care se află în afara aplicației."),
   T("Trilha", "Muzică"),
   T("Trilha original · Prévias de áudio", "Muzică originală · Mostre audio"),

@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · 公开个人资料"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt、Simkl 和 Letterboxd 合并为一个人，好友不再重复。社交面板的标签在标题旁：好友、动态和日程。"),
   T("Transição do destaque", "焦点区切换"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "调出位于应用之外的浏览器诊断面板。"),
   T("Trilha", "配乐"),
   T("Trilha original · Prévias de áudio", "原创配乐 · 音频试听"),

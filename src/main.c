@@ -103,6 +103,7 @@
 #include "iptvvod.h"
 #include "posterprov.h"
 #include "espn.h"
+#include "tsdb.h"
 #include "trakt.h"
 #include "player.h"
 #include "retomamorna.h"
@@ -1767,6 +1768,7 @@ int main(int argc, char **argv) {
 #ifdef NV_LINUX_DESKTOP
   // Desktop test builds only: point the Sport Center at a local fixture.
   if (getenv("QRT_ESPN_BASE") && getenv("QRT_ESPN_BASE")[0]) espn_definir_base(getenv("QRT_ESPN_BASE"));
+  if (getenv("QRT_TSDB_BASE") && getenv("QRT_TSDB_BASE")[0]) tsdb_definir_base(getenv("QRT_TSDB_BASE"));
 #endif
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);

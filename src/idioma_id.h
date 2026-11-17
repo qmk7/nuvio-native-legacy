@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · profil publik"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt, Simkl, dan Letterboxd menjadi satu orang, tanpa teman ganda. Di panel Social, tab ada di samping judul: Teman, Aktivitas, dan Jadwal."),
   T("Transição do destaque", "Transisi sorotan"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "Mengembalikan panel diagnostik browser, yang berada di luar aplikasi."),
   T("Trilha", "Musik"),
   T("Trilha original · Prévias de áudio", "Musik asli · Pratinjau audio"),

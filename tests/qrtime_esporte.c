@@ -6,6 +6,7 @@
 //   qrtime_esporte <data dir> <base url> offline (fixture down: cache)
 #include "espn.h"
 #include "esporte.h"
+#include "tsdb.h"
 #include "dados.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -178,6 +179,41 @@ int main(int argc, char **argv) {
     snprintf(t.abrev, sizeof t.abrev, "MUN");
     CONFERE(esporte_time_em(&t, "Premier League: Man United v Chelsea") && esporte_time_em(&t, "MUN vs CHE") &&
             !esporte_time_em(&t, "Manchester City v Chelsea"), "team words: short name, abbreviation, no false match");
+  }
+
+  // ---- TheSportsDB: per-country channels ----
+  {
+    Lista l = {0};
+    TsdbTv tv[8];
+    const EspEvento *e;
+    char b2[200], id[24];
+    int k;
+    snprintf(b2, sizeof b2, "%s/tsdb", argv[2]);
+    tsdb_definir_base(b2);
+    espn_buscar("soccer/ksa.1", agora, juntar, &l, &quando, &falhou);
+    e = achar(&l, "700001");
+    CONFERE(e && tsdb_achar_evento("{\"events\":[{\"idEvent\":\"9\",\"strHomeTeam\":\"Al-Hilal\",\"strAwayTeam\":\"Al-Nassr\"}]}", e, id, sizeof id) &&
+            !strcmp(id, "9"), "same match by team names (hyphens, no time)");
+    CONFERE(e && !tsdb_achar_evento("{\"events\":[{\"idEvent\":\"9\",\"strHomeTeam\":\"Al-Hilal\",\"strAwayTeam\":\"Al-Ahli\"}]}", e, id, sizeof id),
+            "different opponent: not the same match");
+    k = tsdb_parse_tv("{\"tvevent\":[{\"strChannel\":\"Sky\",\"strCountry\":\"United Kingdom\"},"
+                      "{\"strChannel\":\"beIN SPORTS 1\",\"strCountry\":\"Saudi Arabia\"}]}", tv, 8);
+    CONFERE(k == 2 && !strcmp(tv[0].canal, "beIN SPORTS 1"), "Middle East channels first");
+    CONFERE(tsdb_parse_tv("{\"tvevent\":null}", tv, 8) == 0, "no listings: none");
+    k = e ? tsdb_canais(e, tv, 8) : -1;
+    CONFERE(k == 3 && !strcmp(tv[0].canal, "beIN SPORTS 1") && !strcmp(tv[0].pais, "Saudi Arabia"),
+            "over HTTP: eventsday -> lookuptv, Saudi channels first");
+    if (e) {
+      EspEvento x = *e;
+      EspSugestao s[8];
+      EspCanalInfo cs[] = { { "c1", "AR: beIN Sports 1 HD", "Sports" }, { "c2", "beIN Sports 11", "Sports" },
+                            { "c3", "SSC 1", "Sports" } };
+      snprintf(x.tvPais, sizeof x.tvPais, "beIN SPORTS 1|Saudi Arabia;SSC 1 HD|Saudi Arabia");
+      k = esporte_sugerir(&x, cs, 3, NULL, NULL, s, 8);
+      CONFERE(k == 2 && s[0].certeza == ESP_PASSA && strstr(s[0].motivo, "TheSportsDB"), "a listed channel on the user's list: showing it");
+      { int tem11 = 0; for (int i = 0; i < k; i++) tem11 |= !strcmp(s[i].canal, "c2");
+        CONFERE(!tem11, "beIN Sports 11 is not beIN SPORTS 1"); }
+    }
   }
 
   // ---- profile isolation ----

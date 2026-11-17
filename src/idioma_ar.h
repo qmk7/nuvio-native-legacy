@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · ملف عام"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "يصبح Trakt وSimkl وLetterboxd شخصًا واحدًا، بلا أصدقاء مكررين. في اللوحة الاجتماعية، تقع التبويبات بجانب العنوان: الأصدقاء والنشاط والجدول."),
   T("Transição do destaque", "انتقال الواجهة"),
+  T("Transmissão (TheSportsDB)", "البث (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "يعيد لوحة تشخيص المتصفح، التي تقع خارج التطبيق."),
   T("Trilha", "الموسيقى"),
   T("Trilha original · Prévias de áudio", "موسيقى أصلية · مقاطع صوتية"),

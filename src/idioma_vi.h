@@ -5491,6 +5491,7 @@
   T("Trakt · perfil público", "Trakt · hồ sơ công khai"),
   T("Trakt, Simkl e Letterboxd viram uma pessoa só, sem amigo repetido. No painel Social, as abas ficam ao lado do título: Amigos, Atividade e Agenda.", "Trakt, Simkl và Letterboxd gộp thành một người, không trùng bạn bè. Trong bảng Social, các thẻ nằm cạnh tiêu đề: Bạn bè, Hoạt động và Lịch."),
   T("Transição do destaque", "Chuyển cảnh nổi bật"),
+  T("Transmissão (TheSportsDB)", "Broadcast (TheSportsDB)"),
   T("Traz de volta o painel de diagnóstico do navegador, que fica fora do app.", "Đưa trở lại bảng chẩn đoán của trình duyệt, vốn nằm ngoài ứng dụng."),
   T("Trilha", "Nhạc phim"),
   T("Trilha original · Prévias de áudio", "Nhạc gốc · Đoạn nghe thử"),

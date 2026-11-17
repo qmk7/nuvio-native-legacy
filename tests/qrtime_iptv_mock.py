@@ -197,6 +197,24 @@ def espn(path):
         return "<html>gateway error</html>"
     return {"events": []}
 
+# ---- TheSportsDB v1 (TV listings for the live Saudi match) ----
+def tsdb(path, q):
+    now = int(time.time())
+    if path.endswith("eventsday.php"):
+        live = time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now - 30 * 60))   # no "Z": some answers omit it
+        return {"events": [
+            {"idEvent": "555000", "strEvent": "Al Ittihad vs Al Ahli", "strHomeTeam": "Al-Ittihad", "strAwayTeam": "Al-Ahli",
+             "strTimestamp": time.strftime("%Y-%m-%dT%H:%M:%S", time.gmtime(now + 2 * 3600))},
+            {"idEvent": "555001", "strEvent": "Al-Hilal vs Al-Nassr", "strHomeTeam": "Al-Hilal", "strAwayTeam": "Al-Nassr",
+             "strTimestamp": live}]}
+    if path.endswith("lookuptv.php"):
+        if q.get("id") == "555001":
+            return {"tvevent": [{"idEvent": "555001", "strChannel": "Sky Sports Football", "strCountry": "United Kingdom"},
+                                {"idEvent": "555001", "strChannel": "beIN SPORTS 1", "strCountry": "Saudi Arabia"},
+                                {"idEvent": "555001", "strChannel": "SSC 1 HD", "strCountry": "Saudi Arabia"}]}
+        return {"tvevent": None}
+    return {"events": None}
+
 ST_GENRES = [{"id": "1", "title": "Stalker Movies"}, {"id": "2", "title": "Stalker Kids"}]
 ST_CHANS = [
     {"id": "501", "name": "Stalker Cinema", "number": "1", "cmd": "ffmpeg %s/st/501" % BASE,
@@ -298,6 +316,8 @@ class H(BaseHTTPRequestHandler):
                               "server_info": {"url": "127.0.0.1", "port": str(PORT),
                                               "server_protocol": "http", "timezone": "Europe/Istanbul",
                                               "timestamp_now": int(time.time())}})
+        if p.startswith("/tsdb/123/"):
+            return self.send(tsdb(p, q))
         if p.startswith("/espn/") and p.endswith("/scoreboard"):
             body = espn(p[len("/espn/"):-len("/scoreboard")])
             if isinstance(body, str):

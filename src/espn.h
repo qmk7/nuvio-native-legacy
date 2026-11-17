@@ -47,6 +47,7 @@ typedef struct {
   EspTime casa, fora;    // tennis: player 1 / player 2
   char local[96];
   char tv[128];          // broadcasters ESPN lists, ", " separated (mostly US)
+  char tvPais[512];      // TheSportsDB channels "name|country;..." (tsdb.c), "" = none/unknown
 } EspEvento;
 
 // Parses one scoreboard body for league `liga`. Calls `cb` per event.
