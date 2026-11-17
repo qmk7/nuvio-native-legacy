@@ -31,7 +31,7 @@
 | بنية محوّلات المزوّدين (provider adapters) | ⏳ | تُوثَّق وتُطبّق مع `ProviderRef` (المرحلة 3) |
 | السجلات بلا كلمات مرور أو tokens | ✅ | `tests/qrtime_livetv.sh` (فحص السجلات) |
 | التخزين الذري لكل ملف شخصي | 🟡 | `dados.c` (tmp + rename) |
-| اختبارات Linux (بوابة) | ✅ | `tools/qrtime/run-tests.sh`، 35/35 |
+| اختبارات Linux (بوابة) | ✅ | `tools/qrtime/run-tests.sh`، 39/39 |
 
 ## المرحلة 2 — البث المباشر
 
