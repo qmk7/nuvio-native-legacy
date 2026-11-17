@@ -1,3 +1,4 @@
+#include "jfid.h"
 #include "visto.h"
 #include "perfisessao.h"
 #include "trakt.h"
@@ -101,6 +102,7 @@ int visto_titulo_ja(const char *imdb, const char *tipo, const int *temporadas,
                     int nt, int visto, int destinos) {
   int ok = 1;
   if (!imdb || !imdb[0]) return 0;
+  if (jfid_e(imdb)) return 0;   // personal-library ids (server, IPTV) stay on this TV
   NvPerfilSessao sessao = nv_perfil_sessao_ler();
   if (!nv_perfil_sessao_travar(sessao)) return 0;
   long long ms = contapend_gesto(imdb, tipo, NULL, 0, visto, destinos, temporadas, nt);
@@ -249,6 +251,7 @@ int visto_episodios_item(int indice, const char *imdb, const char *tipo,
 int visto_titulo(const char *imdb, const char *tipo, const int *temporadas,
                  int nt, int visto, int destinos) {
   if (!imdb || !imdb[0]) return 0;
+  if (jfid_e(imdb)) return 0;   // personal-library ids (server, IPTV) stay on this TV
   NvPerfilSessao sessao = nv_perfil_sessao_ler();
   if (!nv_perfil_sessao_travar(sessao)) return 0;
   vistoep_titulo_gesto(imdb, visto);

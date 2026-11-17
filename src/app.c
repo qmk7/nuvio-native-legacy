@@ -6103,6 +6103,13 @@ void app_atualizar(float dt, Uint32 agora) {
       // fechamento do app sem depender de conta nenhuma; ver salvos.h. Sem
       // isto, quem nao tem Trakt vinculado apertava "+" e nao guardava nada.
       if (c) salvos_definir(c, entrar);
+      // A personal-library title (server or IPTV) stays in this TV's list:
+      // no social activity, Trakt or Simkl ever gets its local id.
+      if (c && jfid_e(c->imdb)) {
+        cat_definir_na_lista(i, entrar);
+        ilhasalvar_aviso(c, entrar);
+        c = NULL;
+      }
       if (c) atividade_salvo(c, entrar);   // ev=salvo para o Social (atividade.h)
       // O TRAKT SO SE A PESSOA PEDIU. A escolha vem do explicador de primeira
       // vez e continua em Ajustes › Interface e conta ("Onde o + salva"). O

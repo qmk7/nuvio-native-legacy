@@ -301,6 +301,10 @@ int main(int argc, char **argv) {
   // um item sem gesto local nunca e oculto
   assert(contapend_visto_oculto("tt7777777", 1, 1, 1) == 0);
   // idem lista
+  // QR TIME: a personal-library id (IPTV "qv:", server "jf:") never enters
+  // the account's list journal.
+  assert(contapend_lista("qv:0123456789abcdef.m", "movie", "IPTV", "", 1) == 0);
+  assert(contapend_lista("jf:0123abcd.0123456789abcdef0123456789abcdef", "movie", "Srv", "", 1) == 0);
   assert(contapend_lista("tt0068646", "movie", "O Poderoso", "", 0) == 1);
   assert(contapend_lista_oculta("tt0068646", agora - 1) == 1);
   assert(contapend_lista_oculta("tt0068646:1:2", agora - 1) == 1);  // sufixo de episodio

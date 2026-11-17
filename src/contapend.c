@@ -1,3 +1,4 @@
+#include "jfid.h"
 #include "arteurl.h"
 #include "contapend.h"
 #include "contacache.h"
@@ -327,6 +328,9 @@ int contapend_lista(const char *imdb, const char *tipo, const char *nome,
                     const char *poster, int salvo) {
   char id[24];
   int k = 0, perfil = perfis_ativo();
+  // A personal-library id (server or IPTV, jfid.h) is local to this TV:
+  // it never enters the account's list.
+  if (jfid_e(imdb)) return 0;
   idLista(imdb, id, sizeof id);
   if (!id[0] || perfil < 1 || !sessao_logada()) return 0;
   pthread_mutex_lock(&trava);
