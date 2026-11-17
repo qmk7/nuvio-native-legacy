@@ -11,6 +11,9 @@ int ajustes_menu_explorar(void) { return 1; }
 int ajustes_menu_guia(void) { return 1; }
 int ajustes_menu_agenda(void) { return 1; }
 int ajustes_menu_perfil(void) { return 1; }
+int ajustes_relogio_12h(void) { return 0; }
+float gfx_escala_ui_base(void) { return 1.0f; }
+float gfx_escala_txt(void) { return 1.0f; }
 int ajustes_rail_recolhida(void) { return 0; }
 float gfx_escala_ui(void) { return 1.0f; }
 

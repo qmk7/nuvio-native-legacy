@@ -31,6 +31,8 @@ float ajustes_vidro_opacidade(void) { return opacidadeVidro; }
 float gfx_vidro_opacidade(void) { return opacidadeVidro / 0.78f; }
 int gfx_efeitos_minimos(void) { return 0; }
 int ajustes_relogio_12h(void) { return 0; }
+float gfx_escala_ui_base(void) { return 1.0f; }
+float gfx_escala_txt(void) { return 1.0f; }
 void ajustes_acento(float *r, float *g, float *b) { *r = 1; *g = 1; *b = 1; }
 float gfx_escala_ui(void) { return 1.0f; }
 float ilha_relogio_largura(void) { return 100.0f; }

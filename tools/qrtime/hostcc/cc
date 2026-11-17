@@ -27,6 +27,8 @@ for a in "$@"; do
     -framework) skip=1; continue;;
     -I/opt/homebrew*|-L/opt/homebrew*) continue;;
     -Wl,-dead_strip) args+=(-Wl,--gc-sections); continue;;
+    # macOS "allow unresolved symbols; the test never calls them" -> GNU ld.
+    -Wl,-undefined,dynamic_lookup) args+=(-Wl,--unresolved-symbols=ignore-all); continue;;
     -c|-E|-M|-MM) link=0;;
   esac
   args+=("$a")

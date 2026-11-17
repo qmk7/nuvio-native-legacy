@@ -13,6 +13,7 @@ int ajustes_menu_explorar(void) { return 1; }
 int ajustes_menu_guia(void) { return 1; }
 int ajustes_menu_agenda(void) { return 1; }
 int ajustes_menu_perfil(void) { return 1; }
+int ajustes_relogio_12h(void) { return 0; }
 int ajustes_rail_recolhida(void) { return 0; }
 int ajustes_menu_topo(void) { return 0; }
 static float escalaTeste = 1.0f;
