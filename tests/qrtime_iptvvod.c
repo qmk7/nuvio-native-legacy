@@ -208,6 +208,34 @@ int main(int argc, char **argv) {
     CONFERE(n == 0, "a local id is never resolved through TMDB");
     n = iptvvod_origem("kitsu:1", "series", NULL, NULL, NULL, NULL, &l);
     CONFERE(n == 0, "other addon namespaces are not guessed");
+
+    // ---- verified ids for custom posters (background, on demand) ----
+    {
+      const char *casos[][3] = {
+        { "The Matrix", "m", "tt0133093" },          // panel hint 603, confirmed
+        { "Inception", "m", "tt1375666" },           // panel hint 27205, confirmed
+        { "Breaking Bad", "s", "tt0903747" },        // series hint 1396, confirmed
+        { "Stalker Only Movie", "m", "tt9990001" },  // no hint: one exact search result
+        { "Local Indie Film", "m", "" },             // two identical results: ambiguous, refused
+        { "M3U Only Movie", "m", "" },               // no result
+        { "Local Show", "s", "" },                   // no year: no search
+      };
+      char imdb[24];
+      long tm = 0;
+      nf = iptvvod_fileiras_copiar(itens, 64, fils, 4, &ni);
+      for (int c = 0; c < 7; c++) {
+        const CatItem *it = porTitulo(casos[c][0]);
+        int r = 0;
+        char o[160];
+        if (!it) { snprintf(o, sizeof o, "poster ids: %s missing from the rows", casos[c][0]); CONFERE(0, o); continue; }
+        for (int k = 0; k < 150 && !r; k++) { r = iptvvod_poster_ids(it->imdb, it->tipo, imdb, sizeof imdb, &tm); if (!r) usleep(40000); }
+        snprintf(o, sizeof o, "poster ids: %s -> %s", casos[c][0], casos[c][2][0] ? casos[c][2] : "kept the provider's poster");
+        CONFERE(casos[c][2][0] ? (r && !strcmp(imdb, casos[c][2])) : !r, o);
+      }
+      { char *f = dados_ler("iptvvod-tmdb.tsv");
+        CONFERE(f && strstr(f, "tt0133093") && !strstr(f, "qrt") && !strstr(f, "qv:"), "verified ids cached, provider data not in the file");
+        free(f); }
+    }
   }
 
   // ---- browsing by category, page by page ----

@@ -101,6 +101,11 @@ void iptvvod_ligar_aos_addons(void);   // iptvvodaddons.c
 void iptvvod_definir_chave_tmdb(const char *(*chave)(void));
 void iptvvod_teste_tmdb_base(const char *base);
 
+// Posters (posterprov.c): the real IMDb/TMDB ids TMDB confirmed for a movie
+// or series item. Answers from memory; an unverified item is queued for a
+// background check and answers 0 until then (the card keeps its own poster).
+int  iptvvod_poster_ids(const char *id, const char *tipo, char *imdb, size_t n, long *tmdb);
+
 // Tests: wait for the current load (ms). 1 when idle.
 int  iptvvod_teste_esperar(int ms);
 #endif

@@ -50,3 +50,9 @@ int recomenda_social_mesclar_sessao(CatItem *i, int nTrakt, int max, uint64_t se
 #endif
 #endif
 #endif
+// QR TIME IPTV library (iptvvod.h): descoberta.c asks it for search and the
+// see-all pages. Weak, so a test that links the real iptvvod.c wins.
+__attribute__((weak)) int iptvvod_ativo(void) { return 0; }
+__attribute__((weak)) int iptvvod_buscar(const char *t, char k, CatItem *s, int m) { (void)t; (void)k; (void)s; (void)m; return 0; }
+__attribute__((weak)) int iptvvod_pagina(char k, const char *c, int p, CatItem *o, int m, int *t) {
+  (void)k; (void)c; (void)p; (void)o; (void)m; if (t) *t = 0; return 0; }

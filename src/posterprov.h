@@ -141,6 +141,8 @@ const char *posterprov_card_formato(const char *origem, const char *imdb, long t
 // 1 quando `url` e uma URL montada pelo provedor ativo (para o portao de
 // concorrencia e para redigir o log).
 int posterprov_e_provedor(const char *url);
+// QR TIME: verified real ids of local library items (iptvvod_poster_ids).
+void posterprov_definir_ids_locais(int (*f)(const char *id, const char *tipo, char *imdb, size_t n, long *tmdb));
 
 // PORTAO DE CONCORRENCIA. No maximo PP_SIMULT downloads do provedor ao mesmo
 // tempo, mesmo com quatro fios de rede: uma home com 200 cards nao pode abrir

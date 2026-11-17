@@ -60,6 +60,15 @@ static void *trabalhador(void *a) {
   return NULL;
 }
 
+// QR TIME: verified ids of IPTV library items (iptvvod_poster_ids stand-in).
+static int idsLocaisFalso(const char *id, const char *tipo, char *imdb, size_t n, long *tmdb) {
+  (void)tipo;
+  if (strcmp(id, "qv:0123456789abcdef.m")) return 0;   // anything else: not verified (yet)
+  snprintf(imdb, n, "tt0133093");
+  *tmdb = 603;
+  return 1;
+}
+
 int main(void) {
   char u[PP_URL_MAX], t[PP_TOKEN_MAX + 1], inst[PP_INSTANCIA_MAX], l[80];
   PosterProvCfg c;
@@ -390,6 +399,23 @@ int main(void) {
     assert(pico >= 1 && pico <= PP_SIMULT);
     printf("    pico simultaneo: %d (teto %d)\n", pico, PP_SIMULT); }
   ok("portao: nunca passa de PP_SIMULT downloads juntos");
+
+  // ---------------------------------------------------------- QR TIME: IPTV items
+  {
+    PosterProvCfg m;
+    memset(&m, 0, sizeof m);
+    m.prov = PP_MODELO;
+    snprintf(m.modelo, sizeof m.modelo, "https://btttr.cc/poster-n/imdb/poster-default/{imdb}.jpg?tag=none");
+    posterprov_configurar(&m);
+    estadoFalso = 1;
+    IGUAL(posterprov_card("qv:0123456789abcdef.m", 0, "movie", "https://iptv/p.jpg"), "https://iptv/p.jpg");  // no hook yet
+    posterprov_definir_ids_locais(idsLocaisFalso);
+    IGUAL(posterprov_card("qv:0123456789abcdef.m", 0, "movie", "https://iptv/p.jpg"),
+          "https://btttr.cc/poster-n/imdb/poster-default/tt0133093.jpg?tag=none");
+    IGUAL(posterprov_card("qv:fedcba9876543210.m", 0, "movie", "https://iptv/q.jpg"), "https://iptv/q.jpg");
+    posterprov_definir_ids_locais(NULL);
+  }
+  ok("IPTV: a verified item gets the custom poster, an unverified one keeps its own");
 
   printf("posterprov: tudo ok\n");
   return 0;

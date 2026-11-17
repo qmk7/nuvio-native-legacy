@@ -27,6 +27,8 @@ grep -E "^(PASS|FAIL)" "$W/out"
 if grep -q "/3/find/.*api_key=QRTKEY\|qv:" "$W/requests.log"; then echo "FAIL: key or local id reached the fixture log"; fail=1; fi
 if grep -q "/3/find/" "$W/requests.log" && ! grep -qE "/3/find/(tt0133093|tt1375666|tt0903747|tt9999999|tt0000404)" "$W/requests.log"; then echo "FAIL: unexpected TMDB lookup"; fail=1; fi
 if grep -qE "/3/(find|movie|tv)/[^t0-9]" "$W/requests.log"; then echo "FAIL: a non-TMDB id went to TMDB"; fail=1; fi
+# Searches carry a title and a year only: never a stream id, an account or a local id.
+if grep "/3/search/" "$W/requests.log" | grep -qE "qv:|qrtuser|stream_id|1002|7002|/movie/"; then echo "FAIL: provider data in a TMDB search"; fail=1; fi
 if grep -qE "qrtpass" "$W/out"; then echo "FAIL: a password reached the output"; fail=1; fi
 [ "$fail" = 0 ] && echo "qrtime_iptvvod: ok"
 exit "$fail"

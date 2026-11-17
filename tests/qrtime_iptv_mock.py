@@ -110,7 +110,23 @@ TMDB_FIND = {
                                      "original_title": "Totally Different Film", "release_date": "1987-01-01"}]},
     "tt0000404": {"movie_results": [], "tv_results": []},
 }
-TMDB_MOVIE = {"27205": {"id": 27205, "title": "Inception", "original_title": "Inception", "release_date": "2010-07-15"}}
+TMDB_MOVIE = {
+    "27205": {"id": 27205, "title": "Inception", "original_title": "Inception", "release_date": "2010-07-15",
+              "imdb_id": "tt1375666"},
+    "603": {"id": 603, "title": "The Matrix", "original_title": "The Matrix", "release_date": "1999-03-30",
+            "imdb_id": "tt0133093"},
+    "999001": {"id": 999001, "title": "Stalker Only Movie", "original_title": "Stalker Only Movie",
+               "release_date": "2015-05-05", "imdb_id": "tt9990001"},
+}
+TMDB_TV = {"1396": {"id": 1396, "name": "Breaking Bad", "original_name": "Breaking Bad", "first_air_date": "2008-01-20",
+                    "external_ids": {"imdb_id": "tt0903747"}}}
+# Searches by title + year: one exact result, two identical titles (ambiguous), none.
+TMDB_SEARCH = {
+    ("movie", "stalker only movie", "2015"): [{"id": 999001, "title": "Stalker Only Movie",
+                                               "original_title": "Stalker Only Movie", "release_date": "2015-05-05"}],
+    ("movie", "local indie film", "2021"): [{"id": 1, "title": "Local Indie Film", "release_date": "2021-01-01"},
+                                            {"id": 2, "title": "Local Indie Film", "release_date": "2021-06-01"}],
+}
 
 # ---- Stalker VOD: The Matrix (title+year only), a portal-only movie, and
 # Breaking Bad as a series with episodes 1 and 2 (one season).
@@ -237,6 +253,13 @@ class H(BaseHTTPRequestHandler):
             if p.startswith("/3/movie/"):
                 m = TMDB_MOVIE.get(p[len("/3/movie/"):])
                 return self.send(m) if m else self.send({"status_code": 34}, code=404)
+            if p.startswith("/3/tv/"):
+                m = TMDB_TV.get(p[len("/3/tv/"):])
+                return self.send(m) if m else self.send({"status_code": 34}, code=404)
+            if p.startswith("/3/search/"):
+                kind = p[len("/3/search/"):]
+                year = q.get("year") or q.get("first_air_date_year") or ""
+                return self.send({"results": TMDB_SEARCH.get((kind, q.get("query", "").lower(), year), [])})
             return self.send({"status_code": 34}, code=404)
         # ---- Stremio-style add-ons for the guest add-on list ----
         if p in ("/addon/manifest.json", "/addon2/manifest.json"):

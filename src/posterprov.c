@@ -533,12 +533,25 @@ const char *posterprov_card(const char *imdb, long tmdb, const char *tipo,
   return posterprov_card_formato(NULL, imdb, tmdb, tipo, orig, 0);
 }
 
+// QR TIME: a local library id ("qv:", iptvvod.c) gets the provider's poster
+// only through the real IMDb/TMDB ids that library verified for it. The hook
+// answers from memory and never blocks; 0 = not (yet) verified.
+static int (*idsLocais)(const char *id, const char *tipo, char *imdb, size_t n, long *tmdb);
+void posterprov_definir_ids_locais(int (*f)(const char *, const char *, char *, size_t, long *)) { idsLocais = f; }
+
 const char *posterprov_card_formato(const char *origem, const char *imdb, long tmdb,
                                     const char *tipo, const char *orig, int landscape) {
   uint32_t k;
   Slot *s;
   const char *r = orig;
+  char imdbLocal[24];
   if (cfg.prov == PP_DESLIGADO || posterprov_addon_vence(origem, orig)) return orig;
+  if (imdb && !strncmp(imdb, "qv:", 3)) {
+    long t = 0;
+    if (!idsLocais || !idsLocais(imdb, tipo, imdbLocal, sizeof imdbLocal, &t)) return orig;
+    imdb = imdbLocal;
+    tmdb = t;
+  }
   if (landscape) {
     char decoded[PP_MODELO_MAX];
     if (cfg.prov != PP_MODELO || !modelo_decodificar(cfg.modelo, decoded) ||

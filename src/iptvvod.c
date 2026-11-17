@@ -1467,6 +1467,256 @@ int iptvvod_origem(const char *id, const char *tipo, int (*cancelado)(void *), v
 }
 int iptvvod_origem_ativa(void) { return iptvvod_ativo() && chaveTmdbFn && chaveTmdbFn() && chaveTmdbFn()[0]; }
 
+// ------------------------------------------------------------- verified ids
+// A library item gets real IMDb/TMDB ids only after TMDB confirms them:
+//   - with a panel TMDB hint: /movie|/tv/<hint> must answer with a title that
+//     agrees with the copies' (copiaConfere: same title, or containment with
+//     the year within one);
+//   - without one: /search by the clean title and the year must return
+//     EXACTLY ONE result whose normalized title and year agree.
+// Only a title and a year (or a TMDB id the panel published) go to TMDB,
+// never a provider id. Used for posters (posterprov.c) through a hook that
+// answers from memory; items are verified in the background, on demand.
+// Device file "iptvvod-tmdb.tsv": "<16 hex>\t<kind>\t<1 ok|2 none>\t<tmdb>\t<imdb>".
+typedef struct { uint64_t grupo; char kind, estado; long tmdb; char imdb[16]; } Verif;
+enum { VER_PEND = 0, VER_OK = 1, VER_NADA = 2, VER_ERRO = 3 };
+static Verif *verifs;
+static int nVerifs, capVerifs, verifLido, verifFio;
+static pthread_mutex_t travaVerif = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t sinalVerif = PTHREAD_COND_INITIALIZER;
+
+static int verifAchar(uint64_t g, char kind) {
+  int lo = 0, hi = nVerifs - 1;
+  while (lo <= hi) {
+    int m = (lo + hi) / 2;
+    if (verifs[m].grupo == g && verifs[m].kind == kind) return m;
+    if (verifs[m].grupo < g || (verifs[m].grupo == g && verifs[m].kind < kind)) lo = m + 1; else hi = m - 1;
+  }
+  return -(lo + 1);
+}
+static int verifPor(uint64_t g, char kind) {
+  int i = verifAchar(g, kind), pos;
+  if (i >= 0) return i;
+  pos = -i - 1;
+  if (nVerifs == capVerifs) {
+    int nova = capVerifs ? capVerifs * 2 : 256;
+    Verif *t = realloc(verifs, (size_t)nova * sizeof *t);
+    if (!t) return -1;
+    verifs = t; capVerifs = nova;
+  }
+  memmove(verifs + pos + 1, verifs + pos, sizeof *verifs * (size_t)(nVerifs - pos));
+  memset(&verifs[pos], 0, sizeof verifs[pos]);
+  verifs[pos].grupo = g; verifs[pos].kind = kind; verifs[pos].estado = VER_PEND;
+  nVerifs++;
+  return pos;
+}
+static void verifLerLocked(void) {
+  char *t, *p;
+  if (verifLido) return;
+  verifLido = 1;
+  t = dados_ler("iptvvod-tmdb.tsv");
+  for (p = t; p && *p;) {
+    char *fim = strchr(p, '\n');
+    unsigned long long g;
+    char k, imdb[16] = "";
+    int e;
+    long tm;
+    if (fim) *fim = 0;
+    if (sscanf(p, "%16llx\t%c\t%d\t%ld\t%15s", &g, &k, &e, &tm, imdb) >= 4 && (e == VER_OK || e == VER_NADA)) {
+      int i = verifPor((uint64_t)g, k);
+      if (i >= 0) { verifs[i].estado = (char)e; verifs[i].tmdb = tm; snprintf(verifs[i].imdb, sizeof verifs[i].imdb, "%s", strcmp(imdb, "-") ? imdb : ""); }
+    }
+    p = fim ? fim + 1 : NULL;
+  }
+  free(t);
+}
+static void verifGravarLocked(void) {
+  size_t cap = (size_t)nVerifs * 64 + 1, k = 0;
+  char *t = malloc(cap);
+  if (!t) return;
+  t[0] = 0;
+  for (int i = 0; i < nVerifs; i++)
+    if (verifs[i].estado == VER_OK || verifs[i].estado == VER_NADA)
+      k += (size_t)snprintf(t + k, cap - k, "%016llx\t%c\t%d\t%ld\t%s\n", (unsigned long long)verifs[i].grupo,
+                            verifs[i].kind, verifs[i].estado, verifs[i].tmdb, verifs[i].imdb[0] ? verifs[i].imdb : "-");
+  dados_gravar("iptvvod-tmdb.tsv", t);
+  free(t);
+}
+
+// The copies of one group, for verification (under `trava`).
+typedef struct { char norm[8][128]; int ano[8]; long dica[8]; int n; char titulo[160]; int anoTitulo; } Amostra;
+static int amostraDe(uint64_t g, char kind, Amostra *a) {
+  int ok = 0;
+  memset(a, 0, sizeof *a);
+  pthread_mutex_lock(&trava);
+  for (int i = 0; bibValidaLocked() && i < bib.ng; i++) if (bib.g[i].chave == g && bib.g[i].kind == kind) {
+    for (int j = bib.g[i].primeira; j >= 0 && a->n < 8; j = bib.c[j].proximo) {
+      snprintf(a->norm[a->n], sizeof a->norm[0], "%s", bib.c[j].norm);
+      a->ano[a->n] = bib.c[j].ano; a->dica[a->n] = bib.c[j].tmdb;
+      if (!a->titulo[0] || (bib.c[j].ano && !a->anoTitulo)) {
+        iptvvod_titulo_limpo(bib.c[j].nome, a->titulo, sizeof a->titulo);
+        a->anoTitulo = bib.c[j].ano;
+      }
+      a->n++;
+    }
+    ok = a->n > 0;
+    break;
+  }
+  pthread_mutex_unlock(&trava);
+  return ok;
+}
+static int amostraConfere(const Amostra *a, const char *titulo, const char *original, int ano) {
+  char n1[128], n2[128];
+  iptvvod_normalizar(titulo, n1, sizeof n1);
+  iptvvod_normalizar(original, n2, sizeof n2);
+  for (int i = 0; i < a->n; i++) {
+    Copia c;
+    memset(&c, 0, sizeof c);
+    snprintf(c.norm, sizeof c.norm, "%s", a->norm[i]);
+    c.ano = a->ano[i];
+    if (copiaConfere(&c, n1, n2, ano)) return 1;
+  }
+  return 0;
+}
+static void urlenc(const char *s, char *d, size_t n) {
+  size_t k = 0;
+  for (; *s && k + 4 < n; s++) {
+    unsigned char c = (unsigned char)*s;
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') d[k++] = (char)c;
+    else k += (size_t)snprintf(d + k, n - k, "%%%02X", c);
+  }
+  d[k] = 0;
+}
+// Details of a real TMDB id: titles, year, IMDb id. 1 ok, 0 not found, -1 no answer.
+static int tmdbDetalhes(char kind, long id, const char *chave, char *tit, char *orig, int *ano, char *imdb) {
+  char url[400], data[16] = "";
+  char *c;
+  snprintf(url, sizeof url, "%s/%s/%ld?api_key=%s&append_to_response=external_ids", tmdbBase, kind == 's' ? "tv" : "movie", id, chave);
+  c = rede_baixar_com(url, 15, NULL);
+  if (!c) return -1;
+  tit[0] = orig[0] = imdb[0] = 0;
+  js_texto_raiz(c, kind == 's' ? "name" : "title", tit, 128);
+  js_texto_raiz(c, kind == 's' ? "original_name" : "original_title", orig, 128);
+  js_texto_raiz(c, kind == 's' ? "first_air_date" : "release_date", data, sizeof data);
+  js_texto(c, NULL, "imdb_id", imdb, 16);
+  if (strncmp(imdb, "tt", 2)) imdb[0] = 0;
+  *ano = anoDeData(data);
+  free(c);
+  return tit[0] || orig[0];
+}
+static int verificar(uint64_t g, char kind, Verif *res) {
+  const char *chave = chaveTmdbFn ? chaveTmdbFn() : NULL;
+  Amostra a;
+  char tit[128], orig[128], imdb[16];
+  int ano = 0, r;
+  memset(res, 0, sizeof *res);
+  if (!chave || !chave[0] || !amostraDe(g, kind, &a)) return VER_ERRO;
+  // 1. A panel hint, confirmed by TMDB's own title.
+  for (int i = 0; i < a.n; i++) if (a.dica[i] > 0) {
+    r = tmdbDetalhes(kind, a.dica[i], chave, tit, orig, &ano, imdb);
+    if (r < 0) return VER_ERRO;
+    if (r > 0 && amostraConfere(&a, tit, orig, ano)) {
+      res->tmdb = a.dica[i];
+      snprintf(res->imdb, sizeof res->imdb, "%s", imdb);
+      return VER_OK;
+    }
+    break;   // a wrong hint is not retried with the other copies' copies of it
+  }
+  // 2. Search by title and year: exactly one agreeing result.
+  if (!a.anoTitulo || !a.titulo[0]) return VER_NADA;
+  {
+    char url[600], q[400], *c;
+    const char *p;
+    long achado = 0;
+    int casam = 0;
+    urlenc(a.titulo, q, sizeof q);
+    snprintf(url, sizeof url, "%s/search/%s?api_key=%s&query=%s&%s=%d", tmdbBase, kind == 's' ? "tv" : "movie",
+             chave, q, kind == 's' ? "first_air_date_year" : "year", a.anoTitulo);
+    c = rede_baixar_com(url, 15, NULL);
+    if (!c) return VER_ERRO;
+    p = js_array(c, NULL, "results");
+    while (p && *p == '{') {
+      const char *f = js_fim(p);
+      char t1[128] = "", t2[128] = "", d[16] = "";
+      if (!f) break;
+      js_texto_raiz_em(p, f, kind == 's' ? "name" : "title", t1, sizeof t1);
+      js_texto_raiz_em(p, f, kind == 's' ? "original_name" : "original_title", t2, sizeof t2);
+      js_texto_raiz_em(p, f, kind == 's' ? "first_air_date" : "release_date", d, sizeof d);
+      if (amostraConfere(&a, t1, t2, anoDeData(d))) {
+        char n1[128];
+        iptvvod_normalizar(t1, n1, sizeof n1);
+        // Containment is fine for a hint, not for a search: exact title only.
+        int exato = 0;
+        for (int i = 0; i < a.n; i++) if (!strcmp(a.norm[i], n1)) exato = 1;
+        if (!exato) { iptvvod_normalizar(t2, n1, sizeof n1); for (int i = 0; i < a.n; i++) if (!strcmp(a.norm[i], n1)) exato = 1; }
+        if (exato) { casam++; achado = (long)js_num(p, f, "id", 0.0); }
+      }
+      p = js_prox(f);
+    }
+    free(c);
+    if (casam != 1 || achado <= 0) return VER_NADA;
+    r = tmdbDetalhes(kind, achado, chave, tit, orig, &ano, imdb);
+    if (r < 0) return VER_ERRO;
+    res->tmdb = achado;
+    snprintf(res->imdb, sizeof res->imdb, "%s", imdb);
+    return VER_OK;
+  }
+}
+static void *fioVerif(void *u) {
+  (void)u;
+  for (;;) {
+    uint64_t g = 0;
+    char kind = 0;
+    Verif v;
+    int e, i;
+    pthread_mutex_lock(&travaVerif);
+    for (;;) {
+      for (i = 0; i < nVerifs && verifs[i].estado != VER_PEND; i++) {}
+      if (i < nVerifs) break;
+      pthread_cond_wait(&sinalVerif, &travaVerif);
+    }
+    g = verifs[i].grupo; kind = verifs[i].kind;
+    pthread_mutex_unlock(&travaVerif);
+    e = verificar(g, kind, &v);
+    pthread_mutex_lock(&travaVerif);
+    i = verifAchar(g, kind);
+    if (i >= 0) {
+      verifs[i].estado = (char)e;
+      verifs[i].tmdb = v.tmdb;
+      snprintf(verifs[i].imdb, sizeof verifs[i].imdb, "%s", v.imdb);
+      if (e == VER_OK || e == VER_NADA) verifGravarLocked();
+    }
+    pthread_mutex_unlock(&travaVerif);
+    if (e != VER_ERRO) { printf("[iptvvod] tmdb: titulo %s\n", e == VER_OK ? "confirmado" : "sem correspondencia unica"); fflush(stdout); }
+    usleep(e == VER_ERRO ? 1000000 : 250000);   // gentle with TMDB
+  }
+  return NULL;
+}
+int iptvvod_poster_ids(const char *id, const char *tipo, char *imdb, size_t n, long *tmdb) {
+  uint64_t g;
+  char k;
+  int i, r = 0;
+  (void)tipo;
+  if (!iptvvod_id_ler(id, &g, &k, NULL, NULL) || k == 'e') return 0;
+  if (!chaveTmdbFn || !chaveTmdbFn() || !chaveTmdbFn()[0]) return 0;
+  pthread_mutex_lock(&travaVerif);
+  verifLerLocked();
+  i = verifAchar(g, k);
+  if (i >= 0 && verifs[i].estado == VER_OK && verifs[i].imdb[0]) {
+    snprintf(imdb, n, "%s", verifs[i].imdb);
+    if (tmdb) *tmdb = verifs[i].tmdb;
+    r = 1;
+  } else if (i < 0 && verifPor(g, k) >= 0) {
+    if (!verifFio) {
+      pthread_t t;
+      if (pthread_create(&t, NULL, fioVerif, NULL) == 0) { pthread_detach(t); verifFio = 1; }
+    }
+    pthread_cond_signal(&sinalVerif);
+  }
+  pthread_mutex_unlock(&travaVerif);
+  return r;
+}
+
 int iptvvod_teste_esperar(int ms) {
   for (int i = 0; i < ms / 20; i++) {
     if (!atomic_load(&carregando)) return 1;
