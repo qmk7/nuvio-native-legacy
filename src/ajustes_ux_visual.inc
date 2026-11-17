@@ -245,7 +245,7 @@ static const char *ajVisualIcone(int op) {
     case AJ_STALKER_LIMPAR: return "aj_server";
     case AJ_GUIA_FONTE: case AJ_GUIA_RECARREGAR: case AJ_M3U_URL: case AJ_M3U_EPG: case AJ_M3U_LIMPAR:
     case AJ_IPTV_CONTA: case AJ_IPTV_ADD_XTREAM: case AJ_IPTV_ADD_M3U: case AJ_IPTV_ADD_STALKER:
-    case AJ_IPTV_NOME: case AJ_IPTV_ATIVA: case AJ_IPTV_REMOVER:
+    case AJ_IPTV_NOME: case AJ_IPTV_ATIVA: case AJ_IPTV_REMOVER: case AJ_IPTV_TESTAR:
     case AJ_IPTV_LISTA_XTREAM: case AJ_IPTV_LISTA_M3U: case AJ_IPTV_LISTA_STALKER:
     case AJ_IPTV_ACOES: case AJ_IPTV_EXCLUIR: case AJ_IPTV_SALVAR: case AJ_IPTV_CANCELAR:
     case AJ_GUIA_ORDEM: case AJ_IPTV_ORDEM: case AJ_EPG_MEMORIA: case AJ_GUIA_CATEGORIAS:

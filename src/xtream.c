@@ -911,6 +911,17 @@ void xtream_fonte_selecionar(unsigned id) { atomic_store(&contaEditada, id); }
 int xtream_fonte_configurado(unsigned id) {
   unsigned a = usarFonte(id); int r = xtream_configurado(); usarFonte(a); return r;
 }
+// Connection test (Settings): login + account info of account `id`, read in
+// THAT account's context on the calling (worker) thread. 1 = user_info came.
+int xtream_fonte_testar(unsigned id, uint64_t sessao, XtreamConta *c, int *http) {
+  unsigned a = usarFonte(id);
+  int r;
+  memset(c, 0, sizeof *c);
+  r = xtream_configurado() ? contaLerSessao(c, sessao) : 0;
+  if (http) *http = c->http;
+  usarFonte(a);
+  return r;
+}
 int xtream_fonte_canais(unsigned id, XtreamCanal *out, int max, uint64_t sessao) {
   unsigned a = usarFonte(id); int n = xtream_canais_sessao(out, max, sessao);
   for (int i = 0; i < n; i++) { char original[80]; snprintf(original, sizeof original, "%s", out[i].id);

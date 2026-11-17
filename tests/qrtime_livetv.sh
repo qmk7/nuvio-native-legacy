@@ -27,7 +27,7 @@ fail=0
 ok()   { echo "PASS: $1"; }
 erro() { echo "FAIL: $1"; fail=1; }
 
-cc -std=gnu11 -O1 -g -Isrc -Wno-format-truncation tests/qrtime_iptv_seed.c src/iptvfontes.c src/xtream.c \
+cc -std=gnu11 -O1 -g -Isrc -Wno-format-truncation tests/qrtime_iptv_seed.c src/iptvfontes.c src/xtream.c src/admin.c \
   src/m3u.c src/m3u_parse.c src/stalker.c src/js.c src/dados.c -lpthread -o "$W/seed" \
   || { echo "FAIL: seed tool"; exit 1; }
 

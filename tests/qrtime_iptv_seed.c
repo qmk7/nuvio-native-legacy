@@ -7,6 +7,11 @@
 //   qrtime_iptv_seed <data dir> <base url> badpass   one Xtream account with
 //                                                    a WRONG password only
 //
+// Optional, through the environment (tests/qrtime_catlock.sh):
+//   QRT_SEED_PIN=1234             this TV's administrator PIN (admin.c)
+//   QRT_SEED_LOCK="1:1:QRT Sports" lock that category of IPTV type 1, account 1
+//                                 (key: the guide's categoriaChaveFonte)
+//
 // No network is used: seeding only stores settings. The network stubs below
 // fail loudly if any code path tries to fetch.
 #include "xtream.h"
@@ -15,6 +20,7 @@
 #include "iptvfontes.h"
 #include "dados.h"
 #include "rede.h"
+#include "admin.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +57,31 @@ static unsigned nova(int tipo, const char *nome) {
   return c.id;
 }
 
+// Same identity as guia_categorias.inc categoriaChaveFonte() for an IPTV
+// account category: FNV-1a over "tipo:id:", "" and the name, each ended by 0.
+static uint64_t chaveCategoria(const char *origem, const char *nome) {
+  const char *partes[] = { origem, "", nome };
+  uint64_t h = 1469598103934665603ULL;
+  for (int i = 0; i < 3; i++) {
+    for (const unsigned char *p = (const unsigned char *)partes[i]; *p; p++) h = (h ^ *p) * 1099511628211ULL;
+    h = (h ^ 0) * 1099511628211ULL;
+  }
+  return h ? h : 1;
+}
+static void extras(void) {
+  const char *pin = getenv("QRT_SEED_PIN"), *trava = getenv("QRT_SEED_LOCK");
+  if (pin && *pin && !admin_pin_definir(pin)) { fprintf(stderr, "seed: admin pin\n"); exit(1); }
+  if (trava && *trava) {
+    char origem[32], linha[32];
+    const char *nome = strchr(trava, ':');
+    nome = nome ? strchr(nome + 1, ':') : NULL;
+    if (!nome || nome - trava >= (long)sizeof origem - 1) { fprintf(stderr, "seed: lock\n"); exit(1); }
+    memcpy(origem, trava, (size_t)(nome - trava + 1)); origem[nome - trava + 1] = 0;
+    snprintf(linha, sizeof linha, "%016llx\n", (unsigned long long)chaveCategoria(origem, nome + 1));
+    if (!dados_gravar("guia-categorias-bloq-p1.txt", linha)) { fprintf(stderr, "seed: lock file\n"); exit(1); }
+  }
+}
+
 int main(int argc, char **argv) {
   char lista[300], epg[300];
   if (argc != 3 && argc != 4) { fprintf(stderr, "usage: %s <data dir> <base url> [badpass]\n", argv[0]); return 2; }
@@ -78,6 +109,7 @@ int main(int argc, char **argv) {
   stalker_fonte_selecionar(s);
   if (!stalker_conta_definir(argv[2], "00:1A:79:00:00:42")) { fprintf(stderr, "seed: stalker\n"); return 1; }
 
+  extras();
   printf("seed: xtream=%u m3u=%u stalker=%u accounts=%d\n", x, m, s, iptv_contas(NULL, 0));
   return 0;
 }

@@ -7,12 +7,24 @@ static uint64_t categoriasVisiveis[G_MAX_OCULTAS];
 static BackupCategorias *categoriasOrigem;
 #endif
 static uint64_t categoriasSessao;
+// LOCKED categories (QR TIME parental lock): a per-profile set, kept apart from
+// the hidden ones. A locked category behaves as hidden everywhere (guide rows,
+// All, favourites, recent channels, CH+/CH-, search) until this TV's
+// administrator PIN is typed in the guide's Options; the unlock lasts until the
+// app closes or the profile changes. Locking needs an administrator PIN.
+#define G_MAX_TRAVADAS 1024
+static uint64_t categoriasTravadas[G_MAX_TRAVADAS];
+static int nCategoriasTravadas,categoriasLiberadas;
 static int categoriaComparar(const void *aa,const void *bb) {
   uint64_t a=*(const uint64_t*)aa,b=*(const uint64_t*)bb;return (a>b)-(a<b);
 }
 static void categoriasOrdenar(void) {
   qsort(categoriasOcultas,(size_t)nCategoriasOcultas,sizeof *categoriasOcultas,categoriaComparar);
   qsort(categoriasVisiveis,(size_t)nCategoriasVisiveis,sizeof *categoriasVisiveis,categoriaComparar);
+  qsort(categoriasTravadas,(size_t)nCategoriasTravadas,sizeof *categoriasTravadas,categoriaComparar);
+}
+static int categoriaTravadaChave(uint64_t chave) {
+  return nCategoriasTravadas && bsearch(&chave,categoriasTravadas,(size_t)nCategoriasTravadas,sizeof chave,categoriaComparar)!=NULL;
 }
 static uint64_t categoriaChaveFonte(const GFonteLtv *f,const char *nome) {
   unsigned id=0;
@@ -34,6 +46,7 @@ static void categoriasGarantir(void) {
   int perfil=perfis_ativo();uint64_t sessao=nv_perfil_sessao_ler();
   if(categoriasPerfil==perfil && categoriasSessao==sessao)return;
   categoriasPerfil=perfil;categoriasSessao=sessao;nCategoriasOcultas=nCategoriasVisiveis=0;
+  nCategoriasTravadas=0;categoriasLiberadas=0;   // a new profile session starts locked
 #ifdef NV_GUIA_BACKUP_CATEGORIAS
   backupcategorias_liberar(categoriasOrigem);categoriasOrigem=NULL;
   char origemNome[64];arquivoPerfil("categorias-origem",origemNome,sizeof origemNome);
@@ -53,6 +66,17 @@ static void categoriasGarantir(void) {
     }
     free(texto);
   }
+  arquivoPerfil("categorias-bloq",nome,sizeof nome);texto=dados_ler(nome);
+  if(texto) {
+    for(char *p=texto;*p;) {
+      char *fim=strchr(p,'\n');if(fim)*fim++=0;else fim=p+strlen(p);
+      unsigned long long chave;char sobra;
+      if(nCategoriasTravadas<G_MAX_TRAVADAS && strlen(p)==16 && sscanf(p,"%16llx%c",&chave,&sobra)==1 && chave)
+        categoriasTravadas[nCategoriasTravadas++]=(uint64_t)chave;
+      p=fim;
+    }
+    free(texto);
+  }
   categoriasOrdenar();
   int n=0;for(int i=0;i<nCategoriasOcultas;i++)if(!n || categoriasOcultas[i]!=categoriasOcultas[n-1])categoriasOcultas[n++]=categoriasOcultas[i];
   nCategoriasOcultas=n;
@@ -60,6 +84,7 @@ static void categoriasGarantir(void) {
 static int categoriaOculta(int cat) {
   if(cat<0 || cat>=nCats)return 0;
   uint64_t chave=categoriaChave(cat);
+  if(!categoriasLiberadas && categoriaTravadaChave(chave))return 1;
   if(bsearch(&chave,categoriasVisiveis,(size_t)nCategoriasVisiveis,sizeof *categoriasVisiveis,categoriaComparar))return 0;
   if(bsearch(&chave,categoriasOcultas,(size_t)nCategoriasOcultas,sizeof *categoriasOcultas,categoriaComparar))return 1;
 #ifdef NV_GUIA_BACKUP_CATEGORIAS
@@ -71,15 +96,21 @@ static int categoriaOculta(int cat) {
 }
 static uint64_t sCategoriasOcultas[G_MAX_OCULTAS],sCategoriasVisiveis[G_MAX_OCULTAS];
 static int sNCategoriasOcultas,sNCategoriasVisiveis;
-static int sCategoriasTemOcultas(void) { return sNCategoriasOcultas>0; }
+static uint64_t sCategoriasTravadas[G_MAX_TRAVADAS];
+static int sNCategoriasTravadas;
+static int sCategoriasTemOcultas(void) { return sNCategoriasOcultas>0 || sNCategoriasTravadas>0; }
 static void categoriasCopiar(void) {
   categoriasGarantir();
   sNCategoriasOcultas=nCategoriasOcultas;sNCategoriasVisiveis=nCategoriasVisiveis;
   memcpy(sCategoriasOcultas,categoriasOcultas,(size_t)nCategoriasOcultas*sizeof *categoriasOcultas);
   memcpy(sCategoriasVisiveis,categoriasVisiveis,(size_t)nCategoriasVisiveis*sizeof *categoriasVisiveis);
+  // While unlocked the worker sees no lock at all.
+  sNCategoriasTravadas=categoriasLiberadas?0:nCategoriasTravadas;
+  memcpy(sCategoriasTravadas,categoriasTravadas,(size_t)sNCategoriasTravadas*sizeof *categoriasTravadas);
 }
 static int sCategoriaOculta(int f,const char *nome) {
   uint64_t chave=categoriaChaveFonte(&sLtvF[f],nome);
+  if(sNCategoriasTravadas && bsearch(&chave,sCategoriasTravadas,(size_t)sNCategoriasTravadas,sizeof chave,categoriaComparar))return 1;
   if(bsearch(&chave,sCategoriasVisiveis,(size_t)sNCategoriasVisiveis,sizeof chave,categoriaComparar))return 0;
   return bsearch(&chave,sCategoriasOcultas,(size_t)sNCategoriasOcultas,sizeof chave,categoriaComparar)!=NULL;
 }
@@ -95,6 +126,7 @@ int guia_categorias(GuiaCategoria *out,int max) {
       snprintf(c->conta,sizeof c->conta,"%s",ltvF[f].nome);
       c->oculta=!bsearch(&c->chave,categoriasVisiveis,(size_t)nCategoriasVisiveis,sizeof c->chave,categoriaComparar) &&
         bsearch(&c->chave,categoriasOcultas,(size_t)nCategoriasOcultas,sizeof c->chave,categoriaComparar)!=NULL;
+      if(categoriaTravadaChave(c->chave))c->oculta=GUIA_CAT_TRAVADA;
     }
     n++;
   }

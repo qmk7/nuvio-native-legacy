@@ -149,6 +149,9 @@ int xtream_url_xmltv(char *url, unsigned n);
 void xtream_fonte_selecionar(unsigned id);
 int xtream_fonte_configurado(unsigned id);
 int xtream_fonte_canais(unsigned id, XtreamCanal *out, int max, uint64_t sessao);
+// Connection test of account `id` (blocks: worker thread). 1 = the server
+// answered with user_info (then c->auth says accepted or refused).
+int xtream_fonte_testar(unsigned id, uint64_t sessao, XtreamConta *c, int *http);
 int xtream_fonte_canais_cb(unsigned id, void (*cat)(const char *, int, int, void *),
                          XtreamCb cb, void *u, int *total, uint64_t sessao);
 int xtream_fonte_xmltv(unsigned id, char *out, unsigned n);

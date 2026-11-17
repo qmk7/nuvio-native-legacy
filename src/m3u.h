@@ -27,6 +27,8 @@ void m3u_recarregar(void);
 void m3u_fonte_selecionar(unsigned id);
 int m3u_fonte_configurado(unsigned id);
 int m3u_fonte_canais(unsigned id,M3uCanal *out,int max,uint64_t sessao);
+// Connection test of account `id` (blocks: worker thread): channels found.
+int m3u_fonte_testar(unsigned id,uint64_t sessao);
 int m3u_fonte_urls(unsigned id,char *lista,unsigned nLista,char *epg,unsigned nEpg);
 int m3u_fonte_epg(unsigned id,char *out,unsigned n);
 int m3u_fonte_total(unsigned id);

@@ -86,6 +86,7 @@
 #include "player.h"     /* o preview e uma sessao "mini no guia" do player */
 #include "lembrete.h"   /* lembrete de programa futuro */
 #include "guialembrete.h"
+#include "admin.h"
 #include "streams.h"    /* Stream: url do preview vinda do fio */
 #include "livetv_regras.h" /* variantes FHD/HD/SD do mesmo canal */
 #include "teclado.h"       /* a busca do guia */
@@ -211,7 +212,7 @@ static float gPreviewLargura(void) {
 // CATEGORIAS e o primeiro chip: a porta VISIVEL do painel de categorias,
 // que antes so abria segurando a seta (ninguem descobre gesto que nao se ve).
 enum { G_TOPO_BUSCAR = 0, G_TOPO_CATEGORIAS, G_TOPO_CARTOES, G_TOPO_LISTA, G_TOPO_OPCOES, G_TOPO_ADDONS, G_TOPO_FILTROS, G_TOPO_DIAG,
-       G_TOPO_LIMPAR, G_TOPO_PREVIEW, G_TOPO_N };
+       G_TOPO_LIMPAR, G_TOPO_PREVIEW, G_TOPO_BLOQ, G_TOPO_N };
 #define G_TOPO_PRIMARIOS (G_TOPO_OPCOES + 1)
 
 #ifdef NV_TOUCH_UI
@@ -3206,6 +3207,7 @@ void guia_reordenar(void) {
   empacotar();if(id[0])guia_focar_id(id);
 }
 
+static void categoriasAplicar(void);
 int guia_categorias_definir(const GuiaCategoria *categorias,int n) {
   if(n<0 || n>60000 || (n && !categorias))return 0;
   if(!n)return 1;
@@ -3213,6 +3215,20 @@ int guia_categorias_definir(const GuiaCategoria *categorias,int n) {
   if(!nv_perfil_sessao_atual(sessao))return 0;
   for(int i=0;i<n;i++)if(!categorias[i].chave || categorias[i].sessao!=sessao)return 0;
   categoriasGarantir();
+  // Locks: a new lock needs an administrator PIN on this TV; dropping one needs
+  // the guide unlocked with it. Either rule failing refuses the whole save.
+  int nTrav=nCategoriasTravadas,travMudou=0;
+  uint64_t trav[G_MAX_TRAVADAS];
+  memcpy(trav,categoriasTravadas,(size_t)nTrav*sizeof *trav);
+  for(int i=0;i<n;i++) {
+    int era=categoriaTravadaChave(categorias[i].chave),fica=categorias[i].oculta==GUIA_CAT_TRAVADA;
+    if(era==fica)continue;
+    if(fica && !admin_pin_definido())return 0;
+    if(era && !categoriasLiberadas)return 0;
+    if(fica) { if(nTrav>=G_MAX_TRAVADAS)return 0; trav[nTrav++]=categorias[i].chave; }
+    else { int w=0;for(int k=0;k<nTrav;k++)if(trav[k]!=categorias[i].chave)trav[w++]=trav[k];nTrav=w; }
+    travMudou=1;
+  }
   int nNovas=nCategoriasOcultas,nVisiveis=nCategoriasVisiveis,mudou=0;
   int cap=nCategoriasOcultas+n,capVis=nCategoriasVisiveis+n;
   if(cap>G_MAX_OCULTAS)cap=G_MAX_OCULTAS;
@@ -3246,8 +3262,9 @@ int guia_categorias_definir(const GuiaCategoria *categorias,int n) {
   }
   for(unsigned slot=0;slot<tabelaCap;slot++)if(indice[slot]) {
     const GuiaCategoria *c=&categorias[indice[slot]-1];
-    uint64_t *v=c->oculta?novas:visiveis;
-    int *nv=c->oculta?&nNovas:&nVisiveis,lim=c->oculta?cap:capVis;
+    int esconde=c->oculta==1;   // a locked category is shown once unlocked
+    uint64_t *v=esconde?novas:visiveis;
+    int *nv=esconde?&nNovas:&nVisiveis,lim=esconde?cap:capVis;
     if(*nv>=lim){free(indice);free(novas);free(visiveis);return 0;}
     v[(*nv)++]=c->chave;
   }
@@ -3257,7 +3274,20 @@ int guia_categorias_definir(const GuiaCategoria *categorias,int n) {
   qsort(visiveis,(size_t)nVisiveis,sizeof *visiveis,categoriaComparar);
   mudou=mudou || memcmp(novas,categoriasOcultas,(size_t)nNovas*sizeof *novas) ||
     memcmp(visiveis,categoriasVisiveis,(size_t)nVisiveis*sizeof *visiveis);
-  if(!mudou){free(novas);free(visiveis);return 1;}
+  if(!mudou && !travMudou){free(novas);free(visiveis);return 1;}
+  if(travMudou) {
+    char tt[G_MAX_TRAVADAS*17+1];int ok=0;tt[0]=0;
+    for(int k=0;k<nTrav;k++)snprintf(tt+(size_t)k*17,18,"%016llx\n",(unsigned long long)trav[k]);
+    if(nv_perfil_sessao_travar(sessao)) {
+      char nome[64];arquivoPerfil("categorias-bloq",nome,sizeof nome);
+      ok=nTrav?dados_gravar(nome,tt):(dados_apagar(nome),1);
+      if(ok) { memcpy(categoriasTravadas,trav,(size_t)nTrav*sizeof *trav);nCategoriasTravadas=nTrav;categoriasOrdenar(); }
+      nv_perfil_sessao_destravar();
+    }
+    if(!ok){free(novas);free(visiveis);return 0;}
+    printf("[guia] categorias bloqueadas: %d\n",nTrav);
+    if(!mudou){free(novas);free(visiveis);categoriasAplicar();return 1;}
+  }
   char *texto=calloc((size_t)nNovas*17+(size_t)nVisiveis*22+1,1);int ok=0;
   if(texto) {
     for(int k=0;k<nNovas;k++)snprintf(texto+(size_t)k*17,18,"%016llx\n",(unsigned long long)novas[k]);
@@ -3276,12 +3306,32 @@ int guia_categorias_definir(const GuiaCategoria *categorias,int n) {
   }
   free(novas);free(visiveis);
   if(!ok)return 0;
+  categoriasAplicar();
+  return 1;
+}
+// Hidden or locked set changed: rebuild the published list from what is loaded.
+static void categoriasAplicar(void) {
   guia_reordenar();focoPend[0]=0;
   cargaCancelada=1;recarregarPend=1;
   if(focoLin>=nLinhas())focoLin=nLinhas()>0?nLinhas()-1:0;
   if(focoCol>=linhaN(focoLin))focoCol=0;
   catFoco=focoLin;rolY=velY=rolL=velL=0.0f;
+}
+int guia_categorias_travadas(void) { categoriasGarantir(); return nCategoriasTravadas; }
+int guia_categorias_liberadas(void) { categoriasGarantir(); return categoriasLiberadas; }
+int guia_categorias_liberar(const char *pin) {
+  categoriasGarantir();
+  if(!admin_pin_definido())return -1;
+  if(!pin || !admin_pin_conferir(pin)) { printf("[guia] desbloqueio: PIN recusado\n");return 0; }
+  if(!categoriasLiberadas) { categoriasLiberadas=1;categoriasAplicar(); }
+  printf("[guia] categorias desbloqueadas ate fechar o app\n");
   return 1;
+}
+void guia_categorias_travar(void) {
+  categoriasGarantir();
+  if(!categoriasLiberadas)return;
+  categoriasLiberadas=0;categoriasAplicar();
+  printf("[guia] categorias bloqueadas de novo\n");
 }
 
 int guia_categoria_definir(const GuiaCategoria *categoria,int ocultar) {
@@ -4235,6 +4285,10 @@ static int fontesEvento(SDL_Keycode k, Uint32 agora) {
   return 0;
 }
 
+// Last row of Options: the lock row only exists while a category is locked.
+static int opcoesFim(void) { return guia_categorias_travadas() > 0 ? G_TOPO_BLOQ : G_TOPO_PREVIEW; }
+static int pinPedido;   // the guide keyboard is asking for the administrator PIN
+static void pinAbrir(void);
 // Both the primary row and Options dispatch the existing guide actions.
 static void topoAcionar(int item) {
   if (item == G_TOPO_BUSCAR) buscaAbrir();
@@ -4244,6 +4298,13 @@ static void topoAcionar(int item) {
   else if (item == G_TOPO_FILTROS) filtrosAbrir();
   else if (item == G_TOPO_DIAG) pedLivetvDiag = 1;
   else if (item == G_TOPO_LIMPAR) { limparConfirm = 1; limparFoco = 1; }
+  else if (item == G_TOPO_BLOQ) {
+    if (guia_categorias_liberadas()) {
+      guia_categorias_travar();
+      glem_aviso_curto(i18n("Categorias bloqueadas de novo."));
+    } else if (!admin_pin_definido()) glem_aviso_curto(i18n("Crie o PIN de administrador em Ajustes › Perfil."));
+    else pinAbrir();
+  }
   else if (item == G_TOPO_PREVIEW) {
     previewLigado = !previewLigado;
     previewGravar();
@@ -4294,7 +4355,7 @@ void guia_evento(const SDL_Event *e) {
       opcoesAberto = 0; return;
     }
     if (k == SDLK_UP && opcoesFoco > G_TOPO_ADDONS) opcoesFoco--;
-    if (k == SDLK_DOWN && opcoesFoco < G_TOPO_PREVIEW) opcoesFoco++;
+    if (k == SDLK_DOWN && opcoesFoco < opcoesFim()) opcoesFoco++;
     if ((k == SDLK_RETURN || k == SDLK_KP_ENTER) && !e->key.repeat) {
       opcoesAberto = 0;
       topoAcionar(opcoesFoco);
@@ -6316,6 +6377,8 @@ static void gTopoRotulos(const char **rot) {
   rot[G_TOPO_DIAG]    = i18n("Diagnóstico");
   rot[G_TOPO_LIMPAR]  = i18n("Limpar lista de canais");
   rot[G_TOPO_PREVIEW] = previewLigado ? i18n("Preview: sim") : i18n("Preview: não");
+  rot[G_TOPO_BLOQ] = guia_categorias_liberadas() ? i18n("Bloquear categorias de novo")
+                                                 : i18n("Desbloquear categorias");
 }
 
 static void gTopoLarguras(const char **rot, float *w) {
@@ -6362,7 +6425,7 @@ static void gTopoMedir(void) {
 
 static void ponteiroOpcao(int i, int b) {
   (void)b;
-  if (opcoesAberto && i >= G_TOPO_ADDONS && i <= G_TOPO_PREVIEW) opcoesFoco = i;
+  if (opcoesAberto && i >= G_TOPO_ADDONS && i <= opcoesFim()) opcoesFoco = i;
 }
 
 static void desenharOpcoes(float a) {
@@ -6372,16 +6435,17 @@ static void desenharOpcoes(float a) {
   gTopoRotulos(rot); gTopoLarguras(rot, w);
   gTopoAjustar(w, xs, G_INFO_X + G_INFO_W);
   float mw = 0;
-  for (int i = G_TOPO_ADDONS; i <= G_TOPO_PREVIEW; i++) mw = fmaxf(mw, w[i]);
+  int fim = opcoesFim();
+  for (int i = G_TOPO_ADDONS; i <= fim; i++) mw = fmaxf(mw, w[i]);
   mw = fminf(mw + 32.0f, gRetrato() ? G_AREA_W : G_INFO_W);
   float x = fmaxf(G_AREA_X, xs[G_TOPO_OPCOES] + w[G_TOPO_OPCOES] - mw);
   float y = G_CHIPS_Y + G_TOPO_H + 12.0f;
 #ifdef NV_TOUCH_UI
   if (gRetrato()) { x = G_AREA_X; y = gTopoFim + 12.0f; }
 #endif
-  GfxRect panel = {x, y, mw, 5 * 56.0f + 24.0f};
+  GfxRect panel = {x, y, mw, (float)(fim - G_TOPO_ADDONS + 1) * 56.0f + 24.0f};
   gfx_vidro_ou_solido(panel, 28.0f / panel.h, GFX_VIDRO_DENS, a, .071f, .075f, .086f, .98f);
-  for (int i = G_TOPO_ADDONS; i <= G_TOPO_PREVIEW; i++) {
+  for (int i = G_TOPO_ADDONS; i <= fim; i++) {
     GfxRect row = {x + 12, y + 12 + (i - G_TOPO_ADDONS) * 56.0f, mw - 24, 56};
     int foco = i == opcoesFoco;
     if (foco) plrui_linha_foco(row, 20.0f, a);
@@ -7202,6 +7266,14 @@ static void buscaAbrir(void) {
   teclado_abrir_com("Buscar no guia", "Nome ou número do canal, ou o nome de um programa",
                     TECLADO_MAX, "abcdefghijklmnopqrstuvwxyz0123456789 ", buscaTexto);
 }
+static void pinAbrir(void) {
+  pinPedido = 1;
+  buscaEstado = 1;
+  teclado_abrir_com("PIN de administrador", "Para mostrar as categorias bloqueadas até fechar o app.",
+                    8, "0123456789", NULL);
+  teclado_tipo(TECLADO_TIPO_SENHA);
+  teclado_mascarar(1);
+}
 static int buscaN(void) { return buscaNC + buscaNP; }
 static void ponteiroBuscaItem(int i, int b) {
   (void)b;
@@ -7345,7 +7417,15 @@ static void buscaAtualizar(float dt, Uint32 agora) {
     int r;
     teclado_atualizar(dt, agora);
     r = teclado_resultado();
-    if (r == TECLADO_PRONTO) { buscaFazer(teclado_texto()); buscaEstado = 2; }
+    if (pinPedido && (r == TECLADO_PRONTO || r == TECLADO_CANCELOU)) {
+      int ok = r == TECLADO_PRONTO ? guia_categorias_liberar(teclado_texto()) : -2;
+      teclado_esquecer();
+      pinPedido = 0;
+      buscaEstado = (buscaN() || buscaPendente.ativa) ? 2 : 0;
+      if (ok == 1) glem_aviso_curto(i18n("Categorias desbloqueadas até fechar o app."));
+      else if (ok == 0) glem_aviso_curto(i18n("PIN incorreto"));
+    }
+    else if (r == TECLADO_PRONTO) { buscaFazer(teclado_texto()); buscaEstado = 2; }
     else if (r == TECLADO_CANCELOU) buscaEstado = (buscaN() || buscaPendente.ativa) ? 2 : 0;
   }
   if (buscaEstado == 2) {

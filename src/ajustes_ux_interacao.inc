@@ -305,7 +305,19 @@ static int uxAlternarLayout(void) {
 }
 static void uxCategoriaAlternar(int i) {
   if(!nv_perfil_sessao_atual(iptvListaSessao)) { uxCancelar();return; }
-  if(i>=0 && i<uxNCategorias)uxCategorias[i].oculta=!uxCategorias[i].oculta;
+  if(i<0 || i>=uxNCategorias)return;
+  // Cycle: shown -> hidden -> locked (needs the administrator PIN) -> shown.
+  int v=uxCategorias[i].oculta;
+  if(v==GUIA_CAT_TRAVADA && uxCategoriasAbertura[i]==GUIA_CAT_TRAVADA && !guia_categorias_liberadas()) {
+    uxNotificar("Desbloqueie as categorias no guia (Opções) para mudar esta.");return;
+  }
+  if(v==0)v=1;
+  else if(v==1) {
+    if(admin_pin_definido())v=GUIA_CAT_TRAVADA;
+    else { v=0;uxNotificar("Crie o PIN de administrador em Ajustes › Perfil."); }
+  }
+  else v=0;
+  uxCategorias[i].oculta=v;
 }
 static int uxEvento(SDL_Keycode k) {
   int layoutOculto = !ajLayoutSelecionavel() && (uxCabLayout || uxTopo == AJ2_T_LAYOUT ||

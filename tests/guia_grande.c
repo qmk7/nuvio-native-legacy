@@ -23,6 +23,9 @@ int iptv_contas(IptvConta *out,int n){(void)out;(void)n;return 0;}
 char *dados_ler(const char *n){(void)n;return NULL;}
 int dados_gravar(const char *n,const char *s){(void)n;(void)s;return 1;}
 char *dados_caminho(char *out,unsigned n,const char *nome){snprintf(out,n,"%s/%s",pasta,nome);return out;}
+int dados_apagar(const char *n){(void)n;return 1;}
+int admin_pin_definido(void){return 0;}
+int admin_pin_conferir(const char *p){(void)p;return 0;}
 void marco(const char *s){(void)s;}
 static void seed(int total,int ng) {
  stagingZerar();sTeto=30000;

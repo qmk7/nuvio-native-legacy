@@ -114,7 +114,7 @@ static const Item TELA[] = {
 
   SEC("TV ao vivo", "Provedor e solução de problemas ao assistir canais", "aj_tv-minimal-play"),
     ROT("Contas de TV ao vivo"),
-      OPC(AJ_IPTV_ORDEM), OPC(AJ_IPTV_CONTA), OPC(AJ_IPTV_NOME), OPC(AJ_IPTV_ATIVA),
+      OPC(AJ_IPTV_ORDEM), OPC(AJ_IPTV_CONTA), OPC(AJ_IPTV_NOME), OPC(AJ_IPTV_ATIVA), OPC(AJ_IPTV_TESTAR),
       OPC(AJ_IPTV_LISTA_STALKER), OPC(AJ_IPTV_ADD_STALKER),
       OPC(AJ_IPTV_LISTA_XTREAM), OPC(AJ_IPTV_ADD_XTREAM),
       OPC(AJ_IPTV_LISTA_M3U), OPC(AJ_IPTV_ADD_M3U),

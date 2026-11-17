@@ -245,6 +245,17 @@ void m3u_recarregar(void){pthread_mutex_lock(&trava);carregar();carregada=0;reno
 
 void m3u_fonte_selecionar(unsigned id){atomic_store(&contaEditada,id);}
 int m3u_fonte_configurado(unsigned id){unsigned a=usarFonte(id);int r=m3u_configurado();usarFonte(a);return r;}
+// Connection test (Settings): downloads and parses account `id`'s list on the
+// calling worker thread. Returns the channels in the list (0 = empty/failed).
+int m3u_fonte_testar(unsigned id,uint64_t sessao){
+  M3uCanal *um=calloc(1,sizeof *um);int n,tot;unsigned a;
+  if(!um)return 0;
+  a=usarFonte(id);
+  n=m3u_configurado()?m3u_canais_sessao(um,1,sessao):0;
+  tot=m3u_ultimo_total();
+  usarFonte(a);free(um);
+  return tot>n?tot:n;
+}
 int m3u_fonte_canais(unsigned id,M3uCanal *out,int max,uint64_t sessao){
   unsigned a=usarFonte(id);int n=m3u_canais_sessao(out,max,sessao);
   for(int i=0;i<n;i++){char original[80];snprintf(original,sizeof original,"%s",out[i].id);

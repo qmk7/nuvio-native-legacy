@@ -45,11 +45,20 @@ void guia_reordenar(void); // presentation only; retain cached channels and focu
 
 // Snapshot of all loaded categories, including hidden ones. Identity excludes
 // account names/order; stale profile sessions cannot change visibility.
+// `oculta`: 0 shown, 1 hidden, GUIA_CAT_TRAVADA locked by the administrator PIN.
+enum { GUIA_CAT_TRAVADA = 2 };
 typedef struct { uint64_t chave, sessao; char nome[64], conta[96]; int oculta; } GuiaCategoria;
 int guia_categorias(GuiaCategoria *out, int max);
 int guia_categoria_definir(const GuiaCategoria *categoria, int ocultar);
 // Save a multi-selection atomically; failed or stale editors change nothing.
 int guia_categorias_definir(const GuiaCategoria *categorias, int n);
+// Locked categories (parental lock). Locking needs this TV's administrator PIN
+// (admin.h); removing a lock needs the guide unlocked first, else the save is
+// refused (0). guia_categorias_liberar: 1 unlocked, 0 wrong PIN, -1 no PIN.
+int guia_categorias_travadas(void);
+int guia_categorias_liberadas(void);
+int guia_categorias_liberar(const char *pin);
+void guia_categorias_travar(void);   // lock again (unlocked -> locked)
 
 // Dispara a carga de canais sem abrir nada — o CH+/- do controle funciona
 // mesmo com o guia nunca aberto, e precisa da lista para saber quem vem depois.

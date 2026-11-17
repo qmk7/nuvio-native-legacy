@@ -692,6 +692,15 @@ int stalker_resolver(const char *id, char *url, unsigned n) {
 
 void stalker_fonte_selecionar(unsigned id){atomic_store(&contaEditada,id);}
 int stalker_fonte_configurado(unsigned id){unsigned a=usarFonte(id);int r=stalker_configurado();usarFonte(a);return r;}
+// Connection test (Settings): handshake + channel list of account `id`,
+// counted without keeping the channels.
+static int stContar(const StalkerCanal *c, void *u) { (void)c; (*(int *)u)++; return 1; }
+int stalker_fonte_testar(unsigned id,uint64_t sessao){
+  int n=0;
+  if(!stalker_fonte_configurado(id))return 0;
+  stalker_fonte_canais_cb(id,stContar,&n,sessao);
+  return n;
+}
 int stalker_fonte_canais(unsigned id,StalkerCanal *out,int max,uint64_t sessao){
   unsigned a=usarFonte(id);int n=stalker_canais_sessao(out,max,sessao);
   for(int i=0;i<n;i++){char original[80];snprintf(original,sizeof original,"%s",out[i].id);

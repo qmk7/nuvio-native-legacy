@@ -1156,7 +1156,8 @@ static void aj2EditorEscolha(GfxRect m) {
       if(uxCategorias[i].oculta) {
         float ar,ag,ab;ajustes_acento(&ar,&ag,&ab);
         gfx_cor(box,0.18f,ar,ag,ab,1);
-        ajIconeT("aj_check",box.x,box.y,26,1);
+        ajIconeT(uxCategorias[i].oculta==GUIA_CAT_TRAVADA?"aj_lock":"aj_check",box.x+(uxCategorias[i].oculta==GUIA_CAT_TRAVADA?3:0),
+                 box.y+(uxCategorias[i].oculta==GUIA_CAT_TRAVADA?3:0),uxCategorias[i].oculta==GUIA_CAT_TRAVADA?20:26,1);
       }
       y+=passo;continue;
     }

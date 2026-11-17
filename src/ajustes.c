@@ -55,6 +55,7 @@
 #include "layout.h"
 #include "sessao.h"
 #include "convidado.h"
+#include "iptvteste.h"
 #include "contalib.h"
 #include "sync.h"
 #include "perfis.h"
@@ -726,6 +727,7 @@ typedef enum {
   // Hero logo and information size (0 Normal, 1 Grande, 2 Muito grande). LOCAL, append-only.
   AJ_HERO_TAMANHO,
   AJ_HERO_PASTA_DETALHES, // Device-local folder hero details, append-only; on by default.
+  AJ_IPTV_TESTAR,      // QR TIME: action, test the selected IPTV account now (iptvteste.h).
   AJ_N
 } OpcaoId;
 _Static_assert(DEBRID_RD == 0 && DEBRID_TB == 1 && DEBRID_PM == 2 && DEBRID_AD == 3,
@@ -1864,6 +1866,7 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Suavizar degradês", V_DEGRADES, 3),
   ESC("Tamanho do destaque", V_HERO_TAMANHO, 3),       // local: heroSizeLocal
   ESC("Mostrar detalhes da pasta no destaque", V_LIGA, 2),
+  ACAO("Testar conexão"),
 };
 
 // Nome de cada opcao no arquivo. O formato era POSICIONAL — uma linha por
@@ -2197,6 +2200,7 @@ static const char *CHAVE[] = {
   "suavizarDegradesLocal",
   "heroSizeLocal",
   "heroFolderDetailsLocal",
+  "-iptvTestar",
 };
 // QUATRO VETORES PARALELOS indexados pelo mesmo enum AJ_*: OPCOES, CHAVE,
 // valor e as secoes. OPCOES ja e declarado [AJ_N], e `valor` aceita inicializacao
@@ -2461,6 +2465,7 @@ static int ajIptvLinhaVisivel(int op) {
   if(op==AJ_IPTV_ACOES || op==AJ_IPTV_EXCLUIR || ajIptvAdicionar(op) || op==AJ_IPTV_CONTA || op==AJ_IPTV_REMOVER)return 0;
   if(op==AJ_IPTV_SALVAR)return iptvForm.tipo && iptvForm.nova;
   if(op==AJ_IPTV_CANCELAR || op==AJ_IPTV_NOME || op==AJ_IPTV_ATIVA)return iptvForm.tipo!=0;
+  if(op==AJ_IPTV_TESTAR)return iptvForm.tipo!=0 && !iptvForm.nova;
   int tipo=ajIptvCampoTipo(op);
   if(tipo)return iptvForm.tipo==tipo && (!iptvForm.nova || op!=AJ_XTREAM_CONTA);
   if(op==AJ_GUIA_CATEGORIAS || op==AJ_EPG_MEMORIA || op==AJ_GUIA_ORDEM || op==AJ_IPTV_ORDEM || op==AJ_GUIA_FONTE || op==AJ_GUIA_RECARREGAR || op==AJ_EPG_PAIS ||
@@ -7201,6 +7206,16 @@ static const char *textoLeitura(int op) {
   if (op == AJ_FANART_CHAVE) return fanartMascarada();
   if (op == AJ_SEEKR_CHAVE) return seekrMascarada();
   if (op == AJ_SEEKR_TESTAR) return skTesteTexto();
+  if (op == AJ_IPTV_TESTAR) {
+    static char bufTeste[200];
+    IptvConta c;
+    if (!iptv_conta_selecionada(&c)) return "";
+    switch (iptvteste_estado(c.id, bufTeste, sizeof bufTeste)) {
+      case IPTVT_TESTANDO: return i18n("testando…");
+      case IPTVT_OK: case IPTVT_FALHOU: return bufTeste;
+      default: return i18n("OK testa");
+    }
+  }
   if (op == AJ_SELOS_PACOTE_ADD) return spAddTexto();
   if (op == AJ_URL_M3U_ADD || op == AJ_URL_XMLTV_ADD) return urlAddTexto();
   if (op == AJ_URL_REM) return valor[AJ_URL_LISTA] > 0 ? i18n("OK remove") : i18n("nenhuma lista escolhida");
@@ -7750,6 +7765,7 @@ static const char *ajudaOpcaoBase(int op) {
       return "O Guia de TV reúne todas as contas ativadas deste perfil.";
     case AJ_IPTV_NOME: return "Nome da conta";
     case AJ_IPTV_REMOVER: return "Apaga apenas a conta selecionada e seus canais.";
+    case AJ_IPTV_TESTAR: return "Confere agora se o servidor responde e aceita esta conta, sem mudar nada.";
     case AJ_GUIA_FONTE: return "Fontes exibidas no Guia de TV.";
     case AJ_GUIA_RECARREGAR: return "Mantém os canais disponíveis durante a atualização.";
     case AJ_M3U_URL: return "Lista de canais M3U por URL, salva neste perfil.";
@@ -7771,7 +7787,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_XTREAM_LIMPAR: return "Apaga servidor, usuário e senha deste perfil, e os canais somem do Guia. Sair da conta também apaga.";
     case AJ_XTREAM_CONEXOES: return "Conta com limite de conexões";
     case AJ_XTREAM_CONTA: return "O que o servidor Xtream disse da assinatura na última carga do Guia: se está ativa, quando vence e quantas telas estão em uso.";
-    case AJ_GUIA_CATEGORIAS: return "Oculto no guia";
+    case AJ_GUIA_CATEGORIAS: return "OK alterna: no guia, oculto no guia, ou bloqueado com o PIN de administrador. Bloqueada, a categoria só aparece depois do PIN em Opções do guia.";
     case AJ_EPG_MEMORIA: return "Pouca memória: programa atual e próximas 24 horas. Grade completa: programação disponível. Automático adapta ao aparelho. Não altera canais nem cache no disco.";
     case AJ_EPG_PAIS: return "De que país vem a programação dos canais no Guia. Automático escolhe pelo idioma e pelos nomes dos canais (RO:, |RO|…). A grade do próprio provedor Xtream entra sempre que existir.";
     case AJ_FONTE_MANUAL: return "Ao mandar reproduzir, abre a lista de fontes em vez de escolher sozinho. Canal ao vivo não pergunta.";
@@ -9902,6 +9918,7 @@ static void eventoTela(const SDL_Event *e) {
     if(focoOp==AJ_IPTV_REMOVER) {
       IptvConta c;
       if(iptv_conta_remover(&c)) {
+        iptvteste_esquecer();
         if(c.tipo==IPTV_XTREAM)xtream_fonte_esquecer(c.id);
         else if(c.tipo==IPTV_M3U)m3u_fonte_esquecer(c.id);
         else stalker_fonte_esquecer(c.id);
@@ -9946,6 +9963,11 @@ static void eventoTela(const SDL_Event *e) {
       return;
     }
     if (focoOp == AJ_SEEKR_TESTAR) { skTesteIniciar(); return; }
+    if (focoOp == AJ_IPTV_TESTAR) {
+      IptvConta c;
+      if (iptv_conta_selecionada(&c)) iptvteste_iniciar(c.id, c.tipo);
+      return;
+    }
     if (focoOp == AJ_SELOS_PACOTE_ADD) {
       if (spFioVivo) return;
       stCampo = focoOp;
@@ -10098,15 +10120,17 @@ void ajustes_atualizar(float dt, Uint32 agora) {
         int ok=iptv_conta_renomear(teclado_texto());ajIptvEspelhar();if(ok)guia_reordenar();
         uxNotificar(ok?"Ajuste salvo nesta TV.":"Não foi possível agora. Tente novamente.");
       }
-      else if (stCampo == AJ_STALKER_MAC) stalker_definir_mac(teclado_texto());
+      else if (stCampo == AJ_STALKER_MAC) { iptvteste_esquecer(); stalker_definir_mac(teclado_texto()); }
       else if (stCampo == AJ_M3U_URL || stCampo == AJ_M3U_EPG) {
-        int ok = stCampo == AJ_M3U_URL ? m3u_definir_lista(teclado_texto()) : m3u_definir_epg(teclado_texto());
+        int ok;
+        iptvteste_esquecer();
+        ok = stCampo == AJ_M3U_URL ? m3u_definir_lista(teclado_texto()) : m3u_definir_epg(teclado_texto());
         if (ok) { guia_recarregar(1); if (teclado_texto()[0]) registro_aviso_legal(); }
         uxNotificar(ok ? "Ajuste salvo nesta TV." : "endereço inválido");
       }
-      else if (stCampo == AJ_XTREAM_SERVIDOR) { xtream_definir_servidor(teclado_texto()); if (teclado_texto()[0]) registro_aviso_legal(); }
-      else if (stCampo == AJ_XTREAM_USUARIO)  xtream_definir_usuario(teclado_texto());
-      else if (stCampo == AJ_XTREAM_SENHA)    xtream_definir_senha(teclado_texto());
+      else if (stCampo == AJ_XTREAM_SERVIDOR) { iptvteste_esquecer(); xtream_definir_servidor(teclado_texto()); if (teclado_texto()[0]) registro_aviso_legal(); }
+      else if (stCampo == AJ_XTREAM_USUARIO)  { iptvteste_esquecer(); xtream_definir_usuario(teclado_texto()); }
+      else if (stCampo == AJ_XTREAM_SENHA)    { iptvteste_esquecer(); xtream_definir_senha(teclado_texto()); }
       else if (stCampo == PF_CAMPO) { if (pfDigitado(teclado_texto())) r = TECLADO_NADA; }
       else if (stCampo == AJ_FANART_CHAVE)    fanartDefinir(teclado_texto());
       else if (stCampo == AJ_SEEKR_CHAVE)     { seekrDefinir(teclado_texto()); atomic_store_explicit(&skTeste, 0, memory_order_release); }
@@ -10146,7 +10170,7 @@ void ajustes_atualizar(float dt, Uint32 agora) {
       }
       else if (stCampo >= AJ_POSTER_INST && stCampo <= AJ_POSTER_MODELO) pstDefinir(stCampo, teclado_texto());
       else if (debIdx(stCampo) >= 0)          debDefinir(stCampo, teclado_texto());
-      else if (stCampo != AJ_JF_ENTRAR && stCampo != AJ_EM_ENTRAR) { stalker_definir_portal(teclado_texto()); if (teclado_texto()[0]) registro_aviso_legal(); }
+      else if (stCampo != AJ_JF_ENTRAR && stCampo != AJ_EM_ENTRAR) { iptvteste_esquecer(); stalker_definir_portal(teclado_texto()); if (teclado_texto()[0]) registro_aviso_legal(); }
       if(!rascunho && (stCampo==AJ_STALKER_PORTAL || stCampo==AJ_STALKER_MAC ||
          stCampo==AJ_XTREAM_SERVIDOR || stCampo==AJ_XTREAM_USUARIO || stCampo==AJ_XTREAM_SENHA))
         guia_recarregar(1);

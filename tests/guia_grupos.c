@@ -33,6 +33,10 @@ int dados_gravar(const char *nome,const char *texto){
   FILE *f=fopen(cam,"wb");assert(f);assert(fwrite(texto,1,strlen(texto),f)==strlen(texto));return !fclose(f);
 }
 char *dados_caminho(char *out,unsigned n,const char *nome){snprintf(out,n,"%s/%s",pasta,nome);return out;}
+int dados_apagar(const char *nome){char cam[1024];snprintf(cam,sizeof cam,"%s/%s",pasta,nome);return unlink(cam)==0;}
+static int adminPin;
+int admin_pin_definido(void){return adminPin;}
+int admin_pin_conferir(const char *pin){return adminPin && pin && !strcmp(pin,"4321");}
 void marco(const char *s){(void)s;}
 static void semear(void) {
   stagingZerar();sTeto=30000;nFav=nFavOrd=0;
@@ -72,6 +76,27 @@ int main(int argc,char **argv) {
   assert(guia_categorias(cs,4)==4);for(int i=0;i<4;i++)cs[i].oculta=1;
   assert(guia_categorias_definir(cs,4));assert(nLinhas()==0 && nCanais==4);
   for(int i=0;i<4;i++)cs[i].oculta=0;assert(guia_categorias_definir(cs,4));assert(nLinhas()==4);
+  // Parental lock: locking needs this TV's administrator PIN; dropping a lock
+  // needs the guide unlocked; the unlock is per profile session.
+  assert(guia_categorias(cs,4)==4);
+  adminPin=0;cs[1].oculta=GUIA_CAT_TRAVADA;assert(!guia_categorias_definir(&cs[1],1));assert(nLinhas()==4);
+  adminPin=1;assert(guia_categorias_definir(&cs[1],1));assert(nLinhas()==3 && guia_categorias_travadas()==1);
+  { GuiaCategoria v[4];assert(guia_categorias(v,4)==4 && v[1].oculta==GUIA_CAT_TRAVADA); }
+  categoriasPerfil=-1;empacotar();assert(nLinhas()==3);              // stored, and a reload starts locked
+  assert(guia_categorias(cs,4)==4);cs[1].oculta=0;
+  assert(!guia_categorias_definir(&cs[1],1));assert(nLinhas()==3);    // still locked: no PIN typed yet
+  assert(guia_categorias_liberar("0000")==0 && nLinhas()==3 && !guia_categorias_liberadas());
+  assert(guia_categorias_liberar("4321")==1 && nLinhas()==4 && guia_categorias_liberadas());
+  guia_categorias_travar();assert(nLinhas()==3 && !guia_categorias_liberadas());
+  perfilTeste=2;categoriasPerfil=-1;empacotar();assert(nLinhas()==4 && guia_categorias_travadas()==0);
+  perfilTeste=1;categoriasPerfil=-1;empacotar();assert(nLinhas()==3);
+  assert(guia_categorias_liberar("4321")==1);
+  perfilTeste=2;categoriasPerfil=-1;empacotar();perfilTeste=1;categoriasPerfil=-1;empacotar();
+  assert(nLinhas()==3 && !guia_categorias_liberadas());               // a profile change locks again
+  assert(guia_categorias_liberar("4321")==1);assert(guia_categorias(cs,4)==4);cs[1].oculta=0;
+  assert(guia_categorias_definir(&cs[1],1));assert(guia_categorias_travadas()==0);
+  guia_categorias_travar();assert(nLinhas()==4);                     // no lock left
+  adminPin=0;
   fonteEscolhida=2;vistaMontar();assert(nLinhas()==0);fonteEscolhida=1;vistaMontar();assert(nLinhas()==4);fonteEscolhida=0;
   contasTeste[0].ativa=0;empacotar();assert(nCanais==2 && nLinhas()==2);contasTeste[0].ativa=1;
   // Old per-profile favorites and guide presentation migrate without account leakage.
