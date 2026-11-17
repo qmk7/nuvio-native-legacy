@@ -1,0 +1,881 @@
+#include "iptvvod.h"
+#include "xtvod.h"
+#include "xtream.h"
+#include "iptvfontes.h"
+#include "dados.h"
+#include "idioma.h"
+#include "perfis.h"
+#include "perfisessao.h"
+#include "streams.h"
+#include <ctype.h>
+#include <pthread.h>
+#include <stdatomic.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+
+// The same four answers as JF_FONTES_* (servidores.c checks it).
+enum { VF_NADA = 0, VF_PENDENTE, VF_PRONTO, VF_FALHOU };
+// A provider list older than this is fetched again on the next start.
+#define IPTVVOD_VALIDADE_S (6 * 3600)
+#define IPTVVOD_CONTAS_MAX 16
+
+// ------------------------------------------------------------- identity
+static const char *const PREFIXOS_IDIOMA_SEP = "-:|]";
+static int ehTagQualidade(const char *w) {
+  static const char *const tags[] = { "4k", "uhd", "fhd", "hd", "sd", "hevc", "h265", "x265", "h264",
+                                      "x264", "2160p", "1080p", "720p", "480p", "multi", "multisub",
+                                      "sub", "subs", "dub", "dubbed", "hdr", "hdr10", "dv", "web",
+                                      "webrip", "webdl", "bluray", "remux", "vod", NULL };
+  for (int i = 0; tags[i]; i++) if (!strcmp(w, tags[i])) return 1;
+  return 0;
+}
+// Skips "EN - ", "EN: ", "|EN| ", "[EN] ", "EN| " (2-3 letter language code).
+static const char *pularIdioma(const char *s) {
+  const char *p = s, *q;
+  while (*p == ' ') p++;
+  if (*p == '|' || *p == '[') {
+    q = p + 1;
+    while (isalpha((unsigned char)*q)) q++;
+    if (q - p - 1 >= 2 && q - p - 1 <= 3 && (*q == '|' || *q == ']')) { q++; while (*q == ' ' || *q == '-') q++; return q; }
+    return s;
+  }
+  q = p;
+  while (isupper((unsigned char)*q)) q++;
+  if (q - p >= 2 && q - p <= 3) {
+    const char *r = q;
+    while (*r == ' ') r++;
+    if (*r && strchr(PREFIXOS_IDIOMA_SEP, *r)) { r++; while (*r == ' ') r++; if (*r) return r; }
+  }
+  return s;
+}
+void iptvvod_normalizar(const char *nome, char *dst, size_t tam) {
+  char w[64];
+  size_t n = 0, k = 0;
+  const char *p = pularIdioma(nome ? nome : "");
+  if (!tam) return;
+  dst[0] = 0;
+  for (;; p++) {
+    unsigned char c = (unsigned char)*p;
+    if (c && (isalnum(c) || c >= 0x80)) {
+      if (k + 1 < sizeof w) w[k++] = (char)(c < 0x80 ? tolower(c) : c);
+      continue;
+    }
+    if (k) {
+      int ano;
+      w[k] = 0;
+      ano = k == 4 && isdigit((unsigned char)w[0]) && isdigit((unsigned char)w[3]) ? atoi(w) : 0;
+      if (!ehTagQualidade(w) && !(ano >= 1900 && ano <= 2100) && n + k + 2 < tam) {
+        if (n) dst[n++] = ' ';
+        memcpy(dst + n, w, k);
+        n += k;
+        dst[n] = 0;
+      }
+      k = 0;
+    }
+    if (!c) break;
+  }
+}
+void iptvvod_titulo_limpo(const char *nome, char *dst, size_t tam) {
+  const char *p = pularIdioma(nome ? nome : "");
+  size_t n;
+  int mudou = 1;
+  if (!tam) return;
+  snprintf(dst, tam, "%s", p);
+  // Trailing "(2019)", "[2019]", quality tags and separators, repeatedly.
+  while (mudou) {
+    char *fim, *ini;
+    mudou = 0;
+    n = strlen(dst);
+    while (n && (dst[n - 1] == ' ' || dst[n - 1] == '-' || dst[n - 1] == '|')) dst[--n] = 0;
+    if (n >= 6 && (dst[n - 1] == ')' || dst[n - 1] == ']') && (dst[n - 6] == '(' || dst[n - 6] == '[') &&
+        isdigit((unsigned char)dst[n - 5]) && isdigit((unsigned char)dst[n - 2])) { dst[n - 6] = 0; mudou = 1; continue; }
+    fim = dst + n;
+    ini = fim;
+    while (ini > dst && ini[-1] != ' ') ini--;
+    if (ini > dst && fim > ini) {
+      char w[24];
+      size_t k = (size_t)(fim - ini), i;
+      if (k < sizeof w) {
+        for (i = 0; i < k; i++) w[i] = (char)tolower((unsigned char)ini[i]);
+        w[k] = 0;
+        if (ehTagQualidade(w)) { *ini = 0; mudou = 1; }
+      }
+    }
+  }
+  if (!dst[0]) snprintf(dst, tam, "%s", nome ? nome : "");
+}
+static uint64_t fnv(const char *s, uint64_t h) {
+  for (; *s; s++) h = (h ^ (unsigned char)*s) * 1099511628211ULL;
+  return h;
+}
+int iptvvod_e_id(const char *id) { return id && !strncmp(id, IPTVVOD_PREFIXO, 3); }
+void iptvvod_id_montar(char *dst, size_t tam, uint64_t grupo, char kind, int temporada, int episodio) {
+  if (kind == 'e') snprintf(dst, tam, "qv:%016llx.e%dx%d", (unsigned long long)grupo, temporada, episodio);
+  else snprintf(dst, tam, "qv:%016llx.%c", (unsigned long long)grupo, kind);
+}
+int iptvvod_id_ler(const char *id, uint64_t *grupo, char *kind, int *temporada, int *episodio) {
+  unsigned long long g = 0;
+  int t = 0, e = 0;
+  const char *p;
+  if (!iptvvod_e_id(id) || strlen(id) < 3 + 16 + 2) return 0;
+  for (p = id + 3; p < id + 19; p++) if (!isxdigit((unsigned char)*p) || isupper((unsigned char)*p)) return 0;
+  if (id[19] != '.') return 0;
+  g = strtoull(id + 3, NULL, 16);
+  if ((id[20] == 'm' || id[20] == 's') && !id[21]) { t = e = 0; }
+  else if (id[20] == 'e') {
+    char sobra;
+    if (sscanf(id + 21, "%dx%d%c", &t, &e, &sobra) != 2 || t < 0 || e <= 0 || t > 9999 || e > 99999) return 0;
+  } else return 0;
+  if (grupo) *grupo = g;
+  if (kind) *kind = id[20];
+  if (temporada) *temporada = t;
+  if (episodio) *episodio = e;
+  return 1;
+}
+
+// ------------------------------------------------------------- library
+typedef struct {
+  unsigned conta;
+  char kind;              // 'm' movie, 's' series
+  char sid[XTVOD_SID], ext[8];
+  long tmdb;              // panel's hint
+  int ano, nota10;
+  long long adicionado;
+  char *nome, *poster, *categoria;
+  char norm[128];
+  int grupo, proximo;     // group index; next copy in the same group (-1)
+} Copia;
+typedef struct {
+  uint64_t chave;
+  char kind;
+  int primeira, n;        // first copy (best), copies
+  long long adicionado;
+} Grupo;
+typedef struct {
+  Copia *c; int n, cap;
+  Grupo *g; int ng;
+} Biblio;
+
+static pthread_mutex_t trava = PTHREAD_MUTEX_INITIALIZER;
+static Biblio bib;                  // published snapshot (under trava)
+static uint64_t bibSessao;
+static int bibPerfil = -1;
+static unsigned versao;             // bumps on every publish
+static atomic_int carregando;
+static atomic_uint geracao;         // a profile change invalidates the worker
+static int fioVivo;
+
+static void biblioLiberar(Biblio *b) {
+  for (int i = 0; i < b->n; i++) { free(b->c[i].nome); free(b->c[i].poster); free(b->c[i].categoria); }
+  free(b->c); free(b->g);
+  memset(b, 0, sizeof *b);
+}
+static char *dupTxt(const char *s) { return strdup(s ? s : ""); }
+static int biblioJuntar(Biblio *b, const Copia *c) {
+  if (b->n == b->cap) {
+    int nova = b->cap ? b->cap * 2 : 256;
+    Copia *t = realloc(b->c, (size_t)nova * sizeof *t);
+    if (!t) return 0;
+    b->c = t; b->cap = nova;
+  }
+  b->c[b->n++] = *c;
+  return 1;
+}
+
+// Grouping. Keys: "t<kind><tmdb>" for a TMDB hint, "n<kind><norm>|<year>".
+static uint64_t chaveTmdb(char kind, long tmdb) {
+  char k[40];
+  snprintf(k, sizeof k, "t%c%ld", kind, tmdb);
+  return fnv(k, 1469598103934665603ULL);
+}
+static uint64_t chaveNome(char kind, const char *norm, int ano) {
+  char k[200];
+  snprintf(k, sizeof k, "n%c%s|%d", kind, norm, ano);
+  return fnv(k, 1469598103934665603ULL);
+}
+typedef struct { uint64_t chave; int grupo; } Par;
+static int parCmp(const void *a, const void *b) {
+  uint64_t x = ((const Par *)a)->chave, y = ((const Par *)b)->chave;
+  return (x > y) - (x < y);
+}
+static int achaPar(const Par *v, int n, uint64_t chave) {
+  int lo = 0, hi = n - 1;
+  while (lo <= hi) {
+    int m = (lo + hi) / 2;
+    if (v[m].chave == chave) return v[m].grupo;
+    if (v[m].chave < chave) lo = m + 1; else hi = m - 1;
+  }
+  return -1;
+}
+static int grupoNovo(Biblio *b, int *cap, uint64_t chave, char kind) {
+  if (b->ng == *cap) {
+    int nova = *cap ? *cap * 2 : 256;
+    Grupo *t = realloc(b->g, (size_t)nova * sizeof *t);
+    if (!t) return -1;
+    b->g = t; *cap = nova;
+  }
+  b->g[b->ng] = (Grupo){ chave, kind, -1, 0, 0 };
+  return b->ng++;
+}
+static void grupoAnexar(Biblio *b, int g, int i) {
+  Copia *c = &b->c[i];
+  c->grupo = g;
+  c->proximo = -1;
+  if (b->g[g].primeira < 0) b->g[g].primeira = i;
+  else {
+    // A copy with a TMDB hint or a poster leads the group (its title and art win).
+    int j = b->g[g].primeira;
+    Copia *p = &b->c[j];
+    if ((c->tmdb && !p->tmdb) || (!p->poster[0] && c->poster[0] && (c->tmdb || !p->tmdb))) {
+      c->proximo = j; b->g[g].primeira = i;
+    } else {
+      while (b->c[j].proximo >= 0) j = b->c[j].proximo;
+      b->c[j].proximo = i;
+    }
+  }
+  b->g[g].n++;
+  if (c->adicionado > b->g[g].adicionado) b->g[g].adicionado = c->adicionado;
+}
+typedef struct { uint64_t chave; int i; } Ix;
+static int ixCmp(const void *a, const void *b) {
+  const Ix *x = a, *y = b;
+  if (x->chave != y->chave) return x->chave < y->chave ? -1 : 1;
+  return (x->i > y->i) - (x->i < y->i);
+}
+// O(n log n): sort copies by key, consecutive runs are one group.
+static int agrupar(Biblio *b) {
+  int cap = 0, nv = 0, nn = 0, i, r;
+  Ix *v = malloc(sizeof(Ix) * (size_t)(b->n ? b->n : 1));
+  Par *porNome = malloc(sizeof(Par) * (size_t)(b->n ? b->n : 1));
+  if (!v || !porNome) { free(v); free(porNome); return 0; }
+  free(b->g); b->g = NULL; b->ng = 0;
+  for (i = 0; i < b->n; i++) b->c[i].grupo = -1;
+  // 1. Copies with a TMDB hint, by (kind, tmdb).
+  for (i = 0; i < b->n; i++) if (b->c[i].tmdb) v[nv++] = (Ix){ chaveTmdb(b->c[i].kind, b->c[i].tmdb), i };
+  qsort(v, (size_t)nv, sizeof *v, ixCmp);
+  for (r = 0; r < nv;) {
+    int g = grupoNovo(b, &cap, v[r].chave, b->c[v[r].i].kind), k;
+    if (g < 0) { free(v); free(porNome); return 0; }
+    for (k = r; k < nv && v[k].chave == v[r].chave; k++) grupoAnexar(b, g, v[k].i);
+    r = k;
+  }
+  // Their titles with a year, so a copy without a hint can join them.
+  for (i = 0; i < b->n; i++) {
+    Copia *c = &b->c[i];
+    if (c->grupo >= 0 && c->ano && c->norm[0]) porNome[nn++] = (Par){ chaveNome(c->kind, c->norm, c->ano), c->grupo };
+  }
+  qsort(porNome, (size_t)nn, sizeof *porNome, parCmp);
+  // 2 and 3. Copies without a hint: same normalized title AND year join a
+  // hinted group; otherwise copies with the same key form their own group.
+  nv = 0;
+  for (i = 0; i < b->n; i++) if (b->c[i].grupo < 0) {
+    Copia *c = &b->c[i];
+    v[nv++] = (Ix){ chaveNome(c->kind, c->norm[0] ? c->norm : c->nome, c->ano), i };
+  }
+  qsort(v, (size_t)nv, sizeof *v, ixCmp);
+  for (r = 0; r < nv;) {
+    int g = b->c[v[r].i].ano ? achaPar(porNome, nn, v[r].chave) : -1, k;
+    if (g < 0 && (g = grupoNovo(b, &cap, v[r].chave, b->c[v[r].i].kind)) < 0) { free(v); free(porNome); return 0; }
+    for (k = r; k < nv && v[k].chave == v[r].chave; k++) grupoAnexar(b, g, v[k].i);
+    r = k;
+  }
+  free(v); free(porNome);
+  return 1;
+}
+static int grupoPorId(const Biblio *b, const char *id, char *kindOut) {
+  uint64_t g;
+  char k;
+  int t, e;
+  if (!iptvvod_id_ler(id, &g, &k, &t, &e)) return -1;
+  for (int i = 0; i < b->ng; i++)
+    if (b->g[i].chave == g && (k == 'e' ? b->g[i].kind == 's' : b->g[i].kind == k)) {
+      if (kindOut) *kindOut = k;
+      return i;
+    }
+  return -1;
+}
+
+// ------------------------------------------------------------- disk cache
+// One file per profile: "iptvvod-p<N>.tsv". Line 1: "v1\t<epoch>". Then one
+// copy per line. Provider data only (names, art, ids); no credential.
+static void arquivo(char *dst, size_t tam, int perfil) { snprintf(dst, tam, "iptvvod-p%d.tsv", perfil > 0 ? perfil : 1); }
+static void limparCampo(char *s) { for (; s && *s; s++) if (*s == '\t' || *s == '\n' || *s == '\r') *s = ' '; }
+static int gravarCache(const Biblio *b, int perfil, long long quando) {
+  size_t cap = 64 + (size_t)b->n * 900, k = 0;
+  char *t = malloc(cap), nome[64];
+  int ok;
+  if (!t) return 0;
+  k += (size_t)snprintf(t + k, cap - k, "v1\t%lld\n", quando);
+  for (int i = 0; i < b->n && k < cap; i++) {
+    const Copia *c = &b->c[i];
+    char n1[160], p1[512], c1[96];
+    snprintf(n1, sizeof n1, "%s", c->nome); limparCampo(n1);
+    snprintf(p1, sizeof p1, "%s", c->poster); limparCampo(p1);
+    snprintf(c1, sizeof c1, "%s", c->categoria); limparCampo(c1);
+    k += (size_t)snprintf(t + k, cap - k, "%u\t%c\t%s\t%s\t%ld\t%d\t%d\t%lld\t%s\t%s\t%s\n", c->conta, c->kind,
+                          c->sid, c->ext, c->tmdb, c->ano, c->nota10, c->adicionado, n1, p1, c1);
+  }
+  arquivo(nome, sizeof nome, perfil);
+  ok = k < cap && dados_gravar(nome, t);
+  free(t);
+  return ok;
+}
+static long long lerCache(Biblio *b, int perfil) {
+  char nome[64], *t, *p;
+  long long quando = 0;
+  arquivo(nome, sizeof nome, perfil);
+  t = dados_ler(nome);
+  if (!t) return 0;
+  if (sscanf(t, "v1\t%lld", &quando) != 1) { free(t); return 0; }
+  p = strchr(t, '\n');
+  while (p && *++p) {
+    char *fim = strchr(p, '\n'), *campos[11];
+    int nc = 0;
+    Copia c;
+    if (fim) *fim = 0;
+    campos[nc++] = p;
+    for (char *q = p; *q && nc < 11; q++) if (*q == '\t') { *q = 0; campos[nc++] = q + 1; }
+    if (nc == 11 && (campos[1][0] == 'm' || campos[1][0] == 's') && strlen(campos[2]) < sizeof c.sid) {
+      memset(&c, 0, sizeof c);
+      c.conta = (unsigned)strtoul(campos[0], NULL, 10);
+      c.kind = campos[1][0];
+      snprintf(c.sid, sizeof c.sid, "%s", campos[2]);
+      snprintf(c.ext, sizeof c.ext, "%s", campos[3]);
+      c.tmdb = atol(campos[4]); c.ano = atoi(campos[5]); c.nota10 = atoi(campos[6]);
+      c.adicionado = atoll(campos[7]);
+      c.nome = dupTxt(campos[8]); c.poster = dupTxt(campos[9]); c.categoria = dupTxt(campos[10]);
+      iptvvod_normalizar(c.nome, c.norm, sizeof c.norm);
+      if (!c.nome || !c.poster || !c.categoria || !biblioJuntar(b, &c)) {
+        free(c.nome); free(c.poster); free(c.categoria); break;
+      }
+    }
+    p = fim;
+  }
+  free(t);
+  return quando;
+}
+
+// ------------------------------------------------------------- loading
+typedef struct { Biblio *b; unsigned conta; char kind; } Coleta;
+static int coletar(const XtVodItem *it, void *u) {
+  Coleta *k = u;
+  Copia c;
+  memset(&c, 0, sizeof c);
+  c.conta = k->conta; c.kind = k->kind;
+  snprintf(c.sid, sizeof c.sid, "%s", it->sid);
+  snprintf(c.ext, sizeof c.ext, "%s", it->ext);
+  c.tmdb = it->tmdbProv; c.ano = it->ano; c.nota10 = it->nota10; c.adicionado = it->adicionado;
+  c.nome = dupTxt(it->nome); c.poster = dupTxt(it->poster); c.categoria = dupTxt(it->categoria);
+  iptvvod_normalizar(it->nome, c.norm, sizeof c.norm);
+  if (!c.nome || !c.poster || !c.categoria || !biblioJuntar(k->b, &c)) {
+    free(c.nome); free(c.poster); free(c.categoria);
+    return 0;
+  }
+  return 1;
+}
+static void publicar(Biblio *nova, uint64_t sessao, int perfil, unsigned ger) {
+  pthread_mutex_lock(&trava);
+  if (ger == atomic_load(&geracao) && nv_perfil_sessao_atual(sessao)) {
+    biblioLiberar(&bib);
+    bib = *nova;
+    memset(nova, 0, sizeof *nova);
+    bibSessao = sessao;
+    bibPerfil = perfil;
+    versao++;
+  }
+  pthread_mutex_unlock(&trava);
+  biblioLiberar(nova);
+}
+static void copiarContaDe(Biblio *dst, const Biblio *src, unsigned conta) {
+  for (int i = 0; i < src->n; i++) if (src->c[i].conta == conta) {
+    Copia c = src->c[i];
+    c.nome = dupTxt(c.nome); c.poster = dupTxt(c.poster); c.categoria = dupTxt(c.categoria);
+    if (!biblioJuntar(dst, &c)) { free(c.nome); free(c.poster); free(c.categoria); }
+  }
+}
+static void *fioCarga(void *u) {
+  unsigned ger = (unsigned)(uintptr_t)u;
+  uint64_t sessao = nv_perfil_sessao_ler();
+  int perfil = perfis_ativo();
+  IptvConta contas[IPTVVOD_CONTAS_MAX];
+  int nContas = iptv_contas(contas, IPTVVOD_CONTAS_MAX), i, k, falhas = 0;
+  Biblio velha = {0}, nova = {0};
+  long long quando = lerCache(&velha, perfil), agora = (long long)time(NULL);
+  int fresco = quando > 0 && agora - quando < IPTVVOD_VALIDADE_S;
+  // A provider added since the cache was written has nothing in it yet.
+  for (i = 0; fresco && i < nContas; i++) if (contas[i].ativa && contas[i].tipo == IPTV_XTREAM) {
+    int tem = 0;
+    for (k = 0; k < velha.n && !tem; k++) tem = velha.c[k].conta == contas[i].id;
+    if (!tem) fresco = 0;
+  }
+  // 1. The cached library first: Home has rows before any network.
+  if (velha.n) {
+    Biblio pronta = {0};
+    for (i = 0; i < nContas; i++) if (contas[i].ativa) copiarContaDe(&pronta, &velha, contas[i].id);
+    if (agrupar(&pronta)) publicar(&pronta, sessao, perfil, ger);
+    else biblioLiberar(&pronta);
+  }
+  // 2. Refresh when stale. A provider that fails keeps its cached copies:
+  // one failing provider never empties the others.
+  if (!fresco) {
+    for (i = 0; i < nContas && ger == atomic_load(&geracao); i++) {
+      if (!contas[i].ativa || contas[i].tipo != IPTV_XTREAM) continue;
+      for (k = 0; k < 2; k++) {
+        Coleta c = { &nova, contas[i].id, k ? 's' : 'm' };
+        int antes = nova.n, r = xtvod_listar(contas[i].id, k, coletar, &c, sessao);
+        if (r < 0) {
+          // Roll back a partial list, keep the cached one of this kind.
+          for (int j = antes; j < nova.n; j++) { free(nova.c[j].nome); free(nova.c[j].poster); free(nova.c[j].categoria); }
+          nova.n = antes;
+          for (int j = 0; j < velha.n; j++)
+            if (velha.c[j].conta == contas[i].id && velha.c[j].kind == c.kind) {
+              Copia cp = velha.c[j];
+              cp.nome = dupTxt(cp.nome); cp.poster = dupTxt(cp.poster); cp.categoria = dupTxt(cp.categoria);
+              if (!biblioJuntar(&nova, &cp)) { free(cp.nome); free(cp.poster); free(cp.categoria); }
+            }
+          falhas++;
+        }
+      }
+    }
+    if (ger == atomic_load(&geracao) && nv_perfil_sessao_atual(sessao)) {
+      if (agrupar(&nova)) {
+        if (nv_perfil_sessao_travar(sessao)) { gravarCache(&nova, perfil, falhas ? quando : agora); nv_perfil_sessao_destravar(); }
+        printf("[iptvvod] %d copia(s) de %d provedor(es), %d falha(s)\n", nova.n, nContas, falhas);
+        publicar(&nova, sessao, perfil, ger);
+      }
+    }
+  }
+  biblioLiberar(&velha);
+  biblioLiberar(&nova);
+  { int g, nm = 0, ns = 0;
+    pthread_mutex_lock(&trava);
+    for (g = 0; g < bib.ng; g++) { if (bib.g[g].kind == 'm') nm++; else ns++; }
+    pthread_mutex_unlock(&trava);
+    if (ger == atomic_load(&geracao)) printf("[iptvvod] biblioteca: %d filme(s), %d serie(s)\n", nm, ns); }
+  pthread_mutex_lock(&trava);
+  fioVivo = 0;
+  pthread_mutex_unlock(&trava);
+  atomic_store(&carregando, 0);
+  fflush(stdout);
+  return NULL;
+}
+void iptvvod_carregar(void) {
+  pthread_t t;
+  pthread_mutex_lock(&trava);
+  if (fioVivo) { pthread_mutex_unlock(&trava); return; }
+  fioVivo = 1;
+  pthread_mutex_unlock(&trava);
+  atomic_store(&carregando, 1);
+  if (pthread_create(&t, NULL, fioCarga, (void *)(uintptr_t)atomic_load(&geracao)) != 0) {
+    pthread_mutex_lock(&trava); fioVivo = 0; pthread_mutex_unlock(&trava);
+    atomic_store(&carregando, 0);
+    return;
+  }
+  pthread_detach(t);
+}
+void iptvvod_perfil_trocou(void) {
+  atomic_fetch_add(&geracao, 1);
+  pthread_mutex_lock(&trava);
+  biblioLiberar(&bib);
+  bibPerfil = -1;
+  bibSessao = 0;
+  versao++;
+  pthread_mutex_unlock(&trava);
+}
+// Accounts signature: ids, types and on/off. A change reloads the library.
+static uint64_t assinaturaContas(void) {
+  IptvConta c[IPTVVOD_CONTAS_MAX];
+  int n = iptv_contas(c, IPTVVOD_CONTAS_MAX);
+  uint64_t h = 1469598103934665603ULL ^ (uint64_t)perfis_ativo();
+  for (int i = 0; i < n; i++) h = (h ^ ((uint64_t)c[i].id << 8 | (uint64_t)c[i].tipo << 1 | (uint64_t)!!c[i].ativa)) * 1099511628211ULL;
+  return n ? h : 0;
+}
+int iptvvod_passo(void) {
+  static uint64_t ultima;
+  static unsigned visto;
+  uint64_t a = assinaturaContas();
+  unsigned v;
+  if (a != ultima) {
+    int tinha = ultima != 0;
+    ultima = a;
+    if (tinha) iptvvod_perfil_trocou();
+    if (a) iptvvod_carregar();
+  }
+  pthread_mutex_lock(&trava);
+  v = versao;
+  pthread_mutex_unlock(&trava);
+  if (v != visto) { visto = v; return 1; }
+  return 0;
+}
+static int bibValidaLocked(void) {
+  return bib.ng > 0 && bibPerfil == perfis_ativo() && nv_perfil_sessao_atual(bibSessao);
+}
+int iptvvod_ativo(void) {
+  int r;
+  pthread_mutex_lock(&trava);
+  r = bibValidaLocked();
+  pthread_mutex_unlock(&trava);
+  return r;
+}
+int iptvvod_carregando(void) { return atomic_load(&carregando); }
+unsigned iptvvod_fileiras_versao(void) {
+  unsigned v;
+  pthread_mutex_lock(&trava);
+  v = versao;
+  pthread_mutex_unlock(&trava);
+  return v;
+}
+int iptvvod_chave_fileira(const char *chave) { return chave && !strncmp(chave, "iptvvod_", 8); }
+int iptvvod_n_itens(char kind) {
+  int n = 0;
+  pthread_mutex_lock(&trava);
+  if (bibValidaLocked()) for (int g = 0; g < bib.ng; g++) n += bib.g[g].kind == kind;
+  pthread_mutex_unlock(&trava);
+  return n;
+}
+int iptvvod_n_copias(const char *id) {
+  int g, n = 0;
+  pthread_mutex_lock(&trava);
+  if (bibValidaLocked() && (g = grupoPorId(&bib, id, NULL)) >= 0) n = bib.g[g].n;
+  pthread_mutex_unlock(&trava);
+  return n;
+}
+
+// ------------------------------------------------------------- Home rows
+static void itemDoGrupo(const Biblio *b, int g, CatItem *it) {
+  const Copia *c = &b->c[b->g[g].primeira];
+  memset(it, 0, sizeof *it);
+  iptvvod_id_montar(it->imdb, sizeof it->imdb, b->g[g].chave, b->g[g].kind, 0, 0);
+  snprintf(it->tipo, sizeof it->tipo, "%s", b->g[g].kind == 's' ? "series" : "movie");
+  iptvvod_titulo_limpo(c->nome, it->titulo, sizeof it->titulo);
+  for (int j = b->g[g].primeira; j >= 0 && !it->poster[0]; j = b->c[j].proximo)
+    snprintf(it->poster, sizeof it->poster, "%s", b->c[j].poster);
+  if (c->ano) snprintf(it->meta, sizeof it->meta, "%d", c->ano);
+  if (c->categoria[0]) snprintf(it->genero, sizeof it->genero, "%s", c->categoria);
+  // The panel's rating is not IMDb's: the page labels `nota` as IMDb, so none here.
+  snprintf(it->origem, sizeof it->origem, "IPTV");
+}
+static int recentes(const void *a, const void *b, void *u) {
+  const Biblio *bb = u;
+  long long x = bb->g[*(const int *)a].adicionado, y = bb->g[*(const int *)b].adicionado;
+  return (y > x) - (y < x);
+}
+// qsort_r is not portable across the targets: a small insertion into a top-N.
+static int topRecentes(const Biblio *b, char kind, int *out, int max) {
+  int n = 0;
+  for (int g = 0; g < b->ng; g++) {
+    int k;
+    if (b->g[g].kind != kind) continue;
+    if (n < max) out[n++] = g;
+    else if (recentes(&g, &out[n - 1], (void *)b) < 0) out[n - 1] = g;
+    else continue;
+    for (k = n - 1; k > 0 && recentes(&out[k], &out[k - 1], (void *)b) < 0; k--) {
+      int t = out[k]; out[k] = out[k - 1]; out[k - 1] = t;
+    }
+  }
+  return n;
+}
+int iptvvod_fileiras_copiar(CatItem *itens, int maxItens, CatFileira *fils, int maxFils, int *nItens) {
+  int nf = 0, ni = 0;
+  if (nItens) *nItens = 0;
+  pthread_mutex_lock(&trava);
+  if (bibValidaLocked()) {
+    for (int k = 0; k < 2 && nf < maxFils; k++) {
+      int top[IPTVVOD_POR_FILEIRA], n = topRecentes(&bib, k ? 's' : 'm', top, IPTVVOD_POR_FILEIRA);
+      if (!n || ni + n > maxItens) continue;
+      for (int i = 0; i < n; i++) itemDoGrupo(&bib, top[i], &itens[ni + i]);
+      memset(&fils[nf], 0, sizeof fils[nf]);
+      snprintf(fils[nf].chave, sizeof fils[nf].chave, "iptvvod_%s_recentes", k ? "series" : "movie");
+      snprintf(fils[nf].titulo, sizeof fils[nf].titulo, "%s · IPTV",
+               i18n(k ? "Séries adicionadas recentemente" : "Filmes adicionados recentemente"));
+      snprintf(fils[nf].tipo, sizeof fils[nf].tipo, "%s", k ? "series" : "movie");
+      fils[nf].ini = ni; fils[nf].n = n;
+      ni += n; nf++;
+    }
+  }
+  pthread_mutex_unlock(&trava);
+  if (nItens) *nItens = ni;
+  return nf;
+}
+
+// ------------------------------------------------------------- title page
+// The copies of one group, copied out under the lock (the worker then talks
+// to the providers without holding it).
+typedef struct { unsigned conta; char sid[XTVOD_SID], ext[8]; char nome[160]; } Ref;
+static int copiasDo(const char *id, char kindQuer, Ref *out, int max, uint64_t *grupoOut) {
+  int g, n = 0;
+  char k;
+  pthread_mutex_lock(&trava);
+  if (bibValidaLocked() && (g = grupoPorId(&bib, id, &k)) >= 0 && (kindQuer == 0 || bib.g[g].kind == kindQuer)) {
+    if (grupoOut) *grupoOut = bib.g[g].chave;
+    for (int j = bib.g[g].primeira; j >= 0 && n < max; j = bib.c[j].proximo) {
+      out[n].conta = bib.c[j].conta;
+      snprintf(out[n].sid, sizeof out[n].sid, "%s", bib.c[j].sid);
+      snprintf(out[n].ext, sizeof out[n].ext, "%s", bib.c[j].ext);
+      snprintf(out[n].nome, sizeof out[n].nome, "%s", bib.c[j].nome);
+      n++;
+    }
+  }
+  pthread_mutex_unlock(&trava);
+  return n;
+}
+static void fichaParaItem(const XtVodFicha *f, CatItem *it) {
+  char t[160];
+  if (f->sinopse[0]) snprintf(it->sinopse, sizeof it->sinopse, "%s", f->sinopse);
+  if (f->genero[0]) snprintf(it->genero, sizeof it->genero, "%s", f->genero);
+  if (f->direcao[0]) snprintf(it->direcao, sizeof it->direcao, "%s", f->direcao);
+  if (f->fundo[0]) { snprintf(it->backdrop, sizeof it->backdrop, "%s", f->fundo); snprintf(it->backdropCatalogo, sizeof it->backdropCatalogo, "%s", f->fundo); }
+  if (f->poster[0] && !it->poster[0]) snprintf(it->poster, sizeof it->poster, "%s", f->poster);
+
+  if (f->ano && f->duracaoMin) snprintf(it->meta, sizeof it->meta, "%d · %d min", f->ano, f->duracaoMin);
+  else if (f->ano) snprintf(it->meta, sizeof it->meta, "%d", f->ano);
+  if (f->nome[0] && !it->titulo[0]) { iptvvod_titulo_limpo(f->nome, t, sizeof t); snprintf(it->titulo, sizeof it->titulo, "%s", t); }
+  if (f->elenco[0] && !it->nElenco) {
+    const char *p = f->elenco;
+    while (*p && it->nElenco < CAT_ELENCO_MAX) {
+      const char *v = strchr(p, ',');
+      size_t n = v ? (size_t)(v - p) : strlen(p);
+      while (n && *p == ' ') { p++; n--; }
+      while (n && p[n - 1] == ' ') n--;
+      if (n && n < sizeof it->elenco[0].nome) {
+        memcpy(it->elenco[it->nElenco].nome, p, n);
+        it->elenco[it->nElenco].nome[n] = 0;
+        it->nElenco++;
+      }
+      if (!v) break;
+      p = v + 1;
+    }
+  }
+}
+
+// Episode sources of the series opened last: (season, episode) -> copies.
+#define EP_CACHE_MAX 4096
+typedef struct { uint64_t grupo; int t, e; unsigned conta; char sid[XTVOD_SID], ext[8]; } EpFonte;
+static EpFonte epCache[EP_CACHE_MAX];
+static int nEpCache;
+static uint64_t epCacheGrupo;
+static pthread_mutex_t travaEp = PTHREAD_MUTEX_INITIALIZER;
+
+static int epCmp(const void *a, const void *b) {
+  const CatEp *x = a, *y = b;
+  if (x->temporada != y->temporada) return x->temporada < y->temporada ? -1 : 1;
+  return (x->episodio > y->episodio) - (x->episodio < y->episodio);
+}
+// Fetches every copy's episode list and merges by (season, episode).
+static int serieMesclar(const Ref *r, int nr, uint64_t grupo, CatItem *it, CatEp *eps, int maxEps) {
+  XtVodEp *v = malloc(sizeof(XtVodEp) * 2000);
+  EpFonte *novas = malloc(sizeof(EpFonte) * EP_CACHE_MAX);
+  int nEps = 0, nNovas = 0, algum = 0;
+  uint64_t sessao = nv_perfil_sessao_ler();
+  if (!v || !novas) { free(v); free(novas); return -1; }
+  for (int i = 0; i < nr; i++) {
+    XtVodFicha f;
+    int n = xtvod_ficha_serie(r[i].conta, r[i].sid, &f, v, 2000, sessao);
+    if (n < 0) continue;
+    algum = 1;
+    if (it) fichaParaItem(&f, it);
+    for (int k = 0; k < n; k++) {
+      int j;
+      if (nNovas < EP_CACHE_MAX) {
+        novas[nNovas] = (EpFonte){ grupo, v[k].temporada, v[k].episodio, r[i].conta, "", "" };
+        snprintf(novas[nNovas].sid, sizeof novas[nNovas].sid, "%s", v[k].sid);
+        snprintf(novas[nNovas].ext, sizeof novas[nNovas].ext, "%s", v[k].ext);
+        nNovas++;
+      }
+      if (!eps) continue;
+      for (j = 0; j < nEps && !(eps[j].temporada == v[k].temporada && eps[j].episodio == v[k].episodio); j++) {}
+      if (j < nEps || nEps >= maxEps) continue;
+      memset(&eps[nEps], 0, sizeof eps[nEps]);
+      eps[nEps].temporada = v[k].temporada;
+      eps[nEps].episodio = v[k].episodio;
+      snprintf(eps[nEps].nome, sizeof eps[nEps].nome, "%s", v[k].nome);
+      snprintf(eps[nEps].sinopse, sizeof eps[nEps].sinopse, "%s", v[k].sinopse);
+      snprintf(eps[nEps].thumb, sizeof eps[nEps].thumb, "%s", v[k].thumb);
+      if (v[k].duracaoMin) snprintf(eps[nEps].duracao, sizeof eps[nEps].duracao, "%d min", v[k].duracaoMin);
+      iptvvod_id_montar(eps[nEps].vid, sizeof eps[nEps].vid, grupo, 'e', v[k].temporada, v[k].episodio);
+      nEps++;
+    }
+  }
+  free(v);
+  if (algum) {
+    pthread_mutex_lock(&travaEp);
+    memcpy(epCache, novas, sizeof(EpFonte) * (size_t)nNovas);
+    nEpCache = nNovas;
+    epCacheGrupo = grupo;
+    pthread_mutex_unlock(&travaEp);
+  }
+  free(novas);
+  if (eps && nEps > 1) qsort(eps, (size_t)nEps, sizeof *eps, epCmp);
+  return algum ? nEps : -1;
+}
+int iptvvod_ficha(CatItem *item, CatEp *eps, int maxEps) {
+  Ref r[IPTVVOD_CONTAS_MAX];
+  uint64_t grupo = 0;
+  char k;
+  int nr;
+  if (!item || !iptvvod_id_ler(item->imdb, NULL, &k, NULL, NULL) || k == 'e') return -1;
+  nr = copiasDo(item->imdb, k, r, IPTVVOD_CONTAS_MAX, &grupo);
+  if (!nr) return -1;
+  if (k == 'm') {
+    uint64_t sessao = nv_perfil_sessao_ler();
+    for (int i = 0; i < nr; i++) {
+      XtVodFicha f;
+      if (xtvod_ficha_filme(r[i].conta, r[i].sid, &f, sessao)) { fichaParaItem(&f, item); return 0; }
+    }
+    return 0;   // the row's own data stays; sources still work
+  }
+  {
+    int n = serieMesclar(r, nr, grupo, item, eps, maxEps);
+    if (n > 0) {
+      int t = -1;
+      item->nTemporadas = 0;
+      for (int i = 0; i < n && item->nTemporadas < CAT_TEMP_MAX; i++)
+        if (eps[i].temporada != t) item->temporadas[item->nTemporadas++] = t = eps[i].temporada;
+      snprintf(item->meta, sizeof item->meta, item->nTemporadas == 1 ? i18n("%d temporada") : i18n("%d temporadas"),
+               item->nTemporadas);
+    }
+    return n;
+  }
+}
+
+// ------------------------------------------------------------- sources
+static pthread_mutex_t travaFontes = PTHREAD_MUTEX_INITIALIZER;
+static char fontesAlvo[64];
+static int fontesEstado;
+static Stream *fontesLista;
+static int fontesN;
+static unsigned fontesPedido;
+
+static int alturaDoNome(const char *nome) {
+  char n[160];
+  snprintf(n, sizeof n, " %s ", nome);
+  for (char *c = n; *c; c++) *c = (char)toupper((unsigned char)*c);
+  if (strstr(n, "4K") || strstr(n, "2160") || strstr(n, "UHD")) return 2160;
+  if (strstr(n, "1080") || strstr(n, "FHD")) return 1080;
+  if (strstr(n, " HD ") || strstr(n, "720")) return 720;
+  return 0;
+}
+static void nomeConta(unsigned conta, char *dst, size_t tam) {
+  IptvConta c[IPTVVOD_CONTAS_MAX];
+  int n = iptv_contas(c, IPTVVOD_CONTAS_MAX);
+  snprintf(dst, tam, "IPTV");
+  for (int i = 0; i < n; i++) if (c[i].id == conta) { snprintf(dst, tam, "%s", c[i].nome[0] ? c[i].nome : "IPTV"); return; }
+}
+static int montarFonte(Stream *s, unsigned conta, int episodio, const char *sid, const char *ext, const char *nomePainel) {
+  char conta_[96], up[12];
+  size_t i;
+  memset(s, 0, sizeof *s);
+  if (!xtream_fonte_vod_url(conta, episodio, sid, ext, s->url, sizeof s->url)) return 0;
+  nomeConta(conta, conta_, sizeof conta_);
+  s->altura = alturaDoNome(nomePainel ? nomePainel : "");
+  s->fileIdx = -1;
+  s->mp4 = ext && (!strcmp(ext, "mp4") || !strcmp(ext, "m4v"));
+  for (i = 0; ext && ext[i] && i + 1 < sizeof up; i++) up[i] = (char)toupper((unsigned char)ext[i]);
+  up[i] = 0;
+  if (s->altura) snprintf(s->rotulo, sizeof s->rotulo, "%dp · %s", s->altura, conta_);
+  else snprintf(s->rotulo, sizeof s->rotulo, "%s", conta_);
+  snprintf(s->provedor, sizeof s->provedor, "IPTV · %s", conta_);
+  snprintf(s->descricao, sizeof s->descricao, "%s\n%s", nomePainel && *nomePainel ? nomePainel : conta_, up);
+  snprintf(s->bingeGroup, sizeof s->bingeGroup, "qv|%u", conta);
+  return 1;
+}
+typedef struct { char alvo[64]; unsigned pedido; } PedidoFontes;
+static void *fioFontes(void *u) {
+  PedidoFontes p = *(PedidoFontes *)u;
+  Stream *l = NULL;
+  int n = 0, ok = 0, t = 0, e = 0;
+  uint64_t grupo = 0;
+  char k = 0;
+  free(u);
+  if (iptvvod_id_ler(p.alvo, NULL, &k, &t, &e)) {
+    Ref r[IPTVVOD_CONTAS_MAX];
+    int nr = copiasDo(p.alvo, k == 'e' ? 's' : 'm', r, IPTVVOD_CONTAS_MAX, &grupo);
+    if (nr && k == 'm') {
+      l = calloc((size_t)nr, sizeof *l);
+      for (int i = 0; l && i < nr; i++) if (montarFonte(&l[n], r[i].conta, 0, r[i].sid, r[i].ext, r[i].nome)) n++;
+      ok = l != NULL;
+    } else if (nr && k == 'e') {
+      int tem;
+      pthread_mutex_lock(&travaEp);
+      tem = epCacheGrupo == grupo && nEpCache > 0;
+      pthread_mutex_unlock(&travaEp);
+      if (!tem) serieMesclar(r, nr, grupo, NULL, NULL, 0);
+      l = calloc(IPTVVOD_CONTAS_MAX, sizeof *l);
+      pthread_mutex_lock(&travaEp);
+      for (int i = 0; l && epCacheGrupo == grupo && i < nEpCache && n < IPTVVOD_CONTAS_MAX; i++)
+        if (epCache[i].t == t && epCache[i].e == e) {
+          EpFonte f = epCache[i];
+          char nome[160] = "";
+          for (int j = 0; j < nr; j++) if (r[j].conta == f.conta) snprintf(nome, sizeof nome, "%s", r[j].nome);
+          if (montarFonte(&l[n], f.conta, 1, f.sid, f.ext, nome)) {
+            char ep[24];
+            snprintf(ep, sizeof ep, " · S%02dE%02d", t, e);
+            strncat(l[n].rotulo, ep, sizeof l[n].rotulo - strlen(l[n].rotulo) - 1);
+            n++;
+          }
+        }
+      pthread_mutex_unlock(&travaEp);
+      ok = l != NULL;
+    }
+  }
+  pthread_mutex_lock(&travaFontes);
+  if (p.pedido == fontesPedido) {
+    free(fontesLista);
+    fontesLista = l; fontesN = n; l = NULL;
+    fontesEstado = ok ? VF_PRONTO : VF_FALHOU;
+  }
+  pthread_mutex_unlock(&travaFontes);
+  free(l);
+  printf("[iptvvod] %d fonte(s) para o titulo\n", n);
+  fflush(stdout);
+  return NULL;
+}
+int iptvvod_fontes_pedir(const char *alvo) {
+  PedidoFontes *p;
+  pthread_t t;
+  if (!iptvvod_id_ler(alvo, NULL, NULL, NULL, NULL) || strlen(alvo) >= sizeof fontesAlvo) return 0;
+  p = malloc(sizeof *p);
+  if (!p) return 0;
+  pthread_mutex_lock(&travaFontes);
+  snprintf(fontesAlvo, sizeof fontesAlvo, "%s", alvo);
+  free(fontesLista); fontesLista = NULL; fontesN = 0;
+  fontesEstado = VF_PENDENTE;
+  p->pedido = ++fontesPedido;
+  pthread_mutex_unlock(&travaFontes);
+  snprintf(p->alvo, sizeof p->alvo, "%s", alvo);
+  if (pthread_create(&t, NULL, fioFontes, p) != 0) {
+    free(p);
+    pthread_mutex_lock(&travaFontes); fontesEstado = VF_FALHOU; pthread_mutex_unlock(&travaFontes);
+    return 1;
+  }
+  pthread_detach(t);
+  return 1;
+}
+int iptvvod_fontes_colher(const char *alvo, Stream **lista, int *n) {
+  int e;
+  if (lista) *lista = NULL;
+  if (n) *n = 0;
+  pthread_mutex_lock(&travaFontes);
+  if (!alvo || strcmp(alvo, fontesAlvo)) { pthread_mutex_unlock(&travaFontes); return VF_FALHOU; }
+  e = fontesEstado;
+  if (e == VF_PRONTO) {
+    if (lista) { *lista = fontesLista; fontesLista = NULL; }
+    if (n) *n = fontesN;
+    fontesN = 0;
+    fontesEstado = VF_NADA;
+    fontesAlvo[0] = 0;
+  } else if (e == VF_FALHOU) fontesAlvo[0] = 0;
+  pthread_mutex_unlock(&travaFontes);
+  return e;
+}
+
+int iptvvod_teste_esperar(int ms) {
+  for (int i = 0; i < ms / 20; i++) {
+    if (!atomic_load(&carregando)) return 1;
+    usleep(20000);
+  }
+  return !atomic_load(&carregando);
+}

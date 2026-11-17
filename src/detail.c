@@ -23,6 +23,7 @@
 #define NV_TXT_TELA   // NV_TELA_W/H = tela virtual da escala de texto (escala.h)
 #include "escala.h"
 #include "detail.h"
+#include "jfid.h"
 #include "biblioteca.h"
 #include "detail_acoes.h"
 #include "focoprof.h"
@@ -2574,6 +2575,9 @@ static int temRecomendar(void) {
 static int temLembrar(void) {
   const CatItem *ci = cat_item(idx);
   if (!ci || !ci->imdb[0]) return 0;
+  // A personal-library item (server or IPTV) is already available, and its
+  // local id has no release calendar behind it (agenda works on TMDB/Trakt).
+  if (jfid_e(ci->imdb)) return 0;
   if (!strcmp(ci->tipo, "movie"))
     return agenda_lembrete(ci->imdb) || agenda_filme_elegivel(
       extras_ficha_lancamento(), extras_ficha_digital(), stream_filme_fontes(ci->imdb));

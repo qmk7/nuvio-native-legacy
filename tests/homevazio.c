@@ -15,10 +15,16 @@ unsigned sync_ultimo_ok(void) { return ultimo; }
 int sync_manual_addons(void) { pedidos++; return 1; }
 static int convidado;   // QR TIME guest mode (convidado.h)
 int convidado_ativo(void) { return convidado; }
+static int iptvRows;    // QR TIME IPTV library rows (servidores.h)
+int servidores_fileiras_ativas(void) { return iptvRows; }
 int main(void) {
   SDL_Event e = {0}; Qr q;
   assert(qr_gerar(&q, HOMEVAZIO_URL));
   assert(homevazio_ativo(0));
+  // No add-ons: rows from the IPTV library make a real Home; rows without a
+  // source behind them (placeholders) do not.
+  assert(homevazio_ativo(2));
+  iptvRows = 1; assert(!homevazio_ativo(2)); assert(homevazio_ativo(0)); iptvRows = 0;
   logada = 1; estado = SYNC_RODANDO;
   assert(!homevazio_ativo(0));
   estado = SYNC_PRONTO;

@@ -11,15 +11,19 @@
 #include "jfid.h"
 #include "jellyfin.h"
 #include "plex.h"
+#include "iptvvod.h"
 
 // Rows a Home can receive from all servers together.
-#define SRV_FIL_MAX (JF_FIL_MAX + JF_FIL_MAX + PX_FIL_MAX)
-#define SRV_ITENS_MAX (2 * JF_ITENS_MAX + PX_FIL_MAX * JF_POR_FILEIRA)
+#define SRV_FIL_MAX (JF_FIL_MAX + JF_FIL_MAX + PX_FIL_MAX + IPTVVOD_FIL_MAX)
+#define SRV_ITENS_MAX (2 * JF_ITENS_MAX + PX_FIL_MAX * JF_POR_FILEIRA + IPTVVOD_FIL_MAX * IPTVVOD_POR_FILEIRA)
 
 void servidores_carregar(void);          // active profile's connections
 void servidores_perfil_trocou(void);     // cancels in-flight work, reloads
 void servidores_esquecer_todos(void);    // Nuvio account logout: every token file
 int  servidores_conectado(void);         // any server signed in
+// Home has rows to copy: a signed-in server with the setting on, or the IPTV
+// library (iptvvod.h), which needs no setting: it is the user's own providers.
+int  servidores_fileiras_ativas(void);
 unsigned servidores_fileiras_versao(void);
 int  servidores_chave_fileira(const char *chave);
 int  servidores_fileiras_copiar(CatItem *itens, int maxItens, CatFileira *fils, int maxFils,

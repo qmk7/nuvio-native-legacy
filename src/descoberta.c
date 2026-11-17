@@ -2793,7 +2793,7 @@ typedef struct {
 static int homeVistosReserva(void) {
   int reserva = trakt_ativo() ? 2 * TRAKT_LISTA_MAX : 0;
   if (ajustes_salvos_no_simkl() && simkl_ativo()) reserva += 300;
-  if (ajustes_jellyfin_ligado() && servidores_conectado()) reserva += SRV_ITENS_MAX;
+  if (servidores_fileiras_ativas()) reserva += SRV_ITENS_MAX;
   return reserva;
 }
 static int homeVistosLimitar(int got, int usados, int restantes, int reserva) {
@@ -5398,7 +5398,7 @@ static void *montar(void *u) {
   // network here; the module fetched them on its own worker. Fixed rows
   // (empty base) so they never take an addon row's place in the limit, placed
   // right after the leading fixed rows (Continue watching, social).
-  if (ajustes_jellyfin_ligado() && servidores_conectado()) {
+  if (servidores_fileiras_ativas()) {
     int cabe = SRV_ITENS_MAX, jn = 0, jnf, k, pos = 0;
     CatItem *jfItens = malloc(sizeof(CatItem) * (size_t)cabe);
     CatFileira jfFils[SRV_FIL_MAX];

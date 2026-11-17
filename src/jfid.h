@@ -24,7 +24,7 @@ static inline int jfid_hex(char c) {
   return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
 }
 
-// Namespaces: "jf:" Jellyfin, "em:" Emby, "px:" Plex. Same shape for all three
+// Namespaces: "jf:" Jellyfin, "em:" Emby, "px:" Plex ("qv:" IPTV library, iptvvod.h). Same shape for all three
 // (8 hex of the server id, '.', the opaque item id), so the same privacy gate
 // and the same parser serve every personal server.
 #define JFID_PREFIXO_EMBY "em:"
@@ -34,8 +34,9 @@ static inline int jfid_hex(char c) {
 // this as a privacy gate ("never send to Trakt"), so prefix alone decides.
 static inline int jfid_e(const char *id) {
   if (!id || !id[0] || !id[1] || id[2] != ':') return 0;
+  // "qv:" is the IPTV library (iptvvod.h): provider content under a local id.
   return (id[0] == 'j' && id[1] == 'f') || (id[0] == 'e' && id[1] == 'm') ||
-         (id[0] == 'p' && id[1] == 'x');
+         (id[0] == 'p' && id[1] == 'x') || (id[0] == 'q' && id[1] == 'v');
 }
 
 // Lowercase hex without dashes, at most `max` digits. 1 if valid and not empty.

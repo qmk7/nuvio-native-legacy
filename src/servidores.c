@@ -7,7 +7,10 @@ void servidores_carregar(void) {
   emby_carregar();
   plex_carregar();
 }
+_Static_assert(JF_FONTES_NADA == 0 && JF_FONTES_PENDENTE == 1 && JF_FONTES_PRONTO == 2 && JF_FONTES_FALHOU == 3,
+               "iptvvod.c answers with the same four values");
 void servidores_perfil_trocou(void) {
+  iptvvod_perfil_trocou();
   jellyfin_perfil_trocou();
   emby_perfil_trocou();
   plex_perfil_trocou();
@@ -18,23 +21,32 @@ void servidores_esquecer_todos(void) {
   plex_esquecer_todos();
 }
 int servidores_conectado(void) { return jellyfin_conectado() || emby_conectado() || plex_conectado(); }
+int servidores_fileiras_ativas(void) {
+  return (ajustes_jellyfin_ligado() && servidores_conectado()) || iptvvod_ativo();
+}
 
 unsigned servidores_fileiras_versao(void) {
-  return jellyfin_fileiras_versao() * 3u + emby_fileiras_versao() * 7u + plex_fileiras_versao() * 13u;
+  return jellyfin_fileiras_versao() * 3u + emby_fileiras_versao() * 7u + plex_fileiras_versao() * 13u +
+         iptvvod_fileiras_versao() * 17u;
 }
 int servidores_chave_fileira(const char *chave) {
-  return jellyfin_chave_fileira(chave) || emby_chave_fileira(chave) || plex_chave_fileira(chave);
+  return jellyfin_chave_fileira(chave) || emby_chave_fileira(chave) || plex_chave_fileira(chave) ||
+         iptvvod_chave_fileira(chave);
 }
 
 // Appends each module's rows after the previous ones; item windows are rebased.
 int servidores_fileiras_copiar(CatItem *itens, int maxItens, CatFileira *fils, int maxFils, int *nItens) {
   int nf = 0, ni = 0, m;
   if (nItens) *nItens = 0;
-  for (m = 0; m < 3; m++) {
+  // The IPTV library first: the user's own providers, no setting needed.
+  // Personal servers only with their setting on.
+  for (m = 0; m < 4; m++) {
     int n = 0, k, f;
     if (maxItens - ni <= 0 || maxFils - nf <= 0) break;
-    f = m == 0 ? jellyfin_fileiras_copiar(itens + ni, maxItens - ni, fils + nf, maxFils - nf, &n)
-      : m == 1 ? emby_fileiras_copiar(itens + ni, maxItens - ni, fils + nf, maxFils - nf, &n)
+    if (m > 0 && !ajustes_jellyfin_ligado()) break;
+    f = m == 0 ? iptvvod_fileiras_copiar(itens + ni, maxItens - ni, fils + nf, maxFils - nf, &n)
+      : m == 1 ? jellyfin_fileiras_copiar(itens + ni, maxItens - ni, fils + nf, maxFils - nf, &n)
+      : m == 2 ? emby_fileiras_copiar(itens + ni, maxItens - ni, fils + nf, maxFils - nf, &n)
                : plex_fileiras_copiar(itens + ni, maxItens - ni, fils + nf, maxFils - nf, &n);
     for (k = 0; k < f; k++) fils[nf + k].ini += ni;
     nf += f;
@@ -46,6 +58,7 @@ int servidores_fileiras_copiar(CatItem *itens, int maxItens, CatFileira *fils, i
 
 int servidores_ficha(CatItem *item, CatEp *eps, int maxEps) {
   if (!item) return -1;
+  if (iptvvod_e_id(item->imdb)) return iptvvod_ficha(item, eps, maxEps);
   if (!strncmp(item->imdb, JFID_PREFIXO_PLEX, 3)) return plex_ficha(item, eps, maxEps);
   if (!strncmp(item->imdb, JFID_PREFIXO_EMBY, 3)) return emby_ficha(item, eps, maxEps);
   return jellyfin_ficha(item, eps, maxEps);
@@ -53,13 +66,15 @@ int servidores_ficha(CatItem *item, CatEp *eps, int maxEps) {
 
 int servidores_fontes_pedir(const char *alvo) {
   if (!alvo) return 0;
+  if (iptvvod_e_id(alvo)) return iptvvod_fontes_pedir(alvo);
   if (!strncmp(alvo, JFID_PREFIXO_PLEX, 3)) return plex_fontes_pedir(alvo);
   if (!strncmp(alvo, JFID_PREFIXO_EMBY, 3)) return emby_fontes_pedir(alvo);
   return jellyfin_fontes_pedir(alvo);
 }
 int servidores_fontes_colher(const char *alvo, Stream **lista, int *n) {
   if (!alvo) { if (lista) *lista = NULL; if (n) *n = 0; return JF_FONTES_FALHOU; }
-  // PX_FONTES_* and JF_FONTES_* are the same four values on purpose.
+  // PX_FONTES_*, JF_FONTES_* and iptvvod's answers are the same four values.
+  if (iptvvod_e_id(alvo)) return iptvvod_fontes_colher(alvo, lista, n);
   if (!strncmp(alvo, JFID_PREFIXO_PLEX, 3)) return plex_fontes_colher(alvo, lista, n);
   if (!strncmp(alvo, JFID_PREFIXO_EMBY, 3)) return emby_fontes_colher(alvo, lista, n);
   return jellyfin_fontes_colher(alvo, lista, n);
@@ -89,5 +104,7 @@ int servidores_passo(void) {
     unsigned v = servidores_fileiras_versao();
     if (v != versao) { versao = v; refazer = 1; }
   }
+  // The IPTV library follows the provider accounts, setting or not.
+  if (iptvvod_passo()) refazer = 1;
   return refazer;
 }

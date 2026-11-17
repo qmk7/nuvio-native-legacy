@@ -11,6 +11,7 @@
 #include "layout.h"
 #include "qrtex.h"
 #include "descoberta.h"
+#include "servidores.h"
 #include "ponteiro.h"
 
 #define HV_W 1240.0f
@@ -18,7 +19,9 @@
 #define HV_QR 340.0f
 int homevazio_ativo(int fileiras) {
   if (sessao_logada() && sync_estado() != SYNC_PRONTO && !sync_ultimo_ok()) return 0;
-  if (!addons_n()) return 1;
+  // No add-ons but the IPTV library (or a server) gave Home its rows: that
+  // is a real Home, not an empty one.
+  if (!addons_n()) return !(fileiras && servidores_fileiras_ativas());
   if (fileiras || desc_montando()) return 0;
   for (int i = 0; i < addons_n(); i++)
     if (addons_tem_catalogo(i)) return 0;

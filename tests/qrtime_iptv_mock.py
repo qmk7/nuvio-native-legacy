@@ -90,7 +90,8 @@ def vod_info(acct, vid):
         if str(m["stream_id"]) == vid:
             return {"info": {"name": m["name"], "plot": "Plot of " + m["name"], "genre": "Action",
                              "cast": "Keanu Reeves, Carrie-Anne Moss", "director": "Wachowskis",
-                             "releasedate": "1999-03-31", "duration_secs": 8160,
+                             "releasedate": "%s-01-01" % (m.get("year") or (m["name"].split("(")[-1][:4] if "(" in m["name"] else "")),
+                             "duration_secs": 8160,
                              "backdrop_path": [BASE + "/img/bd.jpg"], "tmdb_id": m.get("tmdb", "")},
                     "movie_data": {"stream_id": m["stream_id"], "name": m["name"],
                                    "container_extension": m["container_extension"]}}
@@ -214,7 +215,11 @@ class H(BaseHTTPRequestHandler):
             if a == "get_all_channels":
                 return self.send({"js": {"data": ST_CHANS}})
             return self.send({"js": []})
-        if p.startswith(("/live/", "/m3u/", "/st/", "/movie/", "/series/")):
+        if p.startswith(("/movie/", "/series/")):
+            # A tiny MP4 header: enough for the app's source check (video/*);
+            # real decoding is only provable on the TV.
+            return self.send(b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"\x00" * 64, "video/mp4")
+        if p.startswith(("/live/", "/m3u/", "/st/")):
             # Placeholder media: the desktop build has no video decoder; on a
             # TV this would need a real stream (validated on hardware).
             return self.send(b"#EXTM3U\n#EXT-X-ENDLIST\n", "application/vnd.apple.mpegurl")
