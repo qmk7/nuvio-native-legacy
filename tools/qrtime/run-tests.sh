@@ -25,10 +25,13 @@ mkdir -p "$LOGS"
 pass=0 fail=0 skip=0
 failed=()
 for t in "${tests[@]}"; do
+  # "name:seconds" gives one slow test its own limit (default TEST_TIMEOUT).
+  lim="${TEST_TIMEOUT:-300}"
+  case "$t" in *:*) lim="${t##*:}"; t="${t%%:*}";; esac
   t="${t%.sh}"
   f="tests/$t.sh"
   if [ ! -f "$f" ]; then echo "MISSING $t"; fail=$((fail+1)); failed+=("$t"); continue; fi
-  if timeout -k 5 "${TEST_TIMEOUT:-300}" bash "$f" >"$LOGS/$t.log" 2>&1; then
+  if timeout -k 5 "$lim" bash "$f" >"$LOGS/$t.log" 2>&1; then
     if grep -Eq '(^|[^A-Za-z])SKIP([^A-Za-z]|$)' "$LOGS/$t.log"; then
       echo "SKIP  $t"; skip=$((skip+1))
     else

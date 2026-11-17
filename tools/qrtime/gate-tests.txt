@@ -35,7 +35,8 @@ ajustes_sync
 ajustes_nuvem
 ajustes_escala_migra
 ajustes_idioma_disco
-ajustes_memoria_migra
+# Builds the whole app twice: needs more than the default 300 s.
+ajustes_memoria_migra:900
 
 # Guest mode (QR TIME)
 convidado
@@ -44,8 +45,11 @@ homevazio
 i18n
 
 # Main navigation, end to end (Xvfb)
-qrtime_nav
+qrtime_nav:900
 
 # Live TV / IPTV end to end (Xvfb + local IPTV fixtures)
 qrtime_xmltv_tz
 qrtime_livetv
+qrtime_iptv_teste
+guia_grupos
+qrtime_catlock
