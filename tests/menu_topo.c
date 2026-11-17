@@ -1,3 +1,4 @@
+#include <math.h>
 // #461: menu na barra do topo. A rail some (conteudo usa a largura toda) e as
 // setas giram: ESQUERDA/DIREITA andam pelos itens, BAIXO devolve o foco ao
 // conteudo, CIMA nao faz nada, OK escolhe, Voltar fecha. Desligado, a rail volta.
@@ -78,7 +79,7 @@ int main(void) {
   tecla(SDLK_RIGHT); tecla(SDLK_UP);          // anda; cima nao fecha nem escolhe
   assert(menu_aberto() && !menu_escolheu());
   tecla(SDLK_RIGHT); tecla(SDLK_LEFT); tecla(SDLK_RETURN);
-  assert(menu_escolheu() && menu_destino() == MENU_EXPLORAR);
+  assert(menu_escolheu() && menu_destino() == MENU_GUIA);   // QR TIME order: Live TV after Home
 
   abrir(MENU_INICIO);
   tecla(SDLK_RIGHT); tecla(SDLK_DOWN);        // baixo volta ao conteudo
@@ -98,8 +99,14 @@ int main(void) {
       snprintf(cfg, sizeof cfg, "homeLayoutLocal 0\nmodernSidebar 0\nmenuTopoLocal 1\nmenuExplorarLocal 0\nmenuGuiaLocal 0\nmenuAgendaLocal 0\nmenuPerfilLocal 0\nidioma %d\n", idiomas[j]);
       gravar(cfg);
       menu_topo_geo(&g);
-      printf("topo idioma %d: largura %.0f cortado %d\n", idiomas[j], g.trilha[2], g.cortado);
-      assert(g.cortado == 0 && g.trilha[2] > 600.0f && g.trilha[2] < 1300.0f);
+      printf("topo idioma %d: largura %.0f cortado %d icones %d\n", idiomas[j], g.trilha[2], g.cortado, g.icones);
+      // Never a cut label. QR TIME has more destinations: when the labels do
+      // not fit the bar turns into square icon pills (menu.c, TopoTira.icones).
+      assert(g.cortado == 0 && g.trilha[2] < 1300.0f);
+      if (g.icones) {
+        for (int k = 0; k < g.n; k++) assert(fabsf(g.w[k] - g.h) < 0.5f);
+        assert(g.trilha[2] > g.n * g.h);
+      } else assert(g.trilha[2] > 600.0f);
     }
     gravar("homeLayoutLocal 0\nmodernSidebar 0\nmenuTopoLocal 1\n"); }
 
@@ -116,7 +123,7 @@ int main(void) {
   assert(!ajustes_menu_topo() && ajustes_rail_largura_fixa() > 0.0f);
   abrir(MENU_INICIO);
   tecla(SDLK_DOWN); tecla(SDLK_RIGHT);
-  assert(menu_escolheu() && menu_destino() == MENU_EXPLORAR);
+  assert(menu_escolheu() && menu_destino() == MENU_GUIA);   // QR TIME order
 
   // #461: com a barra no topo, CIMA no primeiro item da tela abre a barra.
   gravar("homeLayoutLocal 0\nmodernSidebar 0\nmenuTopoLocal 1\n");

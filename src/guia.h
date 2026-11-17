@@ -35,6 +35,12 @@ int  guia_visivel(void);         // qualquer um dos dois
 // da fileira de canais ja abre no canal focado) e pelo player (o overlay abre
 // no canal que esta tocando).
 void guia_focar_id(const char *id);
+// QR TIME Sport Center (interim): focus the first section whose name matches
+// `pedido` ("esportes" = any sports word: sport, esporte, deporte, football...).
+// Before the list is published the request waits for it. guia_secao_ausente()
+// is 1 (once) when the list has no such section, so the caller can say so.
+void guia_focar_secao(const char *pedido);
+int  guia_secao_ausente(void);
 void guia_reordenar(void); // presentation only; retain cached channels and focus
 
 // Snapshot of all loaded categories, including hidden ones. Identity excludes

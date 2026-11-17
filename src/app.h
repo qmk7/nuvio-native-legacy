@@ -8,6 +8,7 @@
 #ifndef NV_APP_H
 #define NV_APP_H
 #include <SDL2/SDL.h>
+#include <stddef.h>
 
 // TELA_LOGIN e TELA_ESCOLHA_PERFIL sao a excecao a ordem de prioridade: quando
 // uma delas esta ativa NADA mais desenha nem recebe tecla. Sem conta nao ha
@@ -55,6 +56,9 @@ void app_abrir_titulo(const char *imdb);
 // Porta de teste: a funcao que app_atualizar chama antes de entregar a URL
 // guardada ao player (tocarFonteGuardada). 1 = o player recebeu a URL.
 int app_teste_tocar_guardada(void);
+// QR TIME navigation test hook: the Movies/Series grid last built from the
+// main menu (id copied into `titulo`); returns its number of catalog tabs.
+int app_teste_nav_pasta(char *titulo, size_t n);
 // Test hooks for the sheet latch (#513). cwTocar is Continue Watching only.
 void app_teste_cw_tocar(int temporada, int episodio);
 void app_teste_gravar_folha(int temporada, int episodio, int tem);

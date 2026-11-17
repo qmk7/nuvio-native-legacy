@@ -21,15 +21,24 @@
 // catalogo. A descoberta fica perto da Home porque e uma porta de entrada,
 // enquanto Biblioteca e Perfil continuam mais abaixo, como no shell legado.
 typedef enum {
+  // QR TIME ORDER (docs/qrtime/UI-SPEC.md §3.1): the twelve main destinations
+  // in the order of the product spec, then the two legacy ones (Explorar,
+  // Perfil e Stats, each still behind its own visibility setting) and
+  // Settings last. The enum IS the display order of the classic rail and of the
+  // Apple TV bar. No value is persisted, so reordering is safe.
   MENU_INICIO,
-  MENU_EXPLORAR,
-  MENU_GUIA,
-  MENU_BUSCAR,
-  MENU_BIBLIOTECA,
-  // AGENDA — o calendario das series acompanhadas. Fica DEPOIS da Biblioteca
-  // e antes do Perfil de proposito: as duas falam do acervo da pessoa (o que
-  // ela guardou, e quando o que ela guardou sai), e o Perfil e sobre ela.
+  MENU_GUIA,        // Live TV
+  MENU_FILMES,      // Movies: every movie catalog of the active add-ons
+  MENU_SERIES,      // Series: every series catalog
+  MENU_ESPORTES,    // Sport Center (interim: the guide on its sports section)
+  MENU_MUSICA,      // Music: hidden until the Music Center exists (phase 7)
+  MENU_YOUTUBE,     // launches the TV's YouTube app; not a tab
+  // AGENDA — o calendario das series acompanhadas.
   MENU_AGENDA,
+  MENU_BUSCAR,
+  MENU_ADDONS,      // Add-ons / providers
+  MENU_BIBLIOTECA,  // Favorites / My Library
+  MENU_EXPLORAR,
   MENU_PERFIL,
   MENU_AJUSTES,
   MENU_N
@@ -107,7 +116,7 @@ float menu_barra_borda(void);
 // rotulo); `cortado` 1 se algum rotulo nao coube inteiro. So os testes leem.
 #define MENU_TOPO_MAX 16
 typedef struct {
-  int n, cortado, busca[MENU_TOPO_MAX];
+  int n, cortado, icones, busca[MENU_TOPO_MAX];   // icones: labels did not fit, icon pills
   float y, h, x[MENU_TOPO_MAX], w[MENU_TOPO_MAX], foco[MENU_TOPO_MAX];
   float trilha[4], avatar[4], sel[3], foc[3];
 } MenuTopoGeo;

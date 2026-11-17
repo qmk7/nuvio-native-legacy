@@ -369,6 +369,11 @@ static int sOk;                 // staging: a carga achou canal (antes de pendPr
 static atomic_int pendPronto;   // release no fio de carga, acquire no desenho
 // Foco pedido com a lista ainda baixando; publicar() aplica ao chegar.
 static char focoPend[80];
+// QR TIME Sport Center (interim): a section asked for before the channel list
+// was published; applied at the next publish (guia_focar_secao).
+static char secaoPend[24];
+static int secaoAusente;
+static int focarSecaoAgora(const char *pedido);
 
 // Catalogos de canal descobertos na home (tipo "channel"/"tv").
 typedef struct { char base[NV_ADDON_URL_MAX], tipo[16], id[96], nome[96]; } GFonte;
@@ -2518,6 +2523,11 @@ static void publicar(void) {
     guia_focar_id(id);
     focoPend[0] = 0;
   } else if (idFoco[0]) { guia_focar_id(idFoco); focoPend[0] = 0; }
+  if (secaoPend[0]) {
+    if (!focarSecaoAgora(secaoPend)) secaoAusente = 1;
+    printf("[guia] section \"%s\": %s\n", secaoPend, secaoAusente ? "not found" : "focused");
+    secaoPend[0] = 0;
+  }
   printf("[guia] %d canais em %d grupos, %d fonte(s), teto %d (%d favoritos)%s\n",
          nCanais, nCats, nLtvF, tetoCarga, nFavOrd, igual ? ", igual a da tela" : "");
   // Uma linha por fonte: chave e contas, nunca URL nem credencial (M6).
@@ -3066,6 +3076,47 @@ int guia_foco_topo(void) { return focoTopo ? topoCol : -1; }
 // O foco pedido com a lista ainda baixando fica pendente em focoPend;
 // publicar() aplica assim que os canais chegam — o overlay aberto pelo
 // player foca o canal que esta no ar mesmo se a carga so terminou depois.
+// Sections whose name holds one of these words (any provider, any case) are
+// "sports": Xtream groups ("SPORTS UK"), M3U groups and the guide's own
+// heuristic section ("Esportes") all count.
+static int secaoCasa(const char *nome, const char *pedido) {
+  static const char *ESPORTES[] = { "sport", "esporte", "deporte", "football", "soccer",
+                                    "futebol", "futbol", "calcio", "\xd8\xb1\xd9\x8a\xd8\xa7\xd8\xb6", NULL };
+  char low[200];
+  size_t i;
+  if (!nome) return 0;
+  for (i = 0; nome[i] && i + 1 < sizeof low; i++)
+    low[i] = (char)((nome[i] >= 'A' && nome[i] <= 'Z') ? nome[i] + 32 : nome[i]);
+  low[i] = 0;
+  if (!strcmp(pedido, "esportes")) {
+    for (i = 0; ESPORTES[i]; i++) if (strstr(low, ESPORTES[i])) return 1;
+    return 0;
+  }
+  return strstr(low, pedido) != NULL;
+}
+static int focarSecaoAgora(const char *pedido) {
+  int l;
+  for (l = 0; l < nLinhas(); l++) {
+    if (linhaEhFav(l) || !linhaN(l)) continue;
+    if (secaoCasa(cats[linhaCatDe(l)].nome, pedido)) {
+      focoLin = l; focoCol = 0; focoTopo = 0;
+      return 1;
+    }
+  }
+  return 0;
+}
+void guia_focar_secao(const char *pedido) {
+  if (!pedido || !*pedido) return;
+  secaoAusente = 0;
+  if (nCanais > 0) {
+    secaoPend[0] = 0;
+    if (!focarSecaoAgora(pedido)) secaoAusente = 1;
+    return;
+  }
+  snprintf(secaoPend, sizeof secaoPend, "%s", pedido);
+}
+int guia_secao_ausente(void) { int v = secaoAusente; secaoAusente = 0; return v; }
+
 void guia_focar_id(const char *id) {
   int l, c, volta;
   if (!id || !*id) return;
@@ -7847,6 +7898,7 @@ void guia_abrir_sessao(void) {
   inventarioDisco = NULL; inventarioCortado = 0;
   fInventarioCat[0] = 0;
   focoPend[0] = pedidoBase[0] = previewId[0] = heroId[0] = 0;
+  secaoPend[0] = 0; secaoAusente = 0;
   aberta = overlay = querSair = pediuCanal = 0;
   focoLin = focoCol = focoTopo = topoCol = 0;
   rolY = velY = rolL = velL = entrada = 0.0f;

@@ -132,7 +132,11 @@ static float menuEscala(void) {
 // "Inicio" sem acento era erro de portugues NA TELA. E "Busca", nao "Buscar":
 // os outros tres sao substantivos (Biblioteca, Ajustes) e o verbo destoava.
 // Rotulos e ordem conferidos na referencia.
-static const char *ROTULOS[MENU_N] = { "Início", "Explorar", "Guia TV", "Busca", "Biblioteca", "Agenda", "Perfil e Stats", "Ajustes" };
+// Same order as MenuDestino (QR TIME spec order).
+static const char *ROTULOS[MENU_N] = {
+  "Início", "TV ao vivo", "Filmes", "Séries", "Central de Esportes", "Música", "YouTube",
+  "Agenda", "Busca", "Add-ons", "Biblioteca", "Explorar", "Perfil e Stats", "Ajustes"
+};
 
 // ITEM ESCONDIDO (#162): Explorar, Guia, Agenda e Perfil somem da barra quando
 // desligados nos Ajustes. Inicio, Busca, Biblioteca e Ajustes ficam sempre —
@@ -144,6 +148,14 @@ static int mostra(int i) {
     case MENU_GUIA:     return ajustes_menu_guia();
     case MENU_AGENDA:   return ajustes_menu_agenda();
     case MENU_PERFIL:   return ajustes_menu_perfil();
+    // QR TIME: no decorative entry. Music appears once the Music Center exists
+    // (phase 7); until then its saved soundtracks need an account server that
+    // a guest build does not have. See docs/qrtime/UI-SPEC.md §3.1.
+#ifdef QRT_MUSICA_PRONTA
+    case MENU_MUSICA:   return 1;
+#else
+    case MENU_MUSICA:   return 0;
+#endif
     default:            return 1;
   }
 }
@@ -620,7 +632,9 @@ void menu_atualizar(float dt, Uint32 agora) {
 static void icone(int d, float cx, float cy, float s, float r, float g, float b, float a) {
   // `portal` ja e um SVG embarcado e le como entrada para uma descoberta;
   // manter o icone real evita inventar um glifo SDF e duplicar o de Busca.
-  static const char *nomes[MENU_N] = {"menu_home", "portal", "menu_guide", "menu_search", "menu_library", "menu_agenda", "menu_profile", "menu_settings"};
+  static const char *nomes[MENU_N] = {"menu_home", "menu_guide", "aj_film", "aj_tv-minimal-play", "aj_trophy",
+                                       "aj_music", "aj_circle-play", "menu_agenda", "menu_search", "aj_puzzle",
+                                       "menu_library", "portal", "menu_profile", "menu_settings"};
   if (d < 0 || d >= MENU_N) return;
   gfx_icone((GfxRect){cx-s*.5f, cy-s*.5f, s, s}, nomes[d], r, g, b, a);
 }
@@ -629,7 +643,9 @@ static void icone(int d, float cx, float cy, float s, float r, float g, float b,
 // Os icones da barra CLASSICA: os de traco do mockup (tools/icones-menu.sh).
 // A Dinamica continua chamando icone(), com os menu_*.png de sempre.
 static void iconeTraco(int d, float cx, float cy, float s, float r, float g, float b, float a) {
-  static const char *nomes[MENU_N] = {"mt_inicio", "mt_explorar", "mt_guia", "mt_busca", "mt_biblioteca", "mt_agenda", "mt_perfil", "mt_ajustes"};
+  static const char *nomes[MENU_N] = {"mt_inicio", "mt_guia", "aj_film", "aj_tv-minimal-play", "aj_trophy",
+                                       "aj_music", "aj_circle-play", "mt_agenda", "mt_busca", "aj_puzzle",
+                                       "mt_biblioteca", "mt_explorar", "mt_perfil", "mt_ajustes"};
   if (d < 0 || d >= MENU_N) return;
   gfx_icone((GfxRect){cx-s*.5f, cy-s*.5f, s, s}, nomes[d], r, g, b, a);
 }
@@ -914,10 +930,12 @@ static float tvPilAlfa = 1.0f, tvPilAlvo = 1.0f;
 
 static int tvAtivo(void) { return ajustes_home_layout() == HOME_LAYOUT_DINAMICA; }
 
-// Ordem do original: Inicio, Busca, Explorar... (o resto segue a ordem do app).
+// QR TIME: the same spec order as the classic rail (one navigation model on
+// every layout; docs/qrtime/UI-SPEC.md §4.2).
 static const int TV_ORDEM[MENU_N] = {
-  MENU_INICIO, MENU_BUSCAR, MENU_EXPLORAR, MENU_GUIA, MENU_AGENDA,
-  MENU_BIBLIOTECA, MENU_PERFIL, MENU_AJUSTES
+  MENU_INICIO, MENU_GUIA, MENU_FILMES, MENU_SERIES, MENU_ESPORTES, MENU_MUSICA,
+  MENU_YOUTUBE, MENU_AGENDA, MENU_BUSCAR, MENU_ADDONS, MENU_BIBLIOTECA,
+  MENU_EXPLORAR, MENU_PERFIL, MENU_AJUSTES
 };
 static const char *tvRotulo(int d) { return menu_rotulo(d); }
 // Focos na ordem de navegacao: cabecalho (trocar de usuario) e os visiveis.
@@ -1422,6 +1440,7 @@ static void tvDesenhar(void) {
 #define TOPO_VAO       TK(2.0f)     // entre duas pilulas
 #define TOPO_TRILHA    TK(NV_CHROME_INSET)   // trilha -> pilula, igual nos 4 lados
 #define TOPO_ICONE     TK(26.0f)    // a pilula da Busca e quadrada
+#define TOPO_MAX_REAL  1250.0f      // widest labelled bar, real px (QR TIME: then icon pills)
 #define TOPO_H         (TOPO_PILULA_H + 2.0f * TOPO_TRILHA)
 #define TOPO_Y         (TOPO_CY - TOPO_H * 0.5f)
 // Sem espaco ate a ilha do relogio, aperta primeiro o vao, depois o respiro;
@@ -1478,7 +1497,10 @@ static const char *topoRotulo(int i) {
 // o vao entre elas e a largura da area das pilulas (sem a trilha), tudo em px
 // da tela da barra. tab_metrics_from + tab_content_w deles, com o aperto no
 // lugar da rolagem: a nossa tira nunca rola.
-typedef struct { int n, ordem[NV_MENU_FOCOS], cortado; float ws[NV_MENU_FOCOS], vao, pad, rotMax, larg; } TopoTira;
+// `icones`: QR TIME has more destinations than labels fit in the top bar in
+// long-label languages. Instead of cutting labels (unreadable at 3 m) every
+// pill becomes a square icon pill, the form the Search pill already has.
+typedef struct { int n, ordem[NV_MENU_FOCOS], cortado, icones; float ws[NV_MENU_FOCOS], vao, pad, rotMax, larg; } TopoTira;
 
 static void topoMedir(TopoTira *t) {
   int k, nl = 0, ni = 0;
@@ -1490,7 +1512,7 @@ static void topoMedir(TopoTira *t) {
   }
   disp = NV_TELA_W - 2.0f * TOPO_RELOGIO - 2.0f * TOPO_TRILHA;
   fixo = txt + ni * TOPO_PILULA_H;
-  t->vao = TOPO_VAO; t->pad = TOPO_PAD; t->rotMax = 1e6f; t->cortado = 0;
+  t->vao = TOPO_VAO; t->pad = TOPO_PAD; t->rotMax = 1e6f; t->cortado = 0; t->icones = 0;
   if (t->n > 1 && fixo + 2.0f * nl * t->pad + (t->n - 1) * t->vao > disp)
     t->vao = fmaxf(TOPO_VAO_MIN, (disp - fixo - 2.0f * nl * t->pad) / (t->n - 1));
   if (nl && fixo + 2.0f * nl * t->pad + (t->n - 1) * t->vao > disp)
@@ -1499,11 +1521,19 @@ static void topoMedir(TopoTira *t) {
     t->rotMax = (disp - ni * TOPO_PILULA_H - (t->n - 1) * t->vao - 2.0f * nl * t->pad) / nl;
     t->cortado = 1;
   }
-  t->larg = t->n > 1 ? (t->n - 1) * t->vao : 0.0f;
-  for (k = 0; k < t->n; k++) {
-    t->ws[k] = t->ordem[k] == MENU_BUSCAR ? TOPO_PILULA_H
-             : 2.0f * t->pad + txt_linha_corta(TOPO_TXT, topoRotulo(t->ordem[k]), 255, 255, 255, 255, t->rotMax).w;
-    t->larg += t->ws[k];
+  for (;;) {
+    t->larg = t->n > 1 ? (t->n - 1) * t->vao : 0.0f;
+    for (k = 0; k < t->n; k++) {
+      t->ws[k] = (t->ordem[k] == MENU_BUSCAR || t->icones) ? TOPO_PILULA_H
+               : 2.0f * t->pad + txt_linha_corta(TOPO_TXT, topoRotulo(t->ordem[k]), 255, 255, 255, 255, t->rotMax).w;
+      t->larg += t->ws[k];
+    }
+    // Icon pills when a label would be cut, or when the labelled bar would
+    // crowd the avatar and the clock island (the bar hugs its content).
+    if (t->icones || (!t->cortado && (t->larg + 2.0f * TOPO_TRILHA) * NV_MENU_ESCALA <= TOPO_MAX_REAL))
+      break;
+    t->cortado = 0; t->icones = 1;
+    t->vao = TOPO_VAO; t->rotMax = 1e6f;
   }
 }
 
@@ -1558,7 +1588,7 @@ void menu_topo_geo(MenuTopoGeo *o) {
   topoMedir(&t);
   memset(o, 0, sizeof *o);
   x0 = floorf((NV_TELA_W - t.larg) * 0.5f);
-  o->n = t.n; o->cortado = t.cortado;
+  o->n = t.n; o->cortado = t.cortado; o->icones = t.icones;
   o->y = (TOPO_CY - TOPO_PILULA_H * 0.5f) * e; o->h = TOPO_PILULA_H * e;
   for (k = 0; k < t.n && k < MENU_TOPO_MAX; k++) {
     o->x[k] = (x0 + topoPilulaX(&t, k)) * e; o->w[k] = t.ws[k] * e;
@@ -1633,7 +1663,7 @@ static void topoDesenhar(void) {
     tb = anim_mistura(0xef, 0x16, fm) / 255.0f;
     ta = a * anim_mistura(ajustes_vidro() && !gfx_efeitos_minimos() ? .74f : .80f, 1.0f, fmaxf(sm, fm));
     if (ponteiro_ativo() && a > 0.5f) ponteiro_alvo(r.x, r.y, r.w, r.h, ponteiroLinha, NULL, i, 0);
-    if (i == MENU_BUSCAR) iconeTraco(i, r.x + r.w * 0.5f, y + TOPO_PILULA_H * 0.5f, TOPO_ICONE, tr, tg, tb, ta);
+    if (i == MENU_BUSCAR || t.icones) iconeTraco(i, r.x + r.w * 0.5f, y + TOPO_PILULA_H * 0.5f, TOPO_ICONE, tr, tg, tb, ta);
     else {
       TxtLinha l = txt_linha_corta(TOPO_TXT, topoRotulo(i), 255, 255, 255, 255, t.rotMax);
       txt_desenhar_tom(l, r.x + (r.w - l.w) * 0.5f, y + (TOPO_PILULA_H - l.h) * 0.5f, tr, tg, tb, ta);

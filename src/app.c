@@ -3718,6 +3718,56 @@ static void perfilAbrirSessao(int antes) {
   perfilSessaoAplicada = sessao;
 }
 
+// QR TIME main navigation (docs/qrtime/UI-SPEC.md §3.1) -------------------
+//
+// Movies / Series: ONE grid whose tabs are every catalog of that type that the
+// active add-ons publish (cat_fileira), rebuilt on each opening so a newly
+// installed add-on shows up. The grid is the existing "See all" layer
+// (vertudo), so focus, Back, paging and the title page behave as there.
+// Returns the number of catalogs; 0 = none of that type (the caller says so).
+static ColSource navFontes[COL_SOURCE_MAX];
+static ColFolder navPasta;
+// 1 while a Movies/Series grid opened by the main menu is on screen. The
+// "grid closed" check needs it: in the frame of the choice the destination is
+// already Movies but the grid only opens later in that frame (the switch).
+static int navGradeAberta;
+static int navAbrirTipo(const char *tipo, const char *titulo, const char *id) {
+  int r, k, n = 0;
+  memset(navFontes, 0, sizeof navFontes);
+  memset(&navPasta, 0, sizeof navPasta);
+  // One slot stays zeroed: readers may look up to COL_SOURCE_MAX entries.
+  for (r = 0; r < cat_n_fileiras() && n < COL_SOURCE_MAX - 1; r++) {
+    const CatFileira *f = cat_fileira(r);
+    int dup = 0;
+    if (!f || strcmp(f->tipo, tipo) || !f->base[0] || !f->catId[0]) continue;
+    for (k = 0; k < n; k++)
+      if (!strcmp(navFontes[k].base, f->base) && !strcmp(navFontes[k].catId, f->catId)) dup = 1;
+    if (dup) continue;
+    snprintf(navFontes[n].title, sizeof navFontes[n].title, "%s", f->titulo);
+    snprintf(navFontes[n].base, sizeof navFontes[n].base, "%s", f->base);
+    snprintf(navFontes[n].type, sizeof navFontes[n].type, "%s", tipo);
+    snprintf(navFontes[n].catId, sizeof navFontes[n].catId, "%s", f->catId);
+    n++;
+  }
+  printf("[nav] %s: %d catalog(s)\n", id, n);
+  fflush(stdout);
+  if (!n) return 0;
+  snprintf(navPasta.id, sizeof navPasta.id, "%s", id);
+  snprintf(navPasta.title, sizeof navPasta.title, "%s", i18n(titulo));
+  navPasta.sources = navFontes;
+  navPasta.nSources = n;
+  vertudo_colecao(&navPasta);
+  navGradeAberta = vertudo_aberta();
+  return 1;
+}
+// Add-ons opened from the main menu return Home on Back; opened from Settings
+// they return to Settings (the original flow).
+static int addonsDoMenu;
+int app_teste_nav_pasta(char *titulo, size_t n) {
+  if (titulo && n) snprintf(titulo, n, "%s", navPasta.id);
+  return navPasta.nSources;
+}
+
 // Someone is INSIDE the app: a signed-in account or a guest (convidado.h).
 // Local features (guide reminders, notices, the clock island) follow this;
 // account features (sync, cloud lists, social) keep asking sessao_logada().
@@ -4011,6 +4061,7 @@ static void spotAtender(void) {
       break; }
     case SPOT_ADDONS:
       detail_fechar();
+      addonsDoMenu = 1;   // like the main menu: Back returns Home
       addonsui_abrir();
       trocarTela(TELA_ADDONS);
       break;
@@ -5536,6 +5587,18 @@ void app_atualizar(float dt, Uint32 agora) {
   if (tela == TELA_HOME && home_pediu_biblioteca()) {
     trocarTela(TELA_BIBLIOTECA); menu_definir_destino(MENU_BIBLIOTECA);
   }
+  // Interim Sport Center: the guide has no sports section to focus.
+  if (tela == TELA_GUIA && guia_secao_ausente())
+    ilha_avisar("qrt-nav-no-sports", ILHA_INFO, NULL,
+                i18n("Nenhuma seção de esportes nas suas listas de TV ao vivo."), 6000u, 0);
+  // Movies / Series grid closed (Back): the menu marks Home again.
+  if (navGradeAberta && !vertudo_aberta() && !menu_aberto()) {
+    navGradeAberta = 0;
+    printf("[nav] %s grid closed\n", menu_destino() == MENU_SERIES ? "qrtime_series" : "qrtime_movies");
+    fflush(stdout);
+    if (tela == TELA_HOME && (menu_destino() == MENU_FILMES || menu_destino() == MENU_SERIES))
+      menu_definir_destino(MENU_INICIO);
+  }
   // QR TIME guest card on an empty Home: "Add IPTV" opens Settings on the
   // Live TV account rows (homevazio.h, ajustes_abrir_no_iptv).
   if (tela == TELA_HOME && homevazio_pediu_iptv()) {
@@ -5550,8 +5613,13 @@ void app_atualizar(float dt, Uint32 agora) {
   // no indice dos Ajustes).
   if (tela == TELA_ADDONS && addonsui_quer_sair()) {
     saiuPorEsquerda = saiuPorCima = 0;
-    ajustes_voltar_de_lista(0);
-    trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES);
+    if (addonsDoMenu) {
+      addonsDoMenu = 0;
+      trocarTela(TELA_HOME); menu_definir_destino(MENU_INICIO);
+    } else {
+      ajustes_voltar_de_lista(0);
+      trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES);
+    }
   }
   if (tela == TELA_AJUSTES) {
     int buscaAjustes = ajustes_pediu_busca();
@@ -5582,6 +5650,7 @@ void app_atualizar(float dt, Uint32 agora) {
     }
   }
   if (tela == TELA_AJUSTES && ajustes_pediu_addons()) {
+    addonsDoMenu = 0;
     addonsui_abrir();
     trocarTela(TELA_ADDONS);
   }
@@ -5702,6 +5771,41 @@ void app_atualizar(float dt, Uint32 agora) {
         // para o preview (sem recarregar) — o PiP nao tem mais lugar no guia.
         if (player_mini_ativo() && player_id_canal()[0]) guiaComCanalNoAr();
         else trocarTela(TELA_GUIA);
+        break;
+      case MENU_FILMES:
+      case MENU_SERIES: {
+        int filmes = menu_destino() == MENU_FILMES;
+        trocarTela(TELA_HOME);
+        if (!navAbrirTipo(filmes ? "movie" : "series", filmes ? "Filmes" : "Séries",
+                          filmes ? "qrtime_movies" : "qrtime_series")) {
+          ilha_avisar("qrt-nav-no-catalog", ILHA_INFO, NULL,
+                      i18n("Nenhum add-on ativo publica este tipo de catálogo."),
+                      6000u, 0);
+          menu_definir_destino(MENU_INICIO);
+        }
+        break; }
+      case MENU_ESPORTES:
+        // Interim Sport Center: the TV guide, focused on its sports section.
+        trocarTela(TELA_GUIA);
+        guia_focar_secao("esportes");
+        break;
+      case MENU_YOUTUBE: {
+        // Not a tab: launch the TV's YouTube app (or its store page) and keep
+        // the current destination highlighted.
+        int e = ondever_abrir("youtube");
+        if (e == ONDE_INFO)
+          ilha_avisar("nav-youtube", ILHA_INFO, NULL,
+                      i18n("O YouTube abre no app da própria TV, que não está disponível neste aparelho."),
+                      6000u, 0);
+        menu_definir_destino(tela == TELA_HOME ? MENU_INICIO : tela == TELA_GUIA ? MENU_GUIA :
+                             tela == TELA_BUSCA ? MENU_BUSCAR : tela == TELA_BIBLIOTECA ? MENU_BIBLIOTECA :
+                             tela == TELA_AGENDA ? MENU_AGENDA : tela == TELA_AJUSTES ? MENU_AJUSTES :
+                             tela == TELA_ADDONS ? MENU_ADDONS : MENU_INICIO);
+        break; }
+      case MENU_ADDONS:
+        addonsDoMenu = 1;
+        addonsui_abrir();
+        trocarTela(TELA_ADDONS);
         break;
       case MENU_EXPLORAR:   trocarTela(TELA_EXPLORAR);   break;
       case MENU_BUSCAR:     trocarTela(TELA_BUSCA);      break;

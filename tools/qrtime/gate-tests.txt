@@ -42,3 +42,6 @@ convidado
 convidado_ajustes
 homevazio
 i18n
+
+# Main navigation, end to end (Xvfb)
+qrtime_nav

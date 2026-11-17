@@ -39,16 +39,24 @@ int main(void) {
   assert(ajustes_menu_explorar() && !ajustes_menu_guia());
   assert(!ajustes_menu_agenda() && ajustes_menu_perfil());
 
+  // QR TIME order (menu.h): Home, [Live TV hidden here], Movies, Series,
+  // Sport Center, [Music hidden until phase 7], YouTube, [Agenda hidden here],
+  // Search, Add-ons, Library, Explore, Profile, Settings.
   menu_iniciar();
-  assert(descer(1) == MENU_EXPLORAR);
-  assert(descer(2) == MENU_BUSCAR);       // pulou o Guia
-  assert(descer(3) == MENU_BIBLIOTECA);
-  assert(descer(4) == MENU_PERFIL);       // pulou a Agenda
-  assert(descer(5) == MENU_AJUSTES);
-  // Subindo a partir dos Ajustes tambem pula.
-  menu_fechar(); menu_definir_destino(MENU_AJUSTES); menu_abrir();
-  tecla(SDLK_UP); tecla(SDLK_UP); tecla(SDLK_RIGHT);
-  assert(menu_destino() == MENU_BIBLIOTECA);
+  assert(descer(1) == MENU_FILMES);       // pulou o Guia
+  assert(descer(2) == MENU_SERIES);
+  assert(descer(3) == MENU_ESPORTES);
+  assert(descer(4) == MENU_YOUTUBE);      // pulou a Musica
+  assert(descer(5) == MENU_BUSCAR);       // pulou a Agenda
+  assert(descer(6) == MENU_ADDONS);
+  assert(descer(7) == MENU_BIBLIOTECA);
+  assert(descer(8) == MENU_EXPLORAR);
+  assert(descer(9) == MENU_PERFIL);
+  assert(descer(10) == MENU_AJUSTES);
+  // Subindo a partir da Busca tambem pula (a Agenda e a Musica).
+  menu_fechar(); menu_definir_destino(MENU_BUSCAR); menu_abrir();
+  tecla(SDLK_UP); tecla(SDLK_RIGHT);
+  assert(menu_destino() == MENU_YOUTUBE);
   // Com o destino em vigor escondido, abrir a barra cai no Inicio.
   menu_fechar(); menu_definir_destino(MENU_GUIA); menu_abrir();
   tecla(SDLK_RIGHT);
@@ -75,7 +83,7 @@ int main(void) {
   assert(!menu_aberto() && menu_escolheu() && !menu_mudou_destino());
   for (int i = 0; i < 200; i++) menu_atualizar(0.016f, 0);
   menu_abrir_sobre(0); tecla(SDLK_DOWN); tecla(SDLK_RETURN);
-  assert(menu_escolheu() && menu_mudou_destino() && menu_destino() == MENU_EXPLORAR);
+  assert(menu_escolheu() && menu_mudou_destino() && menu_destino() == MENU_FILMES);   // QR TIME order, Live TV hidden here
   // A plain open keeps Right = choose.
   for (int i = 0; i < 200; i++) menu_atualizar(0.016f, 0);
   menu_abrir(); assert(!menu_sobre()); tecla(SDLK_RIGHT);

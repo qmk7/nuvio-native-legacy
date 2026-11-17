@@ -51,7 +51,7 @@ static void desenharConvidado(float alfa) {
   l = txt_linha_corta(TXT_HEADLINE, "Sua Home está vazia", 255, 255, 255, 255, tw);
   txt_desenhar_alpha(l, tx, y, alfa);
   y += l.h + 22.0f;
-  y += txt_bloco(TXT_BODY, "Adicione uma lista de IPTV (Xtream, M3U ou Stalker) para ver seus canais. Add-ons também podem ser instalados pelo endereço, nos Ajustes.",
+  y += txt_bloco(TXT_BODY, "Adicione uma lista de IPTV (Xtream, M3U ou Stalker) para ver seus canais.",
                 200, 203, 210, tx, y, tw, 40, alfa, 3) + 14.0f;
   txt_bloco(TXT_CAPTION, "Você está usando o app sem conta. Canais e ajustes ficam guardados nesta TV.",
             160, 163, 172, tx, y, tw, 34, alfa, 2);
