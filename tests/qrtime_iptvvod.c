@@ -210,6 +210,23 @@ int main(int argc, char **argv) {
     CONFERE(n == 0, "other addon namespaces are not guessed");
   }
 
+  // ---- browsing by category, page by page ----
+  {
+    char cats[16][96];
+    CatItem r[IPTVVOD_PAGINA];
+    int total = 0, n, nc = iptvvod_categorias('m', cats, 16), tem = 0;
+    for (int i = 0; i < nc; i++) tem += !strcmp(cats[i], "QRT Action") + !strcmp(cats[i], "ST Films") + !strcmp(cats[i], "VOD Movies");
+    CONFERE(nc >= 4 && tem == 3, "movie categories from every provider");
+    n = iptvvod_pagina('m', "", 1, r, IPTVVOD_PAGINA, &total);
+    CONFERE(n == 5 && total == 5 && !strcmp(r[0].titulo, "Inception"), "All movies: one page, newest first");
+    n = iptvvod_pagina('m', "QRT Action", 1, r, IPTVVOD_PAGINA, &total);
+    CONFERE(n == 2 && total == 2, "a category: its items only (The Matrix, Inception)");
+    n = iptvvod_pagina('m', "ST Films", 1, r, IPTVVOD_PAGINA, &total);
+    CONFERE(n == 2 && total == 2, "a title is in every provider's category (The Matrix is also in ST Films)");
+    CONFERE(iptvvod_pagina('m', "", 2, r, IPTVVOD_PAGINA, &total) == 0 && total == 5, "past the end: empty page, same total");
+    CONFERE(iptvvod_pagina('s', "", 1, r, IPTVVOD_PAGINA, &total) == 2, "series browse");
+  }
+
   // ---- search (local, no network) ----
   {
     CatItem r[8];

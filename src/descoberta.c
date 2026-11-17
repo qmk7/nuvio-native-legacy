@@ -9293,8 +9293,17 @@ int desc_colecao_inicial(const ColSource *fonte, const char *base,
       !descSessaoVincular(sessao)) return 0;
   f = *fonte;
   prov = !f.prov[0] ? 0 : !strcmp(f.prov, "tmdb") ? 1 :
-         !strcmp(f.prov, "trakt") ? 2 : -1;
+         !strcmp(f.prov, "trakt") ? 2 : !strcmp(f.prov, "iptv") ? 3 : -1;
   r.pagina = prov ? 1 : 0;
+  // QR TIME: the IPTV library is local; its first page is the first window.
+  if (prov == 3) {
+    int total = 0;
+    r.n = iptvvod_pagina(!strcasecmp(f.midia, "TV") ? 's' : 'm', f.catId, 1, itens, limite, &total);
+    r.mais = total > r.n;
+    r.pagina = r.mais ? 2 : 1;
+    *resultado = r;
+    return nv_perfil_sessao_atual(sessao);
+  }
   snprintf(origem, sizeof origem, "%s", base ? base : f.base);
   if (prov < 0 || (!prov && (!origem[0] || !f.type[0] || !f.catId[0] ||
                             strlen(base ? base : f.base) >= sizeof origem))) {
@@ -9454,7 +9463,14 @@ static void *fioVerTudo(void *u) {
     CatItem *lote=malloc(sizeof *lote*48); int nl=0, semMais=0, ok=0;
     if(!lote){pthread_mutex_lock(&vtTrava);vtErro=1;vtFioVivo=0;pthread_mutex_unlock(&vtTrava);return NULL;}
     corpo=NULL;
-    if (prov==1) {
+    if (prov==3) {
+      // QR TIME IPTV library: local pages of IPTVVOD_PAGINA, no network.
+      int total=0;
+      nl=iptvvod_pagina(!strcasecmp(fonte.midia,"TV")?'s':'m',fonte.catId,skip,lote,48,&total);
+      raw=nl;
+      semMais=(skip-1)*IPTVVOD_PAGINA+nl>=total;
+      ok=1;
+    } else if (prov==1) {
       const char *vetor=tmdbMontarUrl(&fonte,skip,url,sizeof url);
       if (vetor) corpo=rede_baixar(url,12);
       if (corpo) {
@@ -9657,7 +9673,7 @@ void desc_vertudo_fonte_desde(const ColSource *s, int pagina) {
     return;
   }
   vtFonte = copia;
-  vtProvedor = !strcmp(s->prov, "trakt") ? 2 : 1;
+  vtProvedor = !strcmp(s->prov, "trakt") ? 2 : !strcmp(s->prov, "iptv") ? 3 : 1;
   vtBase[0] = 0;
   vtN = 0; vtPagina = pagina; vtFim = 0; vtErro = 0; vtGeracao++;
   pthread_mutex_unlock(&vtTrava);

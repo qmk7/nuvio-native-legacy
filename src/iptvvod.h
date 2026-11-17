@@ -64,6 +64,13 @@ int  iptvvod_ficha(CatItem *item, CatEp *eps, int maxEps);
 int  iptvvod_fontes_pedir(const char *alvo);
 int  iptvvod_fontes_colher(const char *alvo, struct Stream **lista, int *n);
 
+// Browsing (no network): the categories of one kind ('m'/'s'), and one page
+// of IPTVVOD_PAGINA items of a category ("" = all), newest first. *total is
+// the category's size, so the grid knows when it ends.
+#define IPTVVOD_PAGINA 20
+int  iptvvod_categorias(char kind, char (*out)[96], int max);
+int  iptvvod_pagina(char kind, const char *categoria, int pagina, CatItem *out, int max, int *total);
+
 // Search (no network): items whose normalized title contains the term's,
 // exact titles first, then prefixes, then the rest. Returns items written.
 int  iptvvod_buscar(const char *termo, char kind, CatItem *saida, int max);

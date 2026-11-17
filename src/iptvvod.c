@@ -860,6 +860,53 @@ int iptvvod_fileiras_copiar(CatItem *itens, int maxItens, CatFileira *fils, int 
   return nf;
 }
 
+// ------------------------------------------------------------- browsing
+// A group is in a category when any of its copies is (providers name the
+// same film's category differently).
+static int grupoNaCategoria(const Biblio *b, int g, const char *cat) {
+  if (!cat || !cat[0]) return 1;
+  for (int j = b->g[g].primeira; j >= 0; j = b->c[j].proximo) if (!strcmp(b->c[j].categoria, cat)) return 1;
+  return 0;
+}
+int iptvvod_categorias(char kind, char (*out)[96], int max) {
+  int n = 0;
+  pthread_mutex_lock(&trava);
+  for (int i = 0; bibValidaLocked() && i < bib.n && n < max; i++) {
+    const Copia *c = &bib.c[i];
+    int k;
+    if (c->kind != kind || !c->categoria[0]) continue;
+    for (k = 0; k < n && strcmp(out[k], c->categoria); k++) {}
+    if (k == n) snprintf(out[n++], 96, "%s", c->categoria);
+  }
+  pthread_mutex_unlock(&trava);
+  return n;
+}
+static const Biblio *ordBib;   // read only under `trava`, by the comparator below
+static int ordRecentes(const void *a, const void *b) {
+  int x = *(const int *)a, y = *(const int *)b;
+  long long dx = ordBib->g[x].adicionado, dy = ordBib->g[y].adicionado;
+  if (dx != dy) return dy > dx ? 1 : -1;
+  return (x > y) - (x < y);
+}
+int iptvvod_pagina(char kind, const char *categoria, int pagina, CatItem *out, int max, int *total) {
+  int *ord, n = 0, ini, w = 0;
+  if (total) *total = 0;
+  if (pagina < 1 || max <= 0) return 0;
+  pthread_mutex_lock(&trava);
+  if (!bibValidaLocked() || !(ord = malloc(sizeof(int) * (size_t)bib.ng))) { pthread_mutex_unlock(&trava); return 0; }
+  for (int g = 0; g < bib.ng; g++) if (bib.g[g].kind == kind && grupoNaCategoria(&bib, g, categoria)) ord[n++] = g;
+  // Newest first; equal dates keep library order (O(n log n) for big lists).
+  ordBib = &bib;
+  qsort(ord, (size_t)n, sizeof *ord, ordRecentes);
+  ini = (pagina - 1) * IPTVVOD_PAGINA;
+  for (int i = ini; i < n && i < ini + IPTVVOD_PAGINA && w < max; i++) itemDoGrupo(&bib, ord[i], &out[w++]);
+  if (total) *total = n;
+  free(ord);
+  pthread_mutex_unlock(&trava);
+  for (int i = 0; i < w; i++) progAplicar(&out[i]);
+  return w;
+}
+
 // ------------------------------------------------------------- search
 int iptvvod_buscar(const char *termo, char kind, CatItem *saida, int max) {
   char q[128];

@@ -1,6 +1,7 @@
 #include "imdbnota.h"
 #include "vertudo_pag.h"
 #include "vertudo.h"
+#include "iptvvod.h"
 #include "marcastream.h"
 #include "posterprov.h"
 #include "idioma.h"
@@ -567,7 +568,15 @@ static const char *baseDaFonte(const ColSource *s) {
   addons_base_por_id_copiar(s->addonId, base, sizeof base);
   return base;
 }
+// A non-addon source is available when its service is: TMDB key, Trakt
+// client id, or (QR TIME) a loaded IPTV library.
+static int provDisponivel(const ColSource *s) {
+  if (!strcmp(s->prov, "tmdb")) return desc_chave_tmdb()[0] != 0;
+  if (!strcmp(s->prov, "iptv")) return iptvvod_ativo();
+  return nuvem_trakt_cliente()[0] != 0;
+}
 static const char *mensagemSemFonte(const ColSource *s) {
+  if (s && !strcmp(s->prov, "iptv")) return i18n(iptvvod_carregando() ? "Carregando…" : "Não deu para carregar");
   if (s && !strcmp(s->prov, "tmdb")) return i18n("O TMDB não está configurado nesta TV.");
   if (s && !strcmp(s->prov, "trakt")) return i18n("O Trakt não está configurado nesta TV.");
   AddonIdentidadeEstado estado = addons_identidade_estado(s ? s->addonId : "");
@@ -610,8 +619,7 @@ static void carregarFonte(void) {
   // nesta TV (sem chave do TMDB / sem client id do Trakt), nao addon
   // faltando.
   if (s->prov[0]) {
-    semFonte = !strcmp(s->prov,"tmdb") ? !desc_chave_tmdb()[0]
-                                      : !nuvem_trakt_cliente()[0];
+    semFonte = !provDisponivel(s);
     snprintf(catalogId,sizeof catalogId,"%s",s->title);
     if (semFonte) {
       printf("[vertudo] fonte %s sem servico configurado: %s\n",
@@ -1816,9 +1824,7 @@ static void vitCarregar(Uint32 agora) {
     if (l->estado != VIT_PEND) continue;
     if (vitRetentarEm[r] && (Sint32)(agora - vitRetentarEm[r]) < 0) continue;
     vitRetentarEm[r] = 0;
-    int disponivel = s->prov[0]
-        ? (!strcmp(s->prov, "tmdb") ? desc_chave_tmdb()[0] != 0 : nuvem_trakt_cliente()[0] != 0)
-        : base[0] != 0;
+    int disponivel = s->prov[0] ? provDisponivel(s) : base[0] != 0;
     if (!disponivel) {
       l->estado = VIT_VAZIA; l->semFonte = 1; continue;
     }

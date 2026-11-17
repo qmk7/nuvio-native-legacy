@@ -856,6 +856,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "layout.h"
 #include "segurar.h"
 #include "servidores.h"
+#include "iptvvod.h"
 #include "jfid.h"
 #include "partes.h"
 #include "logrede.h"
@@ -3761,6 +3762,23 @@ static int navAbrirTipo(const char *tipo, const char *titulo, const char *id) {
     snprintf(navFontes[n].type, sizeof navFontes[n].type, "%s", tipo);
     snprintf(navFontes[n].catId, sizeof navFontes[n].catId, "%s", f->catId);
     n++;
+  }
+  // QR TIME: the IPTV library's categories (all of them reachable, page by
+  // page), after the addon catalogs: "IPTV · All" first, then each category.
+  {
+    char kind = !strcmp(tipo, "series") ? 's' : 'm';
+    char (*cats)[96] = malloc(sizeof *cats * COL_SOURCE_MAX);
+    int nc = cats ? iptvvod_categorias(kind, cats, COL_SOURCE_MAX) : 0;
+    for (k = -1; k < nc && n < COL_SOURCE_MAX - 1 && iptvvod_ativo(); k++) {
+      ColSource *f = &navFontes[n++];
+      memset(f, 0, sizeof *f);
+      snprintf(f->title, sizeof f->title, "IPTV · %s", k < 0 ? i18n("Todos") : cats[k]);
+      snprintf(f->type, sizeof f->type, "%s", tipo);
+      snprintf(f->prov, sizeof f->prov, "iptv");
+      snprintf(f->midia, sizeof f->midia, "%s", kind == 's' ? "TV" : "MOVIE");
+      snprintf(f->catId, sizeof f->catId, "%s", k < 0 ? "" : cats[k]);
+    }
+    free(cats);
   }
   printf("[nav] %s: %d catalog(s)\n", id, n);
   fflush(stdout);
