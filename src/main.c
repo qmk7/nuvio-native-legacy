@@ -104,6 +104,7 @@
 #include "posterprov.h"
 #include "espn.h"
 #include "tsdb.h"
+#include "ytapi.h"
 #include "trakt.h"
 #include "player.h"
 #include "retomamorna.h"
@@ -475,7 +476,7 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
   // descanso entrava 2 min depois da ultima tecla DE VERDADE, no meio de uma
   // medida feita so por este arquivo. Nao engole a tecla (consumivel = 0).
   esmaecer_entrada(SDL_GetTicks(), 0);
-  char linha[32];
+  char linha[256];
   while (fgets(linha, sizeof linha, f)) {
     char *fim = linha + strlen(linha);
     while (fim > linha && (fim[-1] == '\n' || fim[-1] == '\r' || fim[-1] == ' ')) *--fim = 0;
@@ -488,6 +489,10 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     // "abrir:tt0121955" abre o titulo direto (app.c). Porta de teste, como
     // "guia".
     if (dp && !strncmp(linha, "abrir:", 6)) { app_abrir_titulo(dp + 1); continue; }
+#ifdef NV_LINUX_DESKTOP
+    // "colar:<texto>" fills the open keyboard as the phone would, and confirms.
+    if (dp && !strncmp(linha, "colar:", 6)) { extern void teclado_porta_colar(const char *); teclado_porta_colar(dp + 1); continue; }
+#endif
     // "ime:abrir", "ime:voz", "ime:fechar": teclado do sistema direto
     // (entrada_texto.h), para medir na TV sem depender da tela que o liga.
     if (dp && !strncmp(linha, "ime:", 4)) {
@@ -1769,6 +1774,8 @@ int main(int argc, char **argv) {
   // Desktop test builds only: point the Sport Center at a local fixture.
   if (getenv("QRT_ESPN_BASE") && getenv("QRT_ESPN_BASE")[0]) espn_definir_base(getenv("QRT_ESPN_BASE"));
   if (getenv("QRT_TSDB_BASE") && getenv("QRT_TSDB_BASE")[0]) tsdb_definir_base(getenv("QRT_TSDB_BASE"));
+  // ... and the YouTube section at a local Data API / OAuth fixture.
+  if (getenv("QRT_YT_BASE") && getenv("QRT_YT_BASE")[0]) yt_definir_base(getenv("QRT_YT_BASE"), getenv("QRT_OAUTH_BASE"));
 #endif
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);

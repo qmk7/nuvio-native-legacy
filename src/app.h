@@ -25,7 +25,8 @@ typedef enum {
   TELA_PLAYER, TELA_SOCIAL, TELA_ADDONS, TELA_AGENDA,
   TELA_LIVETV_DIAG,  // diagnostico da Live TV (livetvdiag.c)
   TELA_PLUGINS,      // plugins Nuvio (pluginsui.c, F09)
-  TELA_ESPORTES      // QR TIME Sport Center (esporteui.c)
+  TELA_ESPORTES,     // QR TIME Sport Center (esporteui.c)
+  TELA_YOUTUBE       // QR TIME YouTube section (ytui.c)
 } Tela;
 
 int  app_iniciar(const char *dirArte);

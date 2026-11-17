@@ -625,6 +625,18 @@ static void fechar(int r) {
   st_fechar(ST_TECLADO);
 }
 
+#ifdef NV_LINUX_DESKTOP
+static void definirDoSistema(const char *t);
+// Desktop test port ("colar:<texto>" in /tmp/nuvio-key): the whole value
+// arrives as from the phone or the system keyboard (same alphabet filter)
+// and the modal confirms. Not in TV builds.
+void teclado_porta_colar(const char *t) {
+  if (!aberto) return;
+  definirDoSistema(t);
+  fechar(TECLADO_PRONTO);
+}
+#endif
+
 static void abrirImeAgora(void) { pendIme = 0; st_ime_tipo(tipoIme); st_ime_abrir(ST_TECLADO, texto, maxN); }
 static void okBarra(void) {
   if (coluna == TE_B_CEL) {

@@ -32,7 +32,7 @@ typedef enum {
   MENU_SERIES,      // Series: every series catalog
   MENU_ESPORTES,    // Sport Center (interim: the guide on its sports section)
   MENU_MUSICA,      // Music: hidden until the Music Center exists (phase 7)
-  MENU_YOUTUBE,     // launches the TV's YouTube app; not a tab
+  MENU_YOUTUBE,     // QR TIME YouTube section (ytui.c); videos play in the TV app
   // AGENDA — o calendario das series acompanhadas.
   MENU_AGENDA,
   MENU_BUSCAR,

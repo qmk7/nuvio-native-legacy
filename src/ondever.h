@@ -60,6 +60,9 @@ void ondever_apps_atualizar(void);
 int  ondever_estado(const char *nome);
 // Faz o que ondever_estado diz. Devolve o ONDE_* que fez.
 int  ondever_abrir(const char *nome);
+// YouTube video id (11 chars) -> the official YouTube app. ONDE_ABRIR when
+// launched, ONDE_INFO on hosts without a launcher, ONDE_PROCURAR bad id.
+int  ondever_youtube_video(const char *videoId);
 
 // Exposto para o teste: a chave que casa servico com app ("HBO Max" -> "max",
 // "Disney+" -> "disneyplus", "Amazon Prime Video" -> "primevideo").

@@ -258,6 +258,125 @@ def m3u():
             "%s/m3u/2.m3u8\n" % (BASE, BASE, BASE)).encode()
 
 
+# ---- YouTube Data API v3 / Google OAuth device flow (shape of the official
+# responses; fixtures only, never proof of the real service) ----
+YT_KEY = "QRTYTKEY"
+YT_TOKENS = {"QRTACCESS", "QRTACCESS2"}
+YT_POLLS = {"n": 0}
+
+
+def yt_thumb(i):
+    return {"default": {"url": "%s/logo/yt%s.jpg" % (BASE, i)},
+            "high": {"url": "https://i.ytimg.com/vi/%s/hqdefault.jpg" % i}}
+
+
+def yt_video(i, title, chan="UCqrtChannel0000000001", ctitle="QRT Channel", dur="PT4M13S", views="1534000", live="none"):
+    return {"kind": "youtube#video", "id": i,
+            "snippet": {"publishedAt": "2026-11-10T12:00:00Z", "channelId": chan, "title": title,
+                        "description": "Description of " + title, "thumbnails": yt_thumb(i),
+                        "channelTitle": ctitle, "liveBroadcastContent": live},
+            "contentDetails": {"duration": dur}, "statistics": {"viewCount": views}}
+
+
+YT_VIDEOS = {v["id"]: v for v in [
+    yt_video("qrtVideo001", "QRT Trending One"),
+    yt_video("qrtVideo002", "QRT Trending Two", dur="PT1H2M3S", views="2500000000"),
+    yt_video("qrtVideo003", "QRT Live Now", dur="P0D", live="live", views="900"),
+    yt_video("qrtSearch01", "Cooking pasta at home"),
+    yt_video("qrtSearch02", "Pasta sauce in 10 minutes", dur="PT10M"),
+    yt_video("qrtUpload01", "Channel upload one"),
+]}
+
+
+def yt_search_item(v):
+    return {"kind": "youtube#searchResult", "id": {"kind": "youtube#video", "videoId": v["id"]},
+            "snippet": {k: v["snippet"][k] for k in ("publishedAt", "channelId", "title", "description",
+                                                       "thumbnails", "channelTitle", "liveBroadcastContent")}}
+
+
+def yt_pl_item(v, owner="Me"):
+    sn = dict(v["snippet"])
+    sn["channelTitle"] = owner
+    sn["videoOwnerChannelTitle"] = v["snippet"]["channelTitle"]
+    sn["resourceId"] = {"kind": "youtube#video", "videoId": v["id"]}
+    return {"kind": "youtube#playlistItem", "snippet": sn}
+
+
+def yt_err(code, reason, msg):
+    return {"error": {"code": code, "message": msg, "errors": [{"reason": reason, "message": msg}]}}
+
+
+def youtube(handler, p, q):
+    res = p[len("/yt/v3/"):]
+    auth = handler.headers.get("Authorization", "")
+    acct = auth.startswith("Bearer ") and auth[7:] in YT_TOKENS
+    if q.get("mine") == "true" or (res == "playlistItems" and q.get("playlistId", "").startswith("PLqrt")):
+        if not acct:
+            return 401, yt_err(401, "authError", "Invalid Credentials")
+    elif not acct:
+        k = q.get("key", "")
+        if k == "QUOTAKEY":
+            return 403, yt_err(403, "quotaExceeded", "The request cannot be completed because you have exceeded your quota.")
+        if k != YT_KEY:
+            return 400, yt_err(400, "badRequest", "API key not valid. Please pass a valid API key.")
+    if res == "videos" and q.get("chart") == "mostPopular":
+        items = [YT_VIDEOS[i] for i in ("qrtVideo001", "qrtVideo002", "qrtVideo003")]
+        if q.get("pageToken") == "PAGE2":
+            return 200, {"kind": "youtube#videoListResponse", "items": [YT_VIDEOS["qrtUpload01"]]}
+        return 200, {"kind": "youtube#videoListResponse", "nextPageToken": "PAGE2", "items": items}
+    if res == "videos":
+        ids = [i for i in q.get("id", "").split(",") if i in YT_VIDEOS]
+        return 200, {"kind": "youtube#videoListResponse", "items": [YT_VIDEOS[i] for i in ids]}
+    if res == "search":
+        qq = q.get("q", "").lower()
+        hits = [yt_search_item(YT_VIDEOS[i]) for i in ("qrtSearch01", "qrtSearch02") if "pasta" in qq]
+        return 200, {"kind": "youtube#searchListResponse", "items": hits}
+    if res == "subscriptions":
+        return 200, {"kind": "youtube#subscriptionListResponse", "items": [
+            {"kind": "youtube#subscription", "snippet": {"title": "QRT Channel", "description": "",
+             "resourceId": {"kind": "youtube#channel", "channelId": "UCqrtChannel0000000001"},
+             "thumbnails": yt_thumb("ch1")}}]}
+    if res == "playlists":
+        return 200, {"kind": "youtube#playlistListResponse", "items": [
+            {"kind": "youtube#playlist", "id": "PLqrtMine01", "snippet": {"title": "My QRT playlist",
+             "channelTitle": "Me", "thumbnails": yt_thumb("pl1")}, "contentDetails": {"itemCount": 2}}]}
+    if res == "playlistItems":
+        pl = q.get("playlistId", "")
+        if pl == "UUqrtChannel0000000001":
+            return 200, {"kind": "youtube#playlistItemListResponse", "items": [yt_pl_item(YT_VIDEOS["qrtUpload01"], "QRT Channel")]}
+        if pl == "PLqrtMine01":
+            gone = {"kind": "youtube#playlistItem", "snippet": {"title": "Deleted video", "resourceId": {"videoId": "qrtGone0000"}}}
+            return 200, {"kind": "youtube#playlistItemListResponse", "items": [yt_pl_item(YT_VIDEOS["qrtVideo001"]), gone,
+                                                                               yt_pl_item(YT_VIDEOS["qrtSearch02"])]}
+        return 404, yt_err(404, "playlistNotFound", "not found")
+    return 404, yt_err(404, "notFound", "not found")
+
+
+def goauth(p, form):
+    if form.get("client_id") != "qrt-client.apps.googleusercontent.com":
+        return 401, {"error": "invalid_client", "error_description": "The OAuth client was not found."}
+    if p == "/goauth/device/code":
+        YT_POLLS["n"] = 0
+        return 200, {"device_code": "QRTDEVICE", "user_code": "QRT-WXYZ", "expires_in": 1800, "interval": 1,
+                     "verification_url": "https://www.google.com/device"}
+    if p == "/goauth/token":
+        if form.get("client_secret") != "qrt-secret":
+            return 401, {"error": "invalid_client"}
+        g = form.get("grant_type", "")
+        if g == "refresh_token":
+            if form.get("refresh_token") == "QRTREFRESH":
+                return 200, {"access_token": "QRTACCESS2", "expires_in": 3599, "token_type": "Bearer"}
+            return 400, {"error": "invalid_grant"}
+        if form.get("device_code") != "QRTDEVICE":
+            return 400, {"error": "invalid_grant"}
+        YT_POLLS["n"] += 1
+        if YT_POLLS["n"] < 2:
+            return 428, {"error": "authorization_pending"}
+        return 200, {"access_token": "QRTACCESS", "refresh_token": "QRTREFRESH", "expires_in": 3599,
+                     "scope": "https://www.googleapis.com/auth/youtube.readonly", "token_type": "Bearer"}
+    return 404, {"error": "not_found"}
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -277,6 +396,8 @@ class H(BaseHTTPRequestHandler):
         safe = self.path.replace(PASS2, "***").replace(PASS, "***")
         if "api_key=" in safe:
             safe = safe.split("api_key=")[0] + "api_key=***"
+        if "key=" in safe and safe.startswith("/yt/"):
+            safe = safe.split("key=")[0] + "key=***"
         with open(WORK + "/requests.log", "a") as f:
             f.write(safe + "\n")
         p = u.path
@@ -316,6 +437,9 @@ class H(BaseHTTPRequestHandler):
                               "server_info": {"url": "127.0.0.1", "port": str(PORT),
                                               "server_protocol": "http", "timezone": "Europe/Istanbul",
                                               "timestamp_now": int(time.time())}})
+        if p.startswith("/yt/v3/"):
+            code, body = youtube(self, p, q)
+            return self.send(body, code=code)
         if p.startswith("/tsdb/123/"):
             return self.send(tsdb(p, q))
         if p.startswith("/espn/") and p.endswith("/scoreboard"):
@@ -393,6 +517,16 @@ class H(BaseHTTPRequestHandler):
             return self.send(b"#EXTM3U\n#EXT-X-ENDLIST\n", "application/vnd.apple.mpegurl")
         if p.startswith("/logo/"):
             return self.send(b"", "image/png", 404)
+        return self.send(b"not found", "text/plain", 404)
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", "0") or 0)
+        form = dict(urllib.parse.parse_qsl(self.rfile.read(n).decode()))
+        with open(WORK + "/requests.log", "a") as f:
+            f.write("POST " + self.path + " " + self.headers.get("Content-Type", "") + "\n")
+        if self.path.startswith("/goauth/"):
+            code, body = goauth(self.path, form)
+            return self.send(body, code=code)
         return self.send(b"not found", "text/plain", 404)
 
 

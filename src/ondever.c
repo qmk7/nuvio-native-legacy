@@ -697,6 +697,32 @@ int ondever_abrir(const char *nome) {
   return e;
 }
 
+// YOUTUBE: a video goes to the official YouTube app on the TV, never to our
+// player (no watch-page scraping, no media URLs). webOS: the app takes the
+// video in params.contentTarget; if the TV has no YouTube app, its page in
+// the LG store opens instead. The contentTarget form is the one public webOS
+// remote-control projects use; it is UNVERIFIED on the B5 until tested there.
+int ondever_youtube_video(const char *v) {
+  int ok = v && strlen(v) == 11;
+  for (const char *p = v; ok && *p; p++)
+    if (!isalnum((unsigned char)*p) && *p != '-' && *p != '_') ok = 0;
+  if (!ok) return ONDE_PROCURAR;
+  printf("[youtube] abrir video %s no app oficial\n", v);
+  fflush(stdout);
+#if defined(ONDE_WEBOS) && !defined(NV_TPK)
+  {
+    char carga[240];
+    static const char lojaYt[] = "111299001912";
+    snprintf(carga, sizeof carga,
+             "{\"id\":\"youtube.leanback.v4\",\"params\":{\"contentTarget\":\"https://www.youtube.com/tv?v=%s\"}}", v);
+    video_luna("luna://com.webos.applicationManager/launch", carga, respostaLaunch, (void *)lojaYt);
+    return ONDE_ABRIR;
+  }
+#else
+  return ONDE_INFO;   // desktop preview / other hosts: no TV app launcher here
+#endif
+}
+
 void ondever_iniciar(void) {
   pthread_t t;
   if(atomic_exchange(&iniciado,1)) return;

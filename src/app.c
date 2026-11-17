@@ -859,6 +859,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "iptvvod.h"
 #include "addonslocal.h"
 #include "esporteui.h"
+#include "ytui.h"
 #include "jfid.h"
 #include "partes.h"
 #include "logrede.h"
@@ -1061,6 +1062,7 @@ static void trocarTela(Tela nova) {
     case TELA_BIBLIOTECA: biblioteca_iniciar(); break;
     case TELA_AGENDA:     agendaui_iniciar();   break;
     case TELA_ESPORTES:   esporteui_abrir();    break;
+    case TELA_YOUTUBE:    ytui_abrir();         break;
     case TELA_PERFIL:     perfil_abrir(); pedirPerfil(); break;
     case TELA_AJUSTES:    ajustes_iniciar();    break;
     case TELA_DIAGNOSTICO: diagnostico_iniciar(); break;
@@ -3708,6 +3710,7 @@ static void perfilAbrirSessao(int antes) {
   // reload artwork nor wait for the old profile's network requests.
   addons_abrir_sessao();
   esporteui_perfil_trocou();   // Sport Center: this profile's follows and links
+  ytui_perfil_trocou();        // YouTube: this profile's account
   // QR TIME guest: this profile's add-ons are the ones saved on this TV.
   if (!sessao_logada() && convidado_ativo()) addonslocal_carregar();
   trakt_abrir_sessao();
@@ -4335,6 +4338,7 @@ static int relogioPedidoPagina(void) {
     case TELA_BIBLIOTECA: return biblioteca_pediu_relogio();
     case TELA_AGENDA: return agendaui_pediu_relogio();
     case TELA_ESPORTES: return 0;
+    case TELA_YOUTUBE: return 0;
     case TELA_PERFIL: return perfil_pediu_relogio();
     case TELA_SOCIAL: return amigoperfil_pediu_relogio();
     case TELA_ADDONS: return addonsui_pediu_relogio();
@@ -4790,6 +4794,7 @@ void app_evento(const SDL_Event *e) {
     case TELA_BIBLIOTECA: biblioteca_evento(e); break;
     case TELA_AGENDA:     agendaui_evento(e);   break;
     case TELA_ESPORTES:   esporteui_evento(e);  break;
+    case TELA_YOUTUBE:    ytui_evento(e);       break;
     case TELA_PERFIL:     perfil_evento(e);     break;
     case TELA_SOCIAL:     amigoperfil_evento(e); break;
     case TELA_ADDONS:     addonsui_evento(e);   break;
@@ -5756,6 +5761,7 @@ void app_atualizar(float dt, Uint32 agora) {
               || (tela == TELA_BIBLIOTECA && biblioteca_quer_sair())
               || (tela == TELA_AGENDA     && agendaui_quer_sair())
               || (tela == TELA_ESPORTES   && esporteui_quer_sair())
+              || (tela == TELA_YOUTUBE    && ytui_quer_sair())
               || (tela == TELA_PERFIL      && perfil_quer_sair())
               || (tela == TELA_SOCIAL      && amigoperfil_quer_sair())
               || (tela == TELA_AJUSTES    && ajustes_quer_sair())
@@ -5830,20 +5836,11 @@ void app_atualizar(float dt, Uint32 agora) {
       case MENU_ESPORTES:
         trocarTela(TELA_ESPORTES);
         break;
-      case MENU_YOUTUBE: {
-        // Not a tab: launch the TV's YouTube app (or its store page) and keep
-        // the current destination highlighted.
-        int e = ondever_abrir("youtube");
-        if (e == ONDE_INFO)
-          ilha_avisar("nav-youtube", ILHA_INFO, NULL,
-                      i18n("O YouTube abre no app da própria TV, que não está disponível neste aparelho."),
-                      6000u, 0);
-        menu_definir_destino(tela == TELA_HOME ? MENU_INICIO : tela == TELA_GUIA ? MENU_GUIA :
-                             tela == TELA_BUSCA ? MENU_BUSCAR : tela == TELA_BIBLIOTECA ? MENU_BIBLIOTECA :
-                             tela == TELA_AGENDA ? MENU_AGENDA : tela == TELA_AJUSTES ? MENU_AJUSTES :
-                             tela == TELA_ESPORTES ? MENU_ESPORTES :
-                             tela == TELA_ADDONS ? MENU_ADDONS : MENU_INICIO);
-        break; }
+      case MENU_YOUTUBE:
+        // QR TIME: its own section (ytui.c). Videos still PLAY in the TV's
+        // official YouTube app; the section lists and describes them.
+        trocarTela(TELA_YOUTUBE);
+        break;
       case MENU_ADDONS:
         addonsDoMenu = 1;
         addonsui_abrir();
@@ -7071,6 +7068,7 @@ void app_atualizar(float dt, Uint32 agora) {
       esporteui_atualizar(dt, agora);
       if (esporteui_pediu_canal(&it)) { if (player_mini_ativo()) player_fechar_mini(); tocarCanal(&it); }
       break; }
+    case TELA_YOUTUBE:    ytui_atualizar(dt, agora);       break;
     case TELA_PERFIL:     break;
     case TELA_AJUSTES:    ajustes_atualizar(dt, agora);    break;
     case TELA_DIAGNOSTICO: diagnostico_atualizar(dt, agora); break;
@@ -7186,6 +7184,7 @@ static void desenharAtrasDoPainel(void *ctx) {
       case TELA_BIBLIOTECA: biblioteca_desenhar(agora); break;
       case TELA_AGENDA:     agendaui_desenhar(agora);   break;
       case TELA_ESPORTES:   esporteui_desenhar(agora);  break;
+      case TELA_YOUTUBE:    ytui_desenhar(agora);       break;
       case TELA_PERFIL:     perfil_desenhar(agora);     break;
       case TELA_SOCIAL:     amigoperfil_desenhar(agora);     break;
       case TELA_ADDONS:     addonsui_desenhar(agora);   break;

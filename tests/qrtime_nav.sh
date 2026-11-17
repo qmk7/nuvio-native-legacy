@@ -150,11 +150,11 @@ a=$(transicao 16); vai 4; foto sport
 [ "$(transicao 16)" -gt "$a" ] && ok "Sport Center opens its screen" || erro "Sport Center"
 volta_home 16 && ok "Back from Sport Center returns Home" || erro "Back from Sport Center"
 
-# 5 YouTube -> launcher (desktop: information only), stays on Home
-a=$(conta "\[transicao\] tela 2 -> ")
-vai 5; foto youtube
-grep -q "\[ondever\] youtube:" "$LOG" && ok "YouTube asks the TV app launcher" || erro "YouTube launcher"
-[ "$(conta "\[transicao\] tela 2 -> ")" = "$a" ] && ok "YouTube is an action, the screen stays Home" || erro "YouTube changed screen"
+# 5 YouTube -> its own section (TELA_YOUTUBE = 17, ytui.c); videos still play
+# in the TV's official app, from the video page
+a=$(transicao 17); vai 5; foto youtube
+[ "$(transicao 17)" -gt "$a" ] && ok "YouTube opens its own section" || erro "YouTube section"
+volta_home 17 && ok "Back from YouTube returns Home" || erro "Back from YouTube"
 
 # 6 Agenda (13), 7 Search (5), 9 Library (6), 10 Explore (3), 11 Profile (7), 12 Settings (8)
 for par in "6 13 Agenda" "7 5 Search" "9 6 Library" "10 3 Explore" "11 7 Profile" "12 8 Settings"; do
