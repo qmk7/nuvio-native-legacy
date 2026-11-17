@@ -25,6 +25,10 @@ deploy/app/art/addons.txt
 # ajustes.txt e a preferencia de LAYOUT de quem montou. Nao e credencial, mas
 # chegaria como se fosse a de quem instalou — e agora ela vem da conta.
 deploy/app/art/ajustes.txt
+# Settings also writes these next to it on a dev run (log-upload notice seen,
+# atomic temp file); they must never be committed or packaged.
+deploy/app/art/ajustes.tmp
+deploy/app/art/envio-151.txt
 deploy/app/art/collections.json
 deploy/app/art/collections/
 
