@@ -110,6 +110,10 @@ int stalker_fonte_canais(unsigned id,StalkerCanal *out,int max,uint64_t sessao);
 int stalker_fonte_canais_cb(unsigned id, StalkerCb cb, void *u, uint64_t sessao);
 // Connection test of account `id` (blocks: worker thread): channels found.
 int stalker_fonte_testar(unsigned id,uint64_t sessao);
+// VOD (stvod.c): one portal query of account `id` (BLOCKS), and the
+// short-lived playback URL of a VOD item (episode number in `serie`, 0 movie).
+char *stalker_fonte_api(unsigned id, const char *consulta, uint64_t sessao);
+int stalker_fonte_vod_link(unsigned id, const char *cmd, int serie, char *url, unsigned n, uint64_t sessao);
 void stalker_fonte_esquecer(unsigned id);
 void stalker_fontes_invalidar(void);
 #endif

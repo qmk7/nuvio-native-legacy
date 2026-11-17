@@ -112,6 +112,25 @@ TMDB_FIND = {
 }
 TMDB_MOVIE = {"27205": {"id": 27205, "title": "Inception", "original_title": "Inception", "release_date": "2010-07-15"}}
 
+# ---- Stalker VOD: The Matrix (title+year only), a portal-only movie, and
+# Breaking Bad as a series with episodes 1 and 2 (one season).
+ST_VOD_CATS = [{"id": "*", "title": "All"}, {"id": "11", "title": "ST Films"}, {"id": "12", "title": "ST Shows"}]
+ST_VOD = [
+    {"id": "7001", "name": "The Matrix", "cmd": "/media/7001.mpg", "year": "1999", "category_id": "11",
+     "screenshot_uri": "", "is_series": "0", "added": "2023-01-01 10:00:00"},
+    {"id": "7002", "name": "Stalker Only Movie", "cmd": "/media/7002.mpg", "year": "2015", "category_id": "11",
+     "screenshot_uri": "", "is_series": 0, "added": "2023-01-02 10:00:00"},
+    {"id": "7003", "name": "Breaking Bad", "cmd": "/media/7003.mpg", "year": "2008", "category_id": "12",
+     "screenshot_uri": "", "is_series": "1", "series": [1, 2], "added": "2023-01-03 10:00:00"},
+]
+def vod_m3u():
+    return ("#EXTM3U\n"
+            "#EXTINF:-1 tvg-logo=\"\" group-title=\"VOD Movies\",The Matrix (1999)\n" + BASE + "/m3uvod/matrix.mp4\n"
+            "#EXTINF:-1 group-title=\"VOD Movies\",M3U Only Movie (2018)\n" + BASE + "/m3uvod/only.mkv\n"
+            "#EXTINF:-1 group-title=\"Series\",Breaking Bad S01E01\n" + BASE + "/m3uvod/bb101.mp4\n"
+            "#EXTINF:-1 group-title=\"Series\",Breaking Bad S01E02\n" + BASE + "/m3uvod/bb102.mp4\n"
+            "#EXTINF:-1 group-title=\"Live\",Live News HD\n" + BASE + "/m3u/live1.m3u8\n").encode()
+
 ST_GENRES = [{"id": "1", "title": "Stalker Movies"}, {"id": "2", "title": "Stalker Kids"}]
 ST_CHANS = [
     {"id": "501", "name": "Stalker Cinema", "number": "1", "cmd": "ffmpeg %s/st/501" % BASE,
@@ -219,12 +238,26 @@ class H(BaseHTTPRequestHandler):
                 m = TMDB_MOVIE.get(p[len("/3/movie/"):])
                 return self.send(m) if m else self.send({"status_code": 34}, code=404)
             return self.send({"status_code": 34}, code=404)
+        if p == "/vod.m3u":
+            return self.send(vod_m3u(), "audio/x-mpegurl")
         if p == "/list.m3u":
             return self.send(m3u(), "audio/x-mpegurl")
         if p == "/epg.xml" or p == "/xmltv.php":
             return self.send(xmltv(), "application/xml")
         if p.endswith("load.php") or p.endswith("portal.php"):
             a = q.get("action", "")
+            if q.get("type") == "vod":
+                if a == "get_categories":
+                    return self.send({"js": ST_VOD_CATS})
+                if a == "get_ordered_list":
+                    page = int(q.get("p", "1") or 1)
+                    return self.send({"js": {"total_items": len(ST_VOD), "max_page_items": 14,
+                                             "data": ST_VOD if page <= 1 else []}})
+                if a == "create_link":
+                    cmd = q.get("cmd", "")
+                    vid = cmd.rsplit("/", 1)[-1].split(".")[0]
+                    return self.send({"js": {"cmd": "ffmpeg %s/stvod/%s.mp4?series=%s" % (BASE, vid, q.get("series", "0"))}})
+                return self.send({"js": []})
             if a == "handshake":
                 return self.send({"js": {"token": "QRTTOKEN", "random": "x"}})
             if a == "get_profile":
@@ -241,7 +274,7 @@ class H(BaseHTTPRequestHandler):
             if a == "get_all_channels":
                 return self.send({"js": {"data": ST_CHANS}})
             return self.send({"js": []})
-        if p.startswith(("/movie/", "/series/")):
+        if p.startswith(("/movie/", "/series/", "/stvod/", "/m3uvod/")):
             # A tiny MP4 header: enough for the app's source check (video/*);
             # real decoding is only provable on the TV.
             return self.send(b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"\x00" * 64, "video/mp4")

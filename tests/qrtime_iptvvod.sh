@@ -9,16 +9,16 @@ SRC="src/admin.c src/iptvfontes.c src/xtream.c src/m3u.c src/m3u_parse.c src/sta
 cc -std=gnu11 -O1 -g -Isrc -Wno-format-truncation tests/qrtime_iptv_seed.c $SRC -lpthread -o "$W/seed" \
   || { echo "FAIL: seed tool"; exit 1; }
 cc -std=gnu11 -O1 -g -Wall -Wextra -Wno-format-truncation -Isrc -I/usr/include/SDL2 -DNV_LINUX_DESKTOP \
-  tests/qrtime_iptvvod.c src/iptvvod.c src/xtvod.c $SRC src/rede.c src/redeurl.c -lpthread -ldl -lz -o "$W/t" \
+  tests/qrtime_iptvvod.c src/iptvvod.c src/xtvod.c src/stvod.c src/m3uvod.c $SRC src/rede.c src/redeurl.c -lpthread -ldl -lz -o "$W/t" \
   || { echo "FAIL: test build"; exit 1; }
 PORT=$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1])')
 python3 tests/qrtime_iptv_mock.py "$PORT" "$W" >/dev/null 2>"$W/mock.err" &
 MOCK=$!
 sleep 1
 mkdir -p "$W/a"
-QRT_SEED_XT2=1 "$W/seed" "$W/a" "http://127.0.0.1:$PORT" >/dev/null || { echo "FAIL: seeding"; exit 1; }
+QRT_SEED_XT2=1 QRT_SEED_M3UVOD=1 "$W/seed" "$W/a" "http://127.0.0.1:$PORT" >/dev/null || { echo "FAIL: seeding"; exit 1; }
 fail=0
-"$W/t" "$W/a" online "http://127.0.0.1:$PORT" > "$W/out" 2>&1 || fail=1
+"$W/t" "$W/a" online "http://127.0.0.1:$PORT" > "$W/out" 2>&1 || fail=1; [ -n "${QRT_DUMP:-}" ] && cp "$W/out" "$QRT_DUMP"
 # Providers down and the cache stale: the library must survive.
 kill "$MOCK"; MOCK=""
 sed -i '1s/.*/v1\t1/' "$W/a/iptvvod-p1.tsv"

@@ -701,6 +701,39 @@ int stalker_fonte_testar(unsigned id,uint64_t sessao){
   stalker_fonte_canais_cb(id,stContar,&n,sessao);
   return n;
 }
+// VOD (QR TIME, stvod.c): one portal query of account `id` in that account's
+// context (token renewal included). `consulta` is built by stvod.c from
+// provider ids only. Body (malloc) or NULL.
+char *stalker_fonte_api(unsigned id, const char *consulta, uint64_t sessao) {
+  unsigned a = usarFonte(id);
+  char *r = stalker_configurado() ? chamar(consulta, 0, sessao) : NULL;
+  usarFonte(a);
+  return r;
+}
+// Playback URL of a VOD item (create_link type=vod; `serie` = episode number,
+// 0 for a movie). Asked at play time: portal links carry a short-lived token.
+int stalker_fonte_vod_link(unsigned id, const char *cmd, int serie, char *url, unsigned n, uint64_t sessao) {
+  char enc[640], consulta[800], bruto[1024];
+  const char *p;
+  char *corpo;
+  unsigned a;
+  if (!cmd || !cmd[0] || !url || n < 2 || strlen(cmd) > 400) return 0;
+  urlenc(cmd, enc, sizeof enc);
+  snprintf(consulta, sizeof consulta, "type=vod&action=create_link&cmd=%s&series=%d&forced_storage=0"
+           "&disable_ad=0&download=0", enc, serie > 0 ? serie : 0);
+  a = usarFonte(id);
+  corpo = stalker_configurado() ? chamar(consulta, 1, sessao) : NULL;
+  usarFonte(a);
+  if (!corpo) return 0;
+  if (!textoResposta(corpo, "cmd", bruto, sizeof bruto)) { free(corpo); return 0; }
+  free(corpo);
+  p = strstr(bruto, "http://");
+  if (!p) p = strstr(bruto, "https://");
+  if (!p) return 0;
+  snprintf(url, n, "%s", p);
+  { char *esp = strchr(url, ' '); if (esp) *esp = 0; }
+  return url[0] != 0;
+}
 int stalker_fonte_canais(unsigned id,StalkerCanal *out,int max,uint64_t sessao){
   unsigned a=usarFonte(id);int n=stalker_canais_sessao(out,max,sessao);
   for(int i=0;i<n;i++){char original[80];snprintf(original,sizeof original,"%s",out[i].id);

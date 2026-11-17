@@ -11,6 +11,8 @@
 //   QRT_SEED_PIN=1234             this TV's administrator PIN (admin.c)
 //   QRT_SEED_XT2=1                a second Xtream account (qrtuser2), whose
 //                                 VOD overlaps the first (tests/qrtime_vod*)
+//   QRT_SEED_M3UVOD=1             an M3U account whose list (/vod.m3u) holds
+//                                 movies and series episodes
 //   QRT_SEED_LOCK="1:1:QRT Sports" lock that category of IPTV type 1, account 1
 //                                 (key: the guide's categoriaChaveFonte)
 //
@@ -115,6 +117,13 @@ int main(int argc, char **argv) {
     unsigned x2 = nova(IPTV_XTREAM, "QRT Xtream Two");
     xtream_fonte_selecionar(x2);
     if (!xtream_conta_definir(argv[2], "qrtuser2", "qrtpass2")) { fprintf(stderr, "seed: xtream2\n"); return 1; }
+  }
+  if (getenv("QRT_SEED_M3UVOD") && *getenv("QRT_SEED_M3UVOD")) {
+    unsigned mv = nova(IPTV_M3U, "QRT M3U VOD");
+    char vl[300];
+    m3u_fonte_selecionar(mv);
+    snprintf(vl, sizeof vl, "%s/vod.m3u", argv[2]);
+    if (!m3u_conta_definir(vl, "")) { fprintf(stderr, "seed: m3u vod\n"); return 1; }
   }
   extras();
   printf("seed: xtream=%u m3u=%u stalker=%u accounts=%d\n", x, m, s, iptv_contas(NULL, 0));

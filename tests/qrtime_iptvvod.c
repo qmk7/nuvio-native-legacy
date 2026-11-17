@@ -4,6 +4,8 @@
 //   qrtime_iptvvod <data dir> online    full checks (fixture running)
 //   qrtime_iptvvod <data dir> offline   fixture down, stale cache: still there
 #include "iptvvod.h"
+#include "m3uvod.h"
+#include "stvod.h"
 #include "streams.h"
 #include "dados.h"
 #include <stdint.h>
@@ -86,23 +88,41 @@ int main(int argc, char **argv) {
             !iptvvod_id_ler("qv:0123456789abcdef.e1x0", NULL, NULL, NULL, NULL), "malformed ids refused");
   }
 
+  // ---- M3U VOD and Stalker episode rules, no network ----
+  {
+    char serie[160];
+    int t = 0, e = 0, nums[8];
+    CONFERE(m3uvod_url_vod("http://h/x/movie.MKV?token=1") && m3uvod_url_vod("http://h/movie/u/p/1.ts") &&
+            !m3uvod_url_vod("http://h/live/1.m3u8") && !m3uvod_url_vod("http://h/ch/1.ts") && !m3uvod_url_vod("rtmp://h/a.mp4"),
+            "M3U: video files and /movie/ paths are VOD, live streams are not");
+    CONFERE(m3uvod_episodio("Breaking Bad S02E05", serie, sizeof serie, &t, &e) && !strcmp(serie, "Breaking Bad") && t == 2 && e == 5,
+            "M3U: S02E05 marker");
+    CONFERE(m3uvod_episodio("The Office - 3x12", serie, sizeof serie, &t, &e) && !strcmp(serie, "The Office") && t == 3 && e == 12,
+            "M3U: 3x12 marker");
+    CONFERE(!m3uvod_episodio("Room 1408", serie, sizeof serie, &t, &e) && !m3uvod_episodio("Seven", serie, sizeof serie, &t, &e),
+            "M3U: no false episodes");
+    CONFERE(stvod_episodios("3,1,2,2", nums, 8) == 3 && nums[0] == 1 && nums[2] == 3, "Stalker: episode numbers sorted, unique");
+  }
+
   // ---- library ----
   carregar();
   CONFERE(iptvvod_ativo(), "library loaded");
-  CONFERE(iptvvod_n_itens('m') == 3, "5 movie copies -> 3 movies (Matrix x2 by tmdb, Inception x2 by title+year)");
-  CONFERE(iptvvod_n_itens('s') == 2, "3 series copies -> 2 series");
-  CONFERE(nf == 2 && fils[0].n == 3 && fils[1].n == 2, "two Home rows: recent movies, recent series");
+  CONFERE(iptvvod_n_itens('m') == 5, "9 movie copies (Xtream x2, Stalker, M3U) -> 5 movies");
+  CONFERE(iptvvod_n_itens('s') == 2, "5 series copies -> 2 series");
+  CONFERE(nf == 2 && fils[0].n == 5 && fils[1].n == 2, "two Home rows: recent movies, recent series");
   {
     const CatItem *m = porTitulo("The Matrix"), *in = porTitulo("Inception"), *ind = porTitulo("Local Indie Film");
     const CatItem *bb = porTitulo("Breaking Bad");
     CONFERE(m && in && ind && bb, "clean titles in the rows");
     CONFERE(nf && ni >= 3 && !strcmp(itens[0].titulo, "Inception") && !strcmp(itens[2].titulo, "Local Indie Film"),
             "movies ordered by most recently added copy");
-    CONFERE(m && iptvvod_n_copias(m->imdb) == 2 && in && iptvvod_n_copias(in->imdb) == 2 &&
-            ind && iptvvod_n_copias(ind->imdb) == 1, "copies per item: 2, 2, 1");
+    CONFERE(m && iptvvod_n_copias(m->imdb) == 4 && in && iptvvod_n_copias(in->imdb) == 2 &&
+            ind && iptvvod_n_copias(ind->imdb) == 1, "The Matrix: 4 copies (2 Xtream by tmdb, Stalker and M3U by title+year)");
+    CONFERE(porTitulo("Stalker Only Movie") && porTitulo("M3U Only Movie"), "provider-only movies stay their own items");
     CONFERE(m && !strncmp(m->imdb, "qv:", 3) && !strcmp(m->tipo, "movie") && strstr(m->poster, "matrix.jpg"),
             "item id is a local qv: id, never a provider or TMDB id");
-    CONFERE(bb && !strcmp(bb->tipo, "series") && iptvvod_n_copias(bb->imdb) == 2, "series grouped across providers");
+    CONFERE(bb && !strcmp(bb->tipo, "series") && iptvvod_n_copias(bb->imdb) == 4,
+            "Breaking Bad: Xtream x2, Stalker (title+year), M3U (unique title, no year)");
 
     if (m) {
       CatItem f = *m;
@@ -111,9 +131,10 @@ int main(int argc, char **argv) {
       CONFERE(iptvvod_ficha(&f, NULL, 0) == 0 && strstr(f.sinopse, "Plot of") && f.nElenco == 2 &&
               strstr(f.meta, "136 min") && f.backdrop[0], "movie details from the provider");
       n = fontes(m->imdb, &l);
-      CONFERE(n == 2 && temUrl(l, n, "/movie/qrtuser/") && temUrl(l, n, "/movie/qrtuser2/"),
-              "The Matrix: one source per provider");
-      CONFERE(n == 2 && strstr(l[0].provedor, "IPTV · QRT Xtream") && l[0].fileIdx == -1, "source attribution");
+      CONFERE(n == 4 && temUrl(l, n, "/movie/qrtuser/") && temUrl(l, n, "/movie/qrtuser2/") &&
+              temUrl(l, n, "/stvod/7001.mp4?series=0") && temUrl(l, n, "/m3uvod/matrix.mp4"),
+              "The Matrix: one source per provider (Stalker link asked at play time)");
+      CONFERE(n >= 2 && strstr(l[0].provedor, "IPTV · QRT") && l[0].fileIdx == -1, "source attribution");
       free(l);
     }
     if (ind) {
@@ -132,8 +153,10 @@ int main(int argc, char **argv) {
       CONFERE(n == 3 && !strncmp(eps[0].vid, "qv:", 3) && strstr(eps[0].vid, ".e1x1") && !strcmp(eps[0].nome, "Pilot"),
               "episode ids are local and carry season/episode");
       n = fontes(eps[0].vid, &l);
-      CONFERE(n == 2 && temUrl(l, n, "/series/qrtuser/") && temUrl(l, n, "/40001.mp4") &&
-              temUrl(l, n, "/series/qrtuser2/") && temUrl(l, n, "/50001.mp4"), "S1E1: one source per provider, right episode ids");
+      CONFERE(n == 4 && temUrl(l, n, "/series/qrtuser/") && temUrl(l, n, "/40001.mp4") &&
+              temUrl(l, n, "/series/qrtuser2/") && temUrl(l, n, "/50001.mp4") &&
+              temUrl(l, n, "/stvod/7003.mp4?series=1") && temUrl(l, n, "/m3uvod/bb101.mp4"),
+              "S1E1: four providers, each with its own episode reference");
       free(l);
       n = fontes(eps[2].vid, &l);
       CONFERE(n == 2 && temUrl(l, n, "/40011.mp4") && temUrl(l, n, "/50011.mp4"), "S2E1 maps to each provider's own id");
@@ -143,8 +166,9 @@ int main(int argc, char **argv) {
   }
   {
     char *c = dados_ler("iptvvod-p1.tsv");
-    CONFERE(c && strstr(c, "Breaking Bad") && !strstr(c, "qrtpass") && !strstr(c, "qrtuser"),
-            "cache written, without credentials");
+    CONFERE(c && strstr(c, "Breaking Bad") && !strstr(c, "qrtpass") && !strstr(c, "qrtuser") &&
+            !strstr(c, "/media/") && !strstr(c, "m3uvod") && !strstr(c, "Stalker Only"),
+            "cache: Xtream copies only, no credentials, no Stalker cmd or M3U URL");
     free(c);
   }
 
@@ -159,8 +183,9 @@ int main(int argc, char **argv) {
             (free(l), l = NULL, 1), "no TMDB key: nothing is asked");
     iptvvod_definir_chave_tmdb(chaveTeste);
     n = iptvvod_origem("tt0133093", "movie", NULL, NULL, NULL, NULL, &l);
-    CONFERE(n == 2 && temUrl(l, n, "/movie/qrtuser/") && temUrl(l, n, "/movie/qrtuser2/"),
-            "addon title tt0133093 (The Matrix): both providers' copies");
+    CONFERE(n == 4 && temUrl(l, n, "/movie/qrtuser/") && temUrl(l, n, "/movie/qrtuser2/") &&
+            temUrl(l, n, "/stvod/7001") && temUrl(l, n, "/m3uvod/matrix.mp4"),
+            "addon title tt0133093 (The Matrix): all four providers' copies");
     free(l); l = NULL;
     n = iptvvod_origem("tt1375666", "movie", NULL, NULL, NULL, NULL, &l);
     CONFERE(n == 2 && temUrl(l, n, "/1003.mp4") && temUrl(l, n, "/2002.mkv"),
@@ -190,6 +215,6 @@ int main(int argc, char **argv) {
   CONFERE(!iptvvod_ativo() && nf == 0 && iptvvod_n_itens('m') == 0, "profile 2 (no providers): nothing from profile 1");
   perfil = 1;
   carregar();
-  CONFERE(iptvvod_n_itens('m') == 3, "back to profile 1: its library again");
+  CONFERE(iptvvod_n_itens('m') == 5, "back to profile 1: its library again");
   return falhas ? 1 : 0;
 }
