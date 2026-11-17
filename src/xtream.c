@@ -374,6 +374,23 @@ static int classificar(const char *c) {
 static const char *nomeClasse(int k) {
   return k == XC_JSON ? "JSON" : k == XC_HTML ? "pagina HTML" : k == XC_VAZIO ? "vazio" : "texto";
 }
+// {"user_info":{"auth":0}} is how panels refuse a login on ANY action. JSON
+// allows whitespace around ':' ("auth": 0, pretty-printing proxies), so do
+// not match the raw text "\"auth\":0"; also accept the quoted "0".
+static int authZero(const char *corpo) {
+  const char *p = corpo;
+  while (p && (p = strstr(p, "\"auth\"")) != NULL) {
+    p += 6;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    if (*p != ':') continue;
+    p++;
+    while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++;
+    if (*p == '"') p++;
+    if (*p == '0' && !(p[1] >= '0' && p[1] <= '9')) return 1;
+  }
+  return 0;
+}
+
 static const char *pulaBom(const char *c) {
   if (c && (unsigned char)c[0] == 0xEF && (unsigned char)c[1] == 0xBB && (unsigned char)c[2] == 0xBF) c += 3;
   while (c && *c && (unsigned char)*c <= ' ') c++;
@@ -491,7 +508,7 @@ int xtream_canais_cb_sessao(void (*cat)(const char *nome, int ordem, int n, void
     // 458 e o limite de telas; 429 e rajada. O numero vai para a tela.
     printf("[xtream] lista de canais: HTTP %d (%s, %ld B)\n", st, nomeClasse(classe),
            (long)strlen(corpo));
-    ultimaFalha = (strstr(corpo, "\"auth\":0") || st == 401) ? XT_RECUSOU
+    ultimaFalha = (authZero(corpo) || st == 401) ? XT_RECUSOU
                 : (st == 502 || st == 504) ? XT_SEM_RESPOSTA : XT_HTTP;
     free(corpo); free(cats);
     return 0;
@@ -501,7 +518,7 @@ int xtream_canais_cb_sessao(void (*cat)(const char *nome, int ordem, int n, void
   // "senha errada".
   p = pulaBom(corpo);
   if (*p != '[') {
-    if (strstr(corpo, "\"auth\":0")) {
+    if (authZero(corpo)) {
       printf("[xtream] servidor recusou a credencial (auth 0)\n");
       ultimaFalha = XT_RECUSOU;
     } else {
