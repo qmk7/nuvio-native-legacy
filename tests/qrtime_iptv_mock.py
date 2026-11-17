@@ -8,6 +8,10 @@ real provider). One HTTP server speaks three protocols on 127.0.0.1:
   XMLTV         /epg.xml    programmes relative to NOW, written with +0300
                             offsets so the guide must convert time zones
   Stalker       .../load.php or .../portal.php ?type=stb&action=handshake ...
+  Xtream VOD    get_vod_categories/streams/info, get_series_categories/series/
+                info; /movie/U/P/<id>.<ext> and /series/U/P/<id>.<ext>.
+                A SECOND Xtream login (qrtuser2/qrtpass2) offers an overlapping
+                catalog, so the unified library can be tested across providers.
 
 Every request is logged to <workdir>/requests.log (path + query, never a
 password: the Xtream password is replaced by ***), so the test can prove what
@@ -21,6 +25,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 PORT = int(sys.argv[1])
 WORK = sys.argv[2]
 USER, PASS, MAC = "qrtuser", "qrtpass", "00:1A:79:00:00:42"
+USER2, PASS2 = "qrtuser2", "qrtpass2"
 BASE = "http://127.0.0.1:%d" % PORT
 
 XT_CATS = [{"category_id": "10", "category_name": "QRT News", "parent_id": 0},
@@ -35,6 +40,62 @@ XT_CHANS = [
     {"num": 3, "name": "QRT Sports Arena", "stream_type": "live", "stream_id": 201,
      "stream_icon": "", "epg_channel_id": "qrt.sports", "category_id": "20", "tv_archive": 0},
 ]
+# ---- VOD / series. Account 1 and account 2 overlap on purpose:
+#  The Matrix: tmdb 603 on both; Inception: tmdb on 1, only title+year on 2;
+#  Local Indie Film and Local Show: no tmdb anywhere (stay provider-local).
+VOD_CATS = {1: [{"category_id": "50", "category_name": "QRT Action"},
+                {"category_id": "51", "category_name": "QRT Indie"}],
+            2: [{"category_id": "7", "category_name": "P2 Movies"}]}
+VOD = {1: [{"num": 1, "name": "EN - The Matrix (1999)", "stream_type": "movie", "stream_id": 1001,
+            "stream_icon": BASE + "/img/matrix.jpg", "rating": "8.7", "added": "1700000100",
+            "category_id": "50", "container_extension": "mkv", "tmdb": "603"},
+           {"num": 2, "name": "Local Indie Film", "stream_type": "movie", "stream_id": 1002,
+            "stream_icon": "", "rating": 0, "added": "1700000300", "category_id": "51",
+            "container_extension": "mp4", "year": "2021"},
+           {"num": 3, "name": "Inception", "stream_type": "movie", "stream_id": "1003",
+            "stream_icon": BASE + "/img/inception.jpg", "rating": 8.8, "added": "1700000200",
+            "category_id": "50", "container_extension": "mp4", "tmdb_id": 27205, "year": "2010"}],
+       2: [{"num": 1, "name": "The Matrix", "stream_type": "movie", "stream_id": 2001,
+            "stream_icon": "", "rating": "7", "added": "1700001000", "category_id": "7",
+            "container_extension": "mp4", "tmdb": "603", "year": 1999},
+           {"num": 2, "name": "Inception 4K (2010)", "stream_type": "movie", "stream_id": 2002,
+            "stream_icon": "", "added": "1700001100", "category_id": "7", "container_extension": "mkv",
+            "tmdb": ""}]}
+SER_CATS = {1: [{"category_id": "60", "category_name": "QRT Drama"}],
+            2: [{"category_id": "8", "category_name": "P2 Series"}]}
+SERIES = {1: [{"num": 1, "name": "Breaking Bad", "series_id": 3001, "cover": BASE + "/img/bb.jpg",
+               "category_id": "60", "tmdb": "1396", "releaseDate": "2008-01-20", "rating": "9.5",
+               "last_modified": "1700002000"},
+              {"num": 2, "name": "Local Show", "series_id": 3002, "cover": "", "category_id": "60",
+               "last_modified": "1700002100"}],
+          2: [{"num": 1, "name": "Breaking Bad (2008)", "series_id": 4001, "cover": "",
+               "category_id": "8", "tmdb_id": 1396, "last_modified": "1700003000"}]}
+def ep(i, s, e, t):
+    return {"id": str(i), "episode_num": e, "title": t, "container_extension": "mp4", "season": s,
+            "info": {"plot": "Plot of " + t, "duration_secs": 2820, "movie_image": ""}}
+SERIES_INFO = {
+    (1, "3001"): {"seasons": [], "info": {"name": "Breaking Bad", "plot": "A chemistry teacher.",
+                  "cast": "Bryan Cranston, Aaron Paul", "genre": "Drama", "releaseDate": "2008-01-20",
+                  "backdrop_path": [BASE + "/img/bb-bd.jpg"], "tmdb": "1396", "episode_run_time": "47"},
+                  "episodes": {"1": [ep(40001, 1, 1, "Pilot"), ep(40002, 1, 2, "Cat's in the Bag")],
+                               "2": [ep(40011, 2, 1, "Seven Thirty-Seven")]}},
+    (1, "3002"): {"info": {"name": "Local Show", "plot": "Only here."},
+                  "episodes": {"1": [ep(41001, 1, 1, "Local One"), ep(41002, 1, 2, "Local Two")]}},
+    (2, "4001"): {"info": {"name": "Breaking Bad", "tmdb_id": 1396},
+                  "episodes": [[ep(50001, 1, 1, "Pilot"), ep(50002, 1, 2, "Cat's in the Bag")],
+                               [ep(50011, 2, 1, "Seven Thirty-Seven")]]},
+}
+def vod_info(acct, vid):
+    for m in VOD[acct]:
+        if str(m["stream_id"]) == vid:
+            return {"info": {"name": m["name"], "plot": "Plot of " + m["name"], "genre": "Action",
+                             "cast": "Keanu Reeves, Carrie-Anne Moss", "director": "Wachowskis",
+                             "releasedate": "1999-03-31", "duration_secs": 8160,
+                             "backdrop_path": [BASE + "/img/bd.jpg"], "tmdb_id": m.get("tmdb", "")},
+                    "movie_data": {"stream_id": m["stream_id"], "name": m["name"],
+                                   "container_extension": m["container_extension"]}}
+    return {"info": [], "movie_data": []}
+
 ST_GENRES = [{"id": "1", "title": "Stalker Movies"}, {"id": "2", "title": "Stalker Kids"}]
 ST_CHANS = [
     {"id": "501", "name": "Stalker Cinema", "number": "1", "cmd": "ffmpeg %s/st/501" % BASE,
@@ -91,15 +152,30 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urllib.parse.urlparse(self.path)
         q = dict(urllib.parse.parse_qsl(u.query))
-        safe = self.path.replace(PASS, "***")
+        safe = self.path.replace(PASS2, "***").replace(PASS, "***")
         with open(WORK + "/requests.log", "a") as f:
             f.write(safe + "\n")
         p = u.path
         if p.endswith("/player_api.php"):
-            ok = q.get("username") == USER and q.get("password") == PASS
+            acct = 1 if (q.get("username"), q.get("password")) == (USER, PASS) else \
+                   2 if (q.get("username"), q.get("password")) == (USER2, PASS2) else 0
             a = q.get("action", "")
-            if not ok:
+            if not acct:
                 return self.send({"user_info": {"auth": 0}})
+            if a == "get_vod_categories":
+                return self.send(VOD_CATS[acct])
+            if a == "get_vod_streams":
+                return self.send(VOD[acct])
+            if a == "get_vod_info":
+                return self.send(vod_info(acct, q.get("vod_id", "")))
+            if a == "get_series_categories":
+                return self.send(SER_CATS[acct])
+            if a == "get_series":
+                return self.send(SERIES[acct])
+            if a == "get_series_info":
+                return self.send(SERIES_INFO.get((acct, q.get("series_id", "")), {"info": [], "episodes": []}))
+            if acct == 2 and a in ("get_live_categories", "get_live_streams"):
+                return self.send([])
             if a == "get_live_categories":
                 return self.send(XT_CATS)
             if a == "get_live_streams":
@@ -138,7 +214,7 @@ class H(BaseHTTPRequestHandler):
             if a == "get_all_channels":
                 return self.send({"js": {"data": ST_CHANS}})
             return self.send({"js": []})
-        if p.startswith(("/live/", "/m3u/", "/st/")):
+        if p.startswith(("/live/", "/m3u/", "/st/", "/movie/", "/series/")):
             # Placeholder media: the desktop build has no video decoder; on a
             # TV this would need a real stream (validated on hardware).
             return self.send(b"#EXTM3U\n#EXT-X-ENDLIST\n", "application/vnd.apple.mpegurl")

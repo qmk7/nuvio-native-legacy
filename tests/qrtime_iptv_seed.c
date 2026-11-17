@@ -9,6 +9,8 @@
 //
 // Optional, through the environment (tests/qrtime_catlock.sh):
 //   QRT_SEED_PIN=1234             this TV's administrator PIN (admin.c)
+//   QRT_SEED_XT2=1                a second Xtream account (qrtuser2), whose
+//                                 VOD overlaps the first (tests/qrtime_vod*)
 //   QRT_SEED_LOCK="1:1:QRT Sports" lock that category of IPTV type 1, account 1
 //                                 (key: the guide's categoriaChaveFonte)
 //
@@ -109,6 +111,11 @@ int main(int argc, char **argv) {
   stalker_fonte_selecionar(s);
   if (!stalker_conta_definir(argv[2], "00:1A:79:00:00:42")) { fprintf(stderr, "seed: stalker\n"); return 1; }
 
+  if (getenv("QRT_SEED_XT2") && *getenv("QRT_SEED_XT2")) {
+    unsigned x2 = nova(IPTV_XTREAM, "QRT Xtream Two");
+    xtream_fonte_selecionar(x2);
+    if (!xtream_conta_definir(argv[2], "qrtuser2", "qrtpass2")) { fprintf(stderr, "seed: xtream2\n"); return 1; }
+  }
   extras();
   printf("seed: xtream=%u m3u=%u stalker=%u accounts=%d\n", x, m, s, iptv_contas(NULL, 0));
   return 0;

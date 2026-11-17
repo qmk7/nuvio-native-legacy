@@ -922,6 +922,43 @@ int xtream_fonte_testar(unsigned id, uint64_t sessao, XtreamConta *c, int *http)
   usarFonte(a);
   return r;
 }
+// VOD and series (QR TIME, xtvod.c): one player_api.php action for account
+// `id`, in that account's context and under the same one-request-at-a-time
+// lock as the channel list. `acao` may carry extra parameters
+// ("get_vod_info&vod_id=12"); they are built by xtvod.c from provider ids
+// only. Body (malloc) and HTTP status; NULL without an answer.
+char *xtream_fonte_api(unsigned id, const char *acao, int prazo, int *status, uint64_t sessao) {
+  unsigned a = usarFonte(id);
+  char *r = xtream_configurado() ? chamarSt(acao, prazo > 0 ? prazo : XT_PRAZO_S, status, sessao) : NULL;
+  usarFonte(a);
+  return r;
+}
+// Playback URL of a movie ("movie") or an episode ("series") of account `id`:
+// <server>/<kind>/<user>/<password>/<stream id>.<ext>. The URL carries the
+// credential like every Xtream stream URL: it goes to the player, never to a log.
+int xtream_fonte_vod_url(unsigned id, int episodio, const char *sid, const char *ext,
+                         char *url, unsigned n) {
+  char u[300], s[300], e[12];
+  unsigned a;
+  int ok = 0;
+  if (!sid || !sid[0] || !url || n < 2) return 0;
+  for (const char *c = sid; *c; c++) if (!((*c >= '0' && *c <= '9') || (*c >= 'a' && *c <= 'z') ||
+                                           (*c >= 'A' && *c <= 'Z') || *c == '-' || *c == '_')) return 0;
+  snprintf(e, sizeof e, "%s", ext && ext[0] ? ext : "mp4");
+  for (char *c = e; *c; c++) if (!((*c >= 'a' && *c <= 'z') || (*c >= '0' && *c <= '9'))) return 0;
+  a = usarFonte(id);
+  pthread_mutex_lock(&trava);
+  carregarTravado();
+  if (servidor[0] && usuario[0] && senha[0]) {
+    urlenc(usuario, u, sizeof u);
+    urlenc(senha, s, sizeof s);
+    snprintf(url, n, "%s/%s/%s/%s/%s.%s", servidor, episodio ? "series" : "movie", u, s, sid, e);
+    ok = 1;
+  }
+  pthread_mutex_unlock(&trava);
+  usarFonte(a);
+  return ok;
+}
 int xtream_fonte_canais(unsigned id, XtreamCanal *out, int max, uint64_t sessao) {
   unsigned a = usarFonte(id); int n = xtream_canais_sessao(out, max, sessao);
   for (int i = 0; i < n; i++) { char original[80]; snprintf(original, sizeof original, "%s", out[i].id);

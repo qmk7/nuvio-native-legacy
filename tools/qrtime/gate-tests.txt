@@ -53,3 +53,4 @@ qrtime_livetv
 qrtime_iptv_teste
 guia_grupos
 qrtime_catlock
+qrtime_xtvod

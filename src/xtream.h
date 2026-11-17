@@ -152,6 +152,11 @@ int xtream_fonte_canais(unsigned id, XtreamCanal *out, int max, uint64_t sessao)
 // Connection test of account `id` (blocks: worker thread). 1 = the server
 // answered with user_info (then c->auth says accepted or refused).
 int xtream_fonte_testar(unsigned id, uint64_t sessao, XtreamConta *c, int *http);
+// VOD/series (xtvod.c): one player_api action of account `id` (BLOCKS), and
+// the playback URL of a movie (episodio 0) or an episode (episodio 1).
+char *xtream_fonte_api(unsigned id, const char *acao, int prazo, int *status, uint64_t sessao);
+int xtream_fonte_vod_url(unsigned id, int episodio, const char *sid, const char *ext,
+                         char *url, unsigned n);
 int xtream_fonte_canais_cb(unsigned id, void (*cat)(const char *, int, int, void *),
                          XtreamCb cb, void *u, int *total, uint64_t sessao);
 int xtream_fonte_xmltv(unsigned id, char *out, unsigned n);
