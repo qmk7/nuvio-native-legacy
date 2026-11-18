@@ -10,6 +10,6 @@ case "$(uname -s)" in
   *) flags+=(-Wl,--gc-sections) ;;
 esac
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-cc "${flags[@]}" src/trakt.c src/js.c src/jsw.c src/metaep.c src/traktscrobble.c \
+cc "${flags[@]}" src/trakt.c src/js.c src/jsw.c src/metaep.c src/traktscrobble.c src/traktid.c src/traktdup.c \
   tests/trakt_alvos512.c -lpthread -o "$dir/teste"
 "$dir/teste"

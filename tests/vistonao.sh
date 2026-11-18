@@ -46,7 +46,7 @@ exige '^\[vistoep\] conta: \+1 episodios \(bloqueados 0; remoto mais novo 0\) \|
 # le episodio nenhum para o mapa — se um dia ler, e por vistoep_fonte.
 echo
 echo "fontes passam pelo juiz:"
-for f in src/extras.c src/contalib.c src/contapend.c src/simkl.c src/trakt.c; do
+for f in src/extras.c src/contalib.c src/contapend.c src/simkl.c src/trakt.c src/traktid.c src/traktdup.c; do
   if grep -n 'vistoep_definir *(' "$f" >/dev/null; then
     echo "  FALHOU: $f escreve no mapa com vistoep_definir (sem consultar a desmarcacao)"
     falhou=1

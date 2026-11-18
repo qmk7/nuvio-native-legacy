@@ -158,6 +158,31 @@ void agenda_filme_aberto(const char *imdb);
 // UI tick: captures add-ons, starts/reaps one bounded worker; never waits for network.
 void agenda_filmes_atualizar(void);
 
+// --- QR TIME: how sure a date is ---------------------------------------------
+// Never invented. CONFIRMADA: a full date for an identified episode (season +
+// number) given by the provider (TMDB air_date, Trakt first_aired, Cinemeta
+// released). ESTIMADA: the provider gives a date that is only partial
+// ("2027", "2027-03") or belongs to a season whose episodes are not listed
+// yet (TMDB season air_date). DESCONHECIDA: no date at all.
+enum { AG_DATA_DESCONHECIDA = 0, AG_DATA_ESTIMADA, AG_DATA_CONFIRMADA };
+int agenda_confianca(const AgItem *it);
+const char *agenda_confianca_rotulo(int conf);   // translation key
+
+// --- QR TIME: following a series explicitly -----------------------------------
+// Besides the watchlist and what is being watched, a series can be followed
+// on its own ("agenda-follows-p<N>.txt", per profile). IMDb ids only.
+int agenda_segue(const char *imdb);
+int agenda_seguir(const char *imdb, const char *titulo, const char *poster, int liga);   // new state
+
+// --- QR TIME: the Trakt calendar ---------------------------------------------
+// With Trakt connected, /calendars/my/shows/<today>/<33 days> gives every
+// upcoming episode of the shows the account follows, at the exact instant.
+// Instants are UTC; the date and time shown are this TV's local ones.
+typedef struct { char imdb[24], titulo[160], nome[120]; int temp, ep; char data[12], hora[6]; long long instante; } AgEpCal;
+int agenda_trakt_cal_parse(const char *corpo, AgEpCal *out, int max);
+// Upcoming episodes of one series from the last calendar read (sorted).
+int agenda_proximos(const char *imdb, AgEpCal *out, int max);
+
 // --- calendario -------------------------------------------------------------
 // Remonta a lista das series seguidas a partir do catalogo, do progresso e do
 // cache. Devolve quantas. FIO PRINCIPAL.

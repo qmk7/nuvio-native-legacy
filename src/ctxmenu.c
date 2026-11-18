@@ -250,7 +250,14 @@ static float focoAnim[CTX_MAX];
 static int holdObservador;
 enum { OP_LISTA = 1, OP_ASSISTIDO, OP_TIRAR_CONTINUAR, OP_RECOMENDAR, OP_DISPENSAR,
        OP_ESTILO, OP_CATEGORIA, OP_DETALHES, OP_L_ABRIR, OP_L_FIXAR, OP_L_HOME,
-       OP_EXTRA = 100 };   // OP_EXTRA + k = extras[k] (modo social)
+       OP_AGENDA, OP_FAV_TRAKT,
+       OP_EXTRA = 100 };
+// QR TIME: follow a series in the Agenda; Trakt favourites. Weak: tests that
+// link this menu alone still build (the options then simply do not appear).
+extern int agenda_segue(const char *imdb) __attribute__((weak));
+extern int agenda_seguir(const char *imdb, const char *titulo, const char *poster, int liga) __attribute__((weak));
+extern int traktfav_estado(const char *id) __attribute__((weak));
+extern int traktfav_alternar(const char *id, const char *tipo) __attribute__((weak));   // OP_EXTRA + k = extras[k] (modo social)
 // "Mover para categoria" pedido no modo painel: o IMDb do titulo, consumido
 // uma vez pelo painel (ctx_pediu_categoria), que abre a escolha dele.
 static char pedCategoriaImdb[24];
@@ -494,6 +501,14 @@ static void montar(void) {
     int k = extraJunta();
     juntar(estadoOperacao == CTX_PENDENTE && operacao == CTX_OP_HISTORICO
              ? "Marcando como assistido..." : extras[k].rot, OP_EXTRA + k);
+  }
+  // QR TIME: follow the series in the Agenda (IMDb-identified series only).
+  if (!doSocial && agenda_segue && !strcmp(ci->tipo, "series") && !strncmp(ci->imdb, "tt", 2))
+    juntar(agenda_segue(ci->imdb) ? "Deixar de seguir na Agenda" : "Seguir na Agenda", OP_AGENDA);
+  // QR TIME: Trakt favourites, once their state is known (the first open loads it).
+  if (!doSocial && traktfav_estado && trakt_ativo() && (!strcmp(ci->tipo, "movie") || !strcmp(ci->tipo, "series"))) {
+    int fe = traktfav_estado(ci->imdb);
+    if (fe >= 0 && strncmp(ci->imdb, "jf:", 3)) juntar(fe ? "Remover dos favoritos do Trakt" : "Favoritar no Trakt", OP_FAV_TRAKT);
   }
   // TIRAR DE "CONTINUAR ASSISTINDO".
   //
@@ -1031,6 +1046,18 @@ static void aplicar(void) {
     case OP_ASSISTIDO:
       iniciarAssistido(atual, ci, 0);
       montar();
+      break;
+    case OP_AGENDA:
+      if (agenda_seguir) {
+        int seg = agenda_seguir(ci->imdb, ci->titulo, ci->poster, !agenda_segue(ci->imdb));
+        ilha_avisar("ctx-agenda", ILHA_INFO, NULL, i18n(seg ? "Seguindo na Agenda." : "Fora da Agenda."), 2500u, 0);
+      }
+      montar();
+      break;
+    case OP_FAV_TRAKT:
+      if (traktfav_alternar && traktfav_alternar(ci->imdb, ci->tipo))
+        ilha_avisar("ctx-fav", ILHA_INFO, NULL, i18n("Enviado ao Trakt."), 2500u, 0);
+      aberto = 0;
       break;
     case OP_CATEGORIA:
       snprintf(pedCategoriaImdb, sizeof pedCategoriaImdb, "%s", ci->imdb);

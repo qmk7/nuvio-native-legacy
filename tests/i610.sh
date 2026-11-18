@@ -16,7 +16,7 @@ if [ "${1:-}" = --prove-before ]; then
   echo "#610 baseline: expected FAIL"
 fi
 for provider in TRAKT SIMKL; do
-  cc -DI610_${provider} tests/i610.c src/js.c src/traktscrobble.c src/metaep.c -Isrc \
+  cc -DI610_${provider} tests/i610.c src/js.c src/traktscrobble.c src/traktid.c src/traktdup.c src/metaep.c -Isrc \
     -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
     -O1 -g -Wno-deprecated-declarations -Wno-macro-redefined \
     -ffunction-sections -fdata-sections -Wl,-dead_strip -lpthread -o "$dir/$provider"
@@ -33,7 +33,7 @@ cc -DI610_AUTH src/simklauth.c src/credfio.c src/js.c src/jsw.c tests/i610.c -Is
 cc -DI610_ORDER tests/i610.c src/cwordem.c -Isrc -O1 \
   -ffunction-sections -fdata-sections -Wl,-dead_strip -lpthread -o "$dir/order"
 "$dir/order"
-cc -DI610_RESUME src/trakt.c src/metaep.c tests/stub_fichameta.c src/js.c src/metaprov.c tests/i610.c \
+cc -DI610_RESUME src/trakt.c src/traktid.c src/traktdup.c src/metaep.c tests/stub_fichameta.c src/js.c src/metaprov.c tests/i610.c \
   -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
   -O1 -Wno-deprecated-declarations -Wno-macro-redefined \
   -ffunction-sections -fdata-sections -Wl,-dead_strip -lpthread -o "$dir/resume"

@@ -1,3 +1,5 @@
+#include "traktdup.h"
+#pragma weak traktdup_renovar   // tests that link traktauth.c without the ledger
 #include "traktauth.h"
 #include "perfisessao.h"
 #include "idioma.h"
@@ -55,6 +57,7 @@ static char token[300], refresh[300];
 // valido: a renovacao sai no primeiro passo, sem esperar o primeiro 401 e sem
 // gastar as chamadas do ciclo de descoberta com uma credencial morta.
 static int renovacaoPend, desconectado;
+static char tokenVelho[300];
 static unsigned pollMs = TRA_POLL_PADRAO;
 static unsigned proximoPoll, comecouMs, limiteMs;
 static unsigned esperaMs, retomarEm, recuoMs = TRA_POLL_PADRAO;
@@ -621,6 +624,7 @@ static void *fioRenovar(void *u) {
     char t[300];
     const char *fim = r + strlen(r);
     if (js_texto(r, fim, "access_token", t, sizeof t)) {
+      snprintf(tokenVelho, sizeof tokenVelho, "%s", token);   // same account: the dedup ledger follows the new token
       snprintf(token, sizeof token, "%s", t);
       // O refresh ROTACIONA: o velho morre nesta resposta.
       if (!js_texto(r, fim, "refresh_token", refresh, sizeof refresh))
@@ -750,6 +754,13 @@ void traktauth_passo(unsigned agoraMs) {
     tokenNovo = 0;
     desconectado = 0;
     renovacaoPend = 0;
+    if (tokenVelho[0] && traktdup_renovar) {
+      char a[340], b[340];
+      snprintf(a, sizeof a, "Authorization: Bearer %s", tokenVelho);
+      snprintf(b, sizeof b, "Authorization: Bearer %s", token);
+      traktdup_renovar(a, b);
+      memset(a, 0, sizeof a); memset(tokenVelho, 0, sizeof tokenVelho);
+    }
     trakt_definir(token, nuvem_trakt_cliente());
     pushPendente = 1;
     pushGeracaoAtual++;

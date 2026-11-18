@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 dir=$(mktemp -d "${TMPDIR:-/tmp}/nuvio-trakt-cine-neg.XXXXXX")
 trap 'rm -rf "$dir"' EXIT
-cc src/trakt.c src/metaep.c tests/stub_fichameta.c src/js.c src/metaprov.c tests/trakt_cine_neg.c \
+cc src/trakt.c src/traktid.c src/traktdup.c src/metaep.c tests/stub_fichameta.c src/js.c src/metaprov.c tests/trakt_cine_neg.c \
   -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
   -o "$dir/teste" -O1 -g -Wall -Wextra -Wl,-dead_strip -lpthread
 rc=0

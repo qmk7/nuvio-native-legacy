@@ -1,3 +1,4 @@
+#include "traktid.h"
 #include "traktscrobble.h"
 #include "metaep.h"
 #include <stdio.h>
@@ -76,22 +77,28 @@ void scrobble_ids_limpar(ScrobbleEpIds *out) {
 
 void scrobble_corpo_ep(char *dst, size_t n, const char *id, double pct,
                        const ScrobbleEpIds *ep) {
-  char base[64];
-  int t = 0, e = 0;
-  char *dp;
-  MetaEpInfo info;
+  TraktId t;
+  char ids[64];
+  if (n) dst[0] = 0;
   if (pct < 0.0) pct = 0.0;
   if (pct > 100.0) pct = 100.0;
-  snprintf(base, sizeof base, "%s", id);
-  dp = strchr(base, ':');
-  if (dp) { sscanf(dp + 1, "%d:%d", &t, &e); *dp = 0; }
-  memset(&info, 0, sizeof info);
-  if (ep) {
-    if (ep->tvdb) snprintf(info.tvdb, sizeof info.tvdb, "%s", ep->tvdb);
-    if (ep->tmdb) snprintf(info.tmdb, sizeof info.tmdb, "%s", ep->tmdb);
-    if (ep->trakt) snprintf(info.trakt, sizeof info.trakt, "%s", ep->trakt);
+  // Only a Trakt-compatible identity makes a body; a local id makes none.
+  if (traktid_resolver(id, &t) < TID_IMDB || !traktid_ids_json(&t, ids, sizeof ids)) return;
+  if (t.temporada >= 0 && t.episodio > 0) {
+    if (ep && ((ep->tvdb && ep->tvdb[0]) || (ep->trakt && ep->trakt[0]))) {
+      // These ids identify the episode itself (Trakt's episode contract: TVDB/Trakt).
+      char eids[160] = "";
+      size_t k = 0;
+      if (ep->tvdb && ep->tvdb[0]) k += (size_t)snprintf(eids + k, sizeof eids - k, "\"tvdb\":%s", ep->tvdb);
+      if (ep->trakt && ep->trakt[0] && k < sizeof eids) snprintf(eids + k, sizeof eids - k, "%s\"trakt\":%s", k ? "," : "", ep->trakt);
+      snprintf(dst, n, "{\"episode\":{\"ids\":{%s}},\"progress\":%.2f}", eids, pct);
+      return;
+    }
+    snprintf(dst, n, "{\"show\":{\"ids\":{%s}},\"episode\":{\"season\":%d,\"number\":%d},\"progress\":%.2f}",
+             ids, t.temporada, t.episodio, pct);
+    return;
   }
-  metaep_scrobble_corpo(dst, n, base, t, e, (t >= 0 && e > 0) ? &info : NULL, pct);
+  snprintf(dst, n, "{\"movie\":{\"ids\":{%s}},\"progress\":%.2f}", ids, pct);
 }
 
 void scrobble_corpo(char *dst, size_t n, const char *id, double pct) {

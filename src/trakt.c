@@ -1,3 +1,5 @@
+#include "traktid.h"
+#include "traktdup.h"
 #include "trakt.h"
 #include "perfisessao.h"
 #include "vistoep.h"
@@ -1134,11 +1136,37 @@ int trakt_episodios_marcar_alvos_destino(const TraktDestino *destino, const char
   // 256 e nao 64: o lote da temporada agora vem do catalogo tambem (visto.c),
   // e temporada de anime passa de 64 — com 64 o resto era cortado calado.
   char feita[256];
-  if (!destino || !destino->aut[0] || !imdb || imdb[0] != 't' || !alvos || qtd < 1) return 0;
+  TraktId tid;
+  TraktEpisodioAlvo filtrados[256];
+  char base[48];
+  if (!destino || !destino->aut[0] || !imdb || !alvos || qtd < 1) return 0;
+  // Identity gate: only IMDb/TMDB/TVDB (or a confirmed resolution of a local id).
+  if (traktid_resolver(imdb, &tid) < TID_IMDB) {
+    printf("[trakt] episodios de um id local: ficam neste aparelho\n");
+    fflush(stdout);
+    return 0;
+  }
+  tid.temporada = -1; tid.episodio = 0;
+  traktid_canonico(&tid, base, sizeof base);
+  snprintf(id, sizeof id, "%s", base);
   if (qtd > (int)sizeof feita) qtd = (int)sizeof feita;
-  for (i = 0; imdb[i] && imdb[i] != ':' && i < (int)sizeof id - 1; i++) id[i] = imdb[i];
-  id[i] = 0;
-  if (!id[0]) return 0;
+  // No duplicate plays: episodes this app already put in the history are not sent again.
+  {
+    int m = 0;
+    for (i = 0; i < qtd; i++) {
+      char c[64];
+      snprintf(c, sizeof c, "%s:%d:%d", base, alvos[i].par.temporada, alvos[i].par.episodio);
+      if (visto && traktdup_tem(destino->aut, c)) continue;
+      filtrados[m++] = alvos[i];
+    }
+    if (!m) {
+      printf("[trakt] %d episodio(s) de %s ja no historico; nada duplicado\n", qtd, base);
+      fflush(stdout);
+      return 1;
+    }
+    alvos = filtrados;
+    qtd = m;
+  }
   memset(feita, 0, sizeof feita);
   for (i = 0; i < qtd; i++) {
     if (alvos[i].tvdbEp <= 0) numericos++;
@@ -1167,7 +1195,8 @@ int trakt_episodios_marcar_alvos_destino(const TraktDestino *destino, const char
     jsw_obj_ini(&w);
     jsw_chave(&w, "ids");
     jsw_obj_ini(&w);
-    jsw_cs(&w, "imdb", id);
+    if (tid.tipo == TID_IMDB) jsw_cs(&w, "imdb", tid.imdb);
+    else jsw_ci(&w, tid.tipo == TID_TMDB ? "tmdb" : "tvdb", (int)tid.num);
     jsw_obj_fim(&w);
     jsw_chave(&w, "seasons");
     jsw_arr_ini(&w);
@@ -1198,11 +1227,15 @@ int trakt_episodios_marcar_alvos_destino(const TraktDestino *destino, const char
   snprintf(pedido.aut, sizeof pedido.aut, "%s", destino->aut);
   snprintf(pedido.chave, sizeof pedido.chave, "%s", destino->chave);
   if (!cabecalhosCongelados(pedido, cab, aut, sizeof aut, chaveCab, sizeof chaveCab)) { jsw_livre(&w); return 0; }
-  snprintf(url, sizeof url, "https://api.trakt.tv/sync/history%s",
-           visto ? "" : "/remove");
-  r = rede_postar_st(url, 20, cab, jsw_texto_final(&w), &st);
+  trakt_url(url, sizeof url, visto ? "/sync/history" : "/sync/history/remove");
+  r = trakt_postar(url, cab, jsw_texto_final(&w), &st);
   jsw_livre(&w);
   ok = st >= 200 && st < 300;
+  if (ok) for (i = 0; i < qtd; i++) {
+    char c[64];
+    snprintf(c, sizeof c, "%s:%d:%d", base, alvos[i].par.temporada, alvos[i].par.episodio);
+    if (visto) traktdup_por(destino->aut, c); else traktdup_tirar(destino->aut, c);
+  }
   // O corpo diz quantos o Trakt de fato mexeu (added/deleted/not_found): HTTP
   // 200 com "not_found" era indistinguivel de sucesso (Silo, 08/10).
   printf("[trakt] %s %d episodios de %s -> %s (HTTP %d) %.160s\n",
@@ -1215,22 +1248,32 @@ int trakt_episodios_marcar_alvos_destino(const TraktDestino *destino, const char
 
 int trakt_titulo_marcar_destino(const TraktDestino *d, const char *imdb, const char *tipo, int visto) {
   const char *cab[4];
-  char aut[200], chave[140], corpo[200], url[80], id[24];
+  char aut[200], chave[140], corpo[200], url[96], ids[64], canon[48];
   int st = 0;
-  if (!d || !imdb || imdb[0] != 't') return 0;
-  size_t n = strcspn(imdb, ":");
-  if (n >= sizeof id) return 0;
-  memcpy(id, imdb, n); id[n] = 0;
+  TraktId tid;
+  if (!d || !imdb || traktid_resolver(imdb, &tid) < TID_IMDB) {
+    if (imdb && imdb[0]) { printf("[trakt] titulo com id local: o visto fica neste aparelho\n"); fflush(stdout); }
+    return 0;
+  }
+  tid.temporada = -1; tid.episodio = 0;
+  traktid_ids_json(&tid, ids, sizeof ids);
+  traktid_canonico(&tid, canon, sizeof canon);
+  if (visto && traktdup_tem(d->aut, canon)) {
+    printf("[trakt] %s ja no historico; nada duplicado\n", canon);
+    fflush(stdout);
+    return 1;
+  }
   HistoricoPedido p = { .sessao = d->sessao, .mapa = d->mapa, .credencial = d->credencial };
   snprintf(p.aut, sizeof p.aut, "%s", d->aut);
   snprintf(p.chave, sizeof p.chave, "%s", d->chave);
   if (!cabecalhosCongelados(p, cab, aut, sizeof aut, chave, sizeof chave)) return 0;
-  snprintf(corpo, sizeof corpo, "{\"%s\":[{\"ids\":{\"imdb\":\"%s\"}}]}",
-           tipo && !strcmp(tipo, "series") ? "shows" : "movies", id);
-  snprintf(url, sizeof url, "https://api.trakt.tv/sync/history%s", visto ? "" : "/remove");
-  char *r = rede_postar_st(url, 20, cab, corpo, &st);
+  snprintf(corpo, sizeof corpo, "{\"%s\":[{\"ids\":{%s}}]}",
+           tipo && !strcmp(tipo, "series") ? "shows" : "movies", ids);
+  trakt_url(url, sizeof url, visto ? "/sync/history" : "/sync/history/remove");
+  char *r = trakt_postar(url, cab, corpo, &st);
   int ok = r && st >= 200 && st < 300;
   free(r);
+  if (ok) { if (visto) traktdup_por(d->aut, canon); else traktdup_tirar(d->aut, canon); }
   return ok;
 }
 
@@ -2442,12 +2485,21 @@ static int scrFioVivo;
 
 static void enviarScrobble(int acao, const TraktScrobbleAlvo *alvo, double pct, HistoricoPedido pedido) {
   const char *cab[4];
-  char aut[200], chave[140], corpo[400], url[64], *r;
+  char aut[200], chave[140], corpo[400], url[200], *r;
   int status = 0;
   if (!cabecalhosCongelados(pedido, cab, aut, sizeof aut, chave, sizeof chave)) return;
   scrobble_corpo_alvo(corpo, sizeof corpo, alvo, pct);
-  snprintf(url, sizeof url, "https://api.trakt.tv/scrobble/%s", scrobble_nome(acao));
-  r = rede_postar_st(url, 20, cab, corpo, &status);
+  if (!corpo[0]) return;   // no Trakt identity: nothing is sent
+  {
+    char caminho[40];
+    snprintf(caminho, sizeof caminho, "/scrobble/%s", scrobble_nome(acao));
+    trakt_url(url, sizeof url, caminho);
+  }
+  r = trakt_postar(url, cab, corpo, &status);
+  // A finished scrobble (stop >= 80%) IS a play in the history: remember it,
+  // so a later "mark watched" does not add a second one. 409 = Trakt already
+  // has this scrobble.
+  if (acao == SCR_STOP && pct >= 80.0 && ((status >= 200 && status < 300) || status == 409)) traktdup_por(pedido.aut, alvo->id);
   // O log NUNCA leva o token. rede_postar devolvia corpo nao nulo tambem em
   // 401/422, e o log antigo dizia "ok" para isso: o erro ficava invisivel.
   if (status >= 200 && status < 300)
@@ -2493,6 +2545,20 @@ int trakt_scrobble_alvo(int evento, const TraktScrobbleAlvo *alvo, double posSeg
   double pct;
   pthread_t t;
   (void)assistiu;
+  TraktScrobbleAlvo canonAlvo;
+  if (alvo && alvo->id[0]) {
+    TraktId tid;
+    if (traktid_resolver(alvo->id, &tid) >= TID_IMDB) {
+      canonAlvo = *alvo;
+      traktid_canonico(&tid, canonAlvo.id, sizeof canonAlvo.id);
+      alvo = &canonAlvo;
+    } else if (alvo->tvdbEp <= 0) {
+      // Provider-local (IPTV not yet resolved, personal servers...): the
+      // progress stays on this TV; nothing goes to Trakt as if it were IMDb.
+      if (evento == SCR_EV_TOCANDO) { printf("[trakt] item com id local: scrobble fica neste aparelho\n"); fflush(stdout); }
+      return recusar(evento);
+    }
+  }
   const char *imdb = alvo ? alvo->id : NULL;
   if (!ligado || !imdb || !*imdb || !isfinite(posSeg) || !isfinite(durSeg) ||
       !isfinite(assistidoSeg) || durSeg < 120.0) return recusar(evento);
@@ -2565,7 +2631,8 @@ void trakt_marcar(const char *imdb, double posSeg, double durSeg, double assisti
 // ci->naLista ja e preenchido por trakt_lista na descoberta; o que faltava era
 // manter esse campo em dia depois de uma escrita nossa.
 typedef struct {
-  char id[24], tipo[8]; int adicionar; HistoricoPedido pedido;
+  char id[48], tipo[8]; int adicionar; HistoricoPedido pedido;
+  char local[64];   // the catalog's own id (local watched mark); id is the canonical Trakt one
 } ComandoTracker;
 static int fioListaVivo, fioHistVivo;
 static uint64_t listaSessao, histSessao;
@@ -2587,14 +2654,22 @@ static void *enviarComando(void *u, int historico) {
   const char *cab[4]; char aut[200], chave[140], url[120], corpo[200];
   int status = 0, confirmado = 0; char *resp = NULL;
   if (cabecalhosCongelados(a->pedido, cab, aut, sizeof aut, chave, sizeof chave)) {
-    snprintf(corpo, sizeof corpo, "{\"%s\":[{\"ids\":{\"imdb\":\"%s\"}}]}",
-             !strcmp(a->tipo, "series") ? "shows" : "movies", a->id);
-    snprintf(url, sizeof url, "https://api.trakt.tv/sync/%s%s",
-             historico ? "history" : "watchlist", a->adicionar ? "" : "/remove");
-    resp = rede_postar_st(url, 20, cab, corpo, &status);
+    TraktId tid;
+    char ids[64], caminho[48];
+    traktid_resolver(a->id, &tid);
+    traktid_ids_json(&tid, ids, sizeof ids);
+    snprintf(corpo, sizeof corpo, "{\"%s\":[{\"ids\":{%s}}]}",
+             !strcmp(a->tipo, "series") ? "shows" : "movies", ids);
+    snprintf(caminho, sizeof caminho, "/sync/%s%s", historico ? "history" : "watchlist", a->adicionar ? "" : "/remove");
+    trakt_url(url, sizeof url, caminho);
+    if (historico && a->adicionar && traktdup_tem(a->pedido.aut, a->id)) {
+      status = 200;   // already in the history through this app: not a second play
+      printf("[trakt] %s ja no historico; nada duplicado\n", a->id);
+    } else resp = trakt_postar(url, cab, corpo, &status);
     confirmado = status >= 200 && status < 300;
+    if (historico && confirmado) { if (a->adicionar) traktdup_por(a->pedido.aut, a->id); else traktdup_tirar(a->pedido.aut, a->id); }
     if (historico && confirmado)
-      confirmado = historicoDefinirPedido(a->id, a->tipo, a->adicionar, a->pedido);
+      confirmado = historicoDefinirPedido(a->local, a->tipo, a->adicionar, a->pedido);
   }
   if (pedidoCredTravar(a->pedido)) {
     pthread_mutex_t *travaOp = historico ? &travaHistorico : &travaLista;
@@ -2617,7 +2692,15 @@ static int iniciarComando(const char *imdb, const char *tipo, int adicionar, int
   ComandoTracker *a;
   pthread_mutex_t *travaOp = historico ? &travaHistorico : &travaLista;
   volatile int *estado = historico ? &historicoEstado : &listaEstado;
-  if (!imdb || imdb[0] != 't') { estadoEscrever(estado, TK_OP_FALHA); return 0; }
+  TraktId tid;
+  char canon[48];
+  if (!imdb || traktid_resolver(imdb, &tid) < TID_IMDB) {
+    if (imdb && imdb[0]) { printf("[trakt] id local: nao vai ao Trakt\n"); fflush(stdout); }
+    estadoEscrever(estado, TK_OP_FALHA);
+    return 0;
+  }
+  tid.temporada = -1; tid.episodio = 0;
+  traktid_canonico(&tid, canon, sizeof canon);
   a = calloc(1, sizeof *a); if (!a) return 0;
   a->pedido = historicoPedido();
   if (!a->pedido.aut[0] || !pedidoTravar(a->pedido)) { free(a); return 0; }
@@ -2627,8 +2710,12 @@ static int iniciarComando(const char *imdb, const char *tipo, int adicionar, int
   if (*vivo && *sessao == a->pedido.sessao) {
     pthread_mutex_unlock(travaOp); pedidoDestravar(); free(a); return 0;
   }
-  size_t k = strcspn(imdb, ":"); if (k >= sizeof a->id) k = sizeof a->id - 1;
-  memcpy(a->id, imdb, k); a->id[k] = 0;
+  snprintf(a->id, sizeof a->id, "%s", canon);
+  {
+    size_t k = !strncmp(imdb, "qv:", 3) ? strlen(imdb) : strcspn(imdb, ":");
+    if (!strncmp(imdb, "tmdb:", 5) || !strncmp(imdb, "tvdb:", 5)) k = 5 + strcspn(imdb + 5, ":");
+    snprintf(a->local, sizeof a->local, "%.*s", (int)k, imdb);
+  }
   snprintf(a->tipo, sizeof a->tipo, "%s", tipo_item(tipo, imdb)); a->adicionar = adicionar;
   *vivo = 1; *sessao = a->pedido.sessao; estadoEscrever(estado, TK_OP_PENDENTE);
   int ok = pthread_create(&fio, NULL, historico ? enviarHistorico : enviarLista, a) == 0;
@@ -2683,7 +2770,11 @@ static void *enviarNota(void *u) {
   int status = 0;
   if (!cabecalhosCongelados(a->pedido, cab, aut, sizeof aut, chave, sizeof chave)) { free(a); return NULL; }
   if (!trakt_nota_corpo(corpo, sizeof corpo, a->id, a->tipo, a->nota)) { free(a); return NULL; }
-  resp = rede_postar_st(a->nota ? "https://api.trakt.tv/sync/ratings" : "https://api.trakt.tv/sync/ratings/remove", 20, cab, corpo, &status);
+  {
+    char url[200];
+    trakt_url(url, sizeof url, a->nota ? "/sync/ratings" : "/sync/ratings/remove");
+    resp = trakt_postar(url, cab, corpo, &status);
+  }
   printf("[trakt] nota %d %s (%s) -> HTTP %d\n", a->nota, a->id, a->tipo, status);
   fflush(stdout);
   free(resp);
@@ -2695,6 +2786,10 @@ int trakt_avaliar(const char *imdb, const char *tipo, int nota) {
   AlvoNota *a;
   pthread_t f;
   char corpo[300];
+  char canon[48];
+  TraktId tid;
+  // A resolved local id rates its canonical IMDb title; otherwise nothing is sent.
+  if (imdb && traktid_resolver(imdb, &tid) == TID_IMDB && traktid_canonico(&tid, canon, sizeof canon)) imdb = canon;
   if (!ligado || !trakt_nota_corpo(corpo, sizeof corpo, imdb, tipo, nota)) return 0;
   a = (AlvoNota *)calloc(1, sizeof *a);
   if (!a) return 0;

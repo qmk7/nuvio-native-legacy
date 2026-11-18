@@ -6,7 +6,7 @@ cd "$ROOT"
 
 # Exercita o contrato de compilacao do escopo sem abrir SDL nem fazer rede.
 cc -Wall -Wextra -Werror -fsyntax-only \
-  src/ctxmenu.c src/catalogo.c src/trakt.c tests/stub_fichameta.c src/cwordem.c \
+  src/ctxmenu.c src/catalogo.c src/trakt.c src/traktid.c src/traktdup.c tests/stub_fichameta.c src/cwordem.c \
   -Isrc -I/opt/homebrew/include -I/opt/homebrew/include/SDL2 \
   -Wno-deprecated-declarations -Wno-macro-redefined
 
@@ -26,7 +26,7 @@ linha_espelho=$(rg -n 'cat_definir_na_lista\(atual, intencao\)' src/ctxmenu.c | 
 
 # Resposta nao nula sozinha nunca pode virar sucesso: o contrato exige HTTP
 # 2xx e usa a variante que devolve o status.
-rg -q 'rede_postar_st\(url, 20, cab, corpo, &status\)' src/trakt.c
+rg -q 'resp = trakt_postar\(url, cab, corpo, &status\)' src/trakt.c
 rg -q 'confirmado = status >= 200 && status < 300' src/trakt.c
 
 # A pressao longa continua pertencendo a home.c e chega ao modal via KEYUP.

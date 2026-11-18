@@ -107,6 +107,7 @@
 #include "ytapi.h"
 #include "mclfm.h"
 #include "mclrc.h"
+#include "traktdup.h"
 #include "trakt.h"
 #include "player.h"
 #include "retomamorna.h"
@@ -1781,6 +1782,8 @@ int main(int argc, char **argv) {
   // ... and the Music Center at local Last.fm / LRCLIB fixtures.
   if (getenv("QRT_LFM_BASE") && getenv("QRT_LFM_BASE")[0]) mclfm_definir_base(getenv("QRT_LFM_BASE"));
   if (getenv("QRT_LRCLIB_BASE") && getenv("QRT_LRCLIB_BASE")[0]) mclrc_definir_base(getenv("QRT_LRCLIB_BASE"));
+  // ... and Trakt's write/calendar paths at a local fixture.
+  if (getenv("QRT_TRAKT_BASE") && getenv("QRT_TRAKT_BASE")[0]) trakt_definir_base(getenv("QRT_TRAKT_BASE"));
 #endif
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);

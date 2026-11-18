@@ -13,6 +13,6 @@ if [ "${SANITIZE:-0}" = 1 ]; then
   flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer)
   if [ "$(uname -s)" = Darwin ]; then export ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}"; fi
 fi
-"${CC:-cc}" "${flags[@]}" src/trakt.c src/metaep.c tests/stub_fichameta.c src/js.c src/metaprov.c src/traktscrobble.c tests/trakt_season_meta.c \
+"${CC:-cc}" "${flags[@]}" src/trakt.c src/metaep.c tests/stub_fichameta.c src/js.c src/metaprov.c src/traktscrobble.c src/traktid.c src/traktdup.c tests/trakt_season_meta.c \
   -Isrc -o "$dir/teste" -lpthread
 "$dir/teste" | grep -E 'trakt_season_meta|PASS'

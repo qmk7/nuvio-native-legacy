@@ -72,3 +72,18 @@ qrtime_mclfm
 qrtime_mcspotify
 qrtime_music_ui:1100
 qrtime_music_extras:900
+
+# Trakt and Agenda (phase 7) + the existing Trakt/Agenda tests that run on Linux
+qrtime_traktid
+qrtime_trakt_sync
+qrtime_agenda7:900
+trakt_alvos512
+trakt_scrobble
+trakt_scrobble_ids
+trakt_contracts
+trakt_episode_identity_512
+trakt_filmes_vistos
+traktauth
+traktauth_429
+agenda:900
+atualizacao_agenda:900

@@ -9,6 +9,6 @@ case "$(uname -s)" in
   *) flags+=(-Wl,--gc-sections) ;;
 esac
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-cc "${flags[@]}" src/trakt.c tests/stub_fichameta.c src/js.c src/metaep.c src/traktscrobble.c src/metaprov.c \
+cc "${flags[@]}" src/trakt.c tests/stub_fichameta.c src/js.c src/metaep.c src/traktscrobble.c src/traktid.c src/traktdup.c src/metaprov.c \
   src/proximo.c tests/trakt_episode_identity_512.c -lpthread -o "$dir/teste"
 for modo in normal missing duplicate offline mapped; do "$dir/teste" "$modo"; done

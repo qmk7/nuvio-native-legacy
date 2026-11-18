@@ -98,11 +98,30 @@ int visto_episodios_ja(const char *imdb, const char *tipo, const VistoPar *pares
   return ok;
 }
 
+// A provider-local id (IPTV VOD "qv:...") whose canonical IMDb title TMDB
+// confirmed goes to TRAKT ONLY, as that IMDb id; unresolved, or a personal
+// server id: nothing leaves this TV. Returns the id to use, or NULL.
+#include "traktid.h"
+#pragma weak traktid_resolver
+#pragma weak traktid_canonico
+static const char *idParaRastreadores(const char *imdb, int *destinos, char *buf, size_t n) {
+  TraktId t;
+  if (!jfid_e(imdb)) return imdb;
+  if (!(*destinos & VISTO_TRAKT) || !traktid_resolver || traktid_resolver(imdb, &t) != TID_IMDB) return NULL;
+  t.temporada = -1; t.episodio = 0;
+  if (!traktid_canonico(&t, buf, n)) return NULL;
+  *destinos = VISTO_TRAKT;
+  printf("[visto] id local resolvido para o Trakt: %s\n", buf);
+  fflush(stdout);
+  return buf;
+}
 int visto_titulo_ja(const char *imdb, const char *tipo, const int *temporadas,
                     int nt, int visto, int destinos) {
   int ok = 1;
+  char canon[48];
   if (!imdb || !imdb[0]) return 0;
-  if (jfid_e(imdb)) return 0;   // personal-library ids (server, IPTV) stay on this TV
+  // Personal-library ids stay on this TV, unless an IPTV item resolved to its IMDb title (Trakt only).
+  if (!(imdb = idParaRastreadores(imdb, &destinos, canon, sizeof canon))) return 0;
   NvPerfilSessao sessao = nv_perfil_sessao_ler();
   if (!nv_perfil_sessao_travar(sessao)) return 0;
   long long ms = contapend_gesto(imdb, tipo, NULL, 0, visto, destinos, temporadas, nt);
@@ -197,7 +216,10 @@ static void capturarDestinos(Envio *e) { // caller holds the profile opening gat
 }
 static int episodiosEnviar(int indice, const char *imdb, const char *tipo,
                            const VistoPar *pares, int n, int visto, int destinos) {
+  char canon[48];
   if (!imdb || !imdb[0] || !pares || n < 1) return 0;
+  if (!(imdb = idParaRastreadores(imdb, &destinos, canon, sizeof canon))) return 0;
+  if (imdb == canon) indice = -1;   // the catalog row is the local item; its TVDB ids do not apply
   if (n > VT_LOTE) n = VT_LOTE;
   NvPerfilSessao sessao = nv_perfil_sessao_ler();
   if (!nv_perfil_sessao_travar(sessao)) return 0;
@@ -250,8 +272,10 @@ int visto_episodios_item(int indice, const char *imdb, const char *tipo,
 }
 int visto_titulo(const char *imdb, const char *tipo, const int *temporadas,
                  int nt, int visto, int destinos) {
+  char canon[48];
   if (!imdb || !imdb[0]) return 0;
-  if (jfid_e(imdb)) return 0;   // personal-library ids (server, IPTV) stay on this TV
+  // Personal-library ids stay on this TV, unless an IPTV item resolved to its IMDb title (Trakt only).
+  if (!(imdb = idParaRastreadores(imdb, &destinos, canon, sizeof canon))) return 0;
   NvPerfilSessao sessao = nv_perfil_sessao_ler();
   if (!nv_perfil_sessao_travar(sessao)) return 0;
   vistoep_titulo_gesto(imdb, visto);

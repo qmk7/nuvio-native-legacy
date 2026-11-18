@@ -9,7 +9,7 @@ case "$(uname -s)" in
   *) flags+=(-Wl,--gc-sections) ;;
 esac
 if [ "${SANITIZE:-0}" = 1 ]; then flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer); fi
-"${CC:-cc}" "${flags[@]}" -DNV_DUBLE_SESSAO src/trakt.c src/traktscrobble.c \
+"${CC:-cc}" "${flags[@]}" -DNV_DUBLE_SESSAO src/trakt.c src/traktscrobble.c src/traktid.c src/traktdup.c \
   src/metaep.c src/js.c src/jsw.c tests/stub_fichameta.c tests/trakt_contracts.c \
   -Isrc -o "$dir/teste" -lpthread
 "$dir/teste"

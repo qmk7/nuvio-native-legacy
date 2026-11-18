@@ -854,7 +854,7 @@ static void alternarLembrete(void) {
 //   Marcar ... como assistido os lancados que o mapa ainda nao tem como vistos
 //   Lembrar-me / Desligar      so quando da para ligar, ou quando esta ligado
 //                              (um lembrete de data vencida tem de poder sair)
-enum { AC_ASSISTIR, AC_ABRIR, AC_NOTICIAS, AC_VISTOS, AC_LEMBRETE, AC_N };
+enum { AC_ASSISTIR, AC_ABRIR, AC_NOTICIAS, AC_VISTOS, AC_LEMBRETE, AC_SEGUIR, AC_N };
 
 #define AG_HIST_VIS 6
 
@@ -883,6 +883,7 @@ static void montaModal(const AgItem *it, AgModal *m) {
   m->ac[m->nAc++] = AC_NOTICIAS;
   if (m->naoVistos > 0) m->ac[m->nAc++] = AC_VISTOS;
   if (it->lembrete || agenda_pode_lembrar(it->imdb)) m->ac[m->nAc++] = AC_LEMBRETE;
+  if (!strncmp(it->imdb, "tt", 2)) m->ac[m->nAc++] = AC_SEGUIR;
 }
 
 static char pediuTocarId[40];
@@ -948,6 +949,10 @@ static void acaoModal(int ac) {
       break;
     case AC_VISTOS:
       marcarVistos(it, &m);
+      break;
+    case AC_SEGUIR:
+      // Stays open: the label flips in front of the person (the confirmation).
+      agenda_seguir(it->imdb, it->titulo, it->poster, !agenda_segue(it->imdb));
       break;
     case AC_LEMBRETE:
       // O modal FICA aberto: o titulo do historico ("Lancados desde o
@@ -1590,7 +1595,11 @@ static void desenhaEsquerda(const AgC1 *L, float a) {
         snprintf(dl, sizeof dl, "%s %d/%d", sem, d, m);
       else snprintf(dl, sizeof dl, "%s %d", sem, d);
       agenda_falta(it->dataProx, falta, sizeof falta);
-      snprintf(cru, sizeof cru, falta[0] ? "%s \xc2\xb7 %s" : "%s", dl, falta);
+      snprintf(cru, sizeof cru, falta[0] ? "%s \xc2\xb7 %s \xc2\xb7 %s" : "%s \xc2\xb7 %s", dl, falta[0] ? falta : i18n(agenda_confianca_rotulo(agenda_confianca(it))),
+               i18n(agenda_confianca_rotulo(agenda_confianca(it))));
+    } else if (it->dataProx[0] && strlen(it->dataProx) < 10) {
+      // A partial date from the provider ("2027", "2027-03"): shown as given, estimated.
+      snprintf(cru, sizeof cru, "%s %s \xc2\xb7 %s", i18n("Previsto para"), it->dataProx, i18n("Data estimada"));
     } else {
       // A situacao ja esta no selo da arte: aqui vai o que ela significa.
       snprintf(cru, sizeof cru, "%s", i18n("Sem data prevista"));
@@ -1613,6 +1622,18 @@ static void desenhaEsquerda(const AgC1 *L, float a) {
     if (buf[0]) {
       txC1(TXT_V2_24, 24, buf, AG_INK2, L->x0, y, 24.0f, w, a);
       y += hC1(TXT_V2_24, 24, 24.0f, 179) + P(12);
+    }
+    // QR TIME: the next episodes from the account's Trakt calendar, at local time.
+    { AgEpCal prox[4];
+      int np = agenda_proximos(it->imdb, prox, 4);
+      if (np > 1) {
+        size_t k = (size_t)snprintf(buf, sizeof buf, "%s:", i18n("Próximos (Trakt)"));
+        for (int i = 0; i < np && k < sizeof buf; i++)
+          k += (size_t)snprintf(buf + k, sizeof buf - k, "%s T%dE%d %d/%d %s", i ? " \xc2\xb7" : "", prox[i].temp, prox[i].ep,
+                                agenda_dia(prox[i].data), agenda_mes(prox[i].data), prox[i].hora);
+        txC1(TXT_V2_24, 20, buf, AG_INK3, L->x0, y, 21.0f, w, a);
+        y += hC1(TXT_V2_24, 20, 21.0f, 179) + P(10);
+      }
     } }
 
   // A sinopse (21, ate 3 linhas) e, quando ha, a ultima manchete como citacao
@@ -2065,6 +2086,8 @@ static const char *rotuloAcao(const AgItem *it, const AgModal *m, int ac,
       return buf;
     case AC_LEMBRETE:
       return it->lembrete ? i18n("Desligar o lembrete") : i18n("Lembrar-me");
+    case AC_SEGUIR:
+      return agenda_segue(it->imdb) ? i18n("Deixar de seguir") : i18n("Seguir esta série");
   }
   return "";
 }

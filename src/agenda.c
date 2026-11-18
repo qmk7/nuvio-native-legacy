@@ -10,6 +10,7 @@
 #include "metaprov.h"
 #include "js.h"
 #include "trakt.h"
+#include "traktdup.h"
 #include "vistoep.h"
 #include "addons.h"
 #include "streams.h"
@@ -1003,6 +1004,197 @@ static void poe(const char *imdb, const char *titulo, const char *poster) {
   it->lembrete = agenda_lembrete(id);
 }
 
+// ---------------------------------------------------------------- QR TIME: follows + Trakt calendar
+typedef struct { char imdb[24], titulo[160], poster[NV_ARTE_URL_MAX]; } AgSeguida;
+static AgSeguida seguidas[AG_MAX];
+static int nSeguidas, seguidasPerfil = -1;
+#define AG_CAL_MAX 300
+static AgEpCal cal[AG_CAL_MAX];
+static int nCal;
+static time_t calQuando;
+static void seguidasArq(char *d, size_t n) { int p = perfis_ativo(); snprintf(d, n, "agenda-follows-p%d.txt", p > 0 ? p : 1); }
+// trava held.
+static void seguidasGarantir(void) {
+  char nome[40], *t, *l, *sp;
+  if (seguidasPerfil == perfis_ativo()) return;
+  seguidasPerfil = perfis_ativo();
+  nSeguidas = 0;
+  nCal = 0; calQuando = 0;   // the calendar belongs to the profile's Trakt account
+  seguidasArq(nome, sizeof nome);
+  t = dados_ler(nome);
+  for (l = t ? strtok_r(t, "\n", &sp) : NULL; l && nSeguidas < AG_MAX; l = strtok_r(NULL, "\n", &sp)) {
+    char *c1 = strchr(l, '\t'), *c2 = c1 ? strchr(c1 + 1, '\t') : NULL;
+    AgSeguida *g = &seguidas[nSeguidas];
+    if (!c1) continue;
+    *c1 = 0;
+    if (c2) *c2 = 0;
+    if (strncmp(l, "tt", 2)) continue;
+    snprintf(g->imdb, sizeof g->imdb, "%s", l);
+    snprintf(g->titulo, sizeof g->titulo, "%s", c1 + 1);
+    snprintf(g->poster, sizeof g->poster, "%s", c2 ? c2 + 1 : "");
+    nSeguidas++;
+  }
+  free(t);
+}
+static void seguidasGravar(void) {
+  char nome[40];
+  size_t cap = 64 + (size_t)nSeguidas * (24 + 160 + NV_ARTE_URL_MAX + 4), k = 0;
+  char *t = malloc(cap);
+  if (!t) return;
+  t[0] = 0;
+  for (int i = 0; i < nSeguidas; i++) k += (size_t)snprintf(t + k, cap - k, "%s\t%s\t%s\n", seguidas[i].imdb, seguidas[i].titulo, seguidas[i].poster);
+  seguidasArq(nome, sizeof nome);
+  if (nSeguidas) dados_gravar(nome, t); else dados_apagar(nome);
+  free(t);
+}
+static void limpoCampo(const char *s, char *d, size_t n) {
+  size_t k = 0;
+  for (; s && *s && k + 1 < n; s++) d[k++] = (*s == '\t' || *s == '\n' || *s == '\r') ? ' ' : *s;
+  d[k] = 0;
+}
+int agenda_segue(const char *imdb) {
+  int r = 0;
+  if (!imdb || !imdb[0]) return 0;
+  pthread_mutex_lock(&trava);
+  seguidasGarantir();
+  for (int i = 0; i < nSeguidas && !r; i++) r = !strcmp(seguidas[i].imdb, imdb);
+  pthread_mutex_unlock(&trava);
+  return r;
+}
+int agenda_seguir(const char *imdb, const char *titulo, const char *poster, int liga) {
+  int i, r;
+  // IMDb ids only: the Agenda's sources (TMDB find, Trakt, Cinemeta) key on them.
+  if (!imdb || strncmp(imdb, "tt", 2) || strlen(imdb) > 12) return 0;
+  pthread_mutex_lock(&trava);
+  seguidasGarantir();
+  for (i = 0; i < nSeguidas && strcmp(seguidas[i].imdb, imdb); i++) {}
+  if (liga && i == nSeguidas && nSeguidas < AG_MAX) {
+    AgSeguida *g = &seguidas[nSeguidas++];
+    snprintf(g->imdb, sizeof g->imdb, "%s", imdb);
+    limpoCampo(titulo, g->titulo, sizeof g->titulo);
+    limpoCampo(poster, g->poster, sizeof g->poster);
+    seguidasGravar();
+  } else if (!liga && i < nSeguidas) {
+    memmove(&seguidas[i], &seguidas[i + 1], sizeof seguidas[0] * (size_t)(nSeguidas - i - 1));
+    nSeguidas--;
+    seguidasGravar();
+  }
+  for (i = 0, r = 0; i < nSeguidas && !r; i++) r = !strcmp(seguidas[i].imdb, imdb);
+  pthread_mutex_unlock(&trava);
+  printf("[agenda] %s %s\n", r ? "seguindo" : "deixou de seguir", imdb);
+  fflush(stdout);
+  return r;
+}
+int agenda_confianca(const AgItem *it) {
+  size_t l = it ? strlen(it->dataProx) : 0;
+  if (!l) return AG_DATA_DESCONHECIDA;
+  if (l < 10 || it->episodio <= 0) return AG_DATA_ESTIMADA;
+  return AG_DATA_CONFIRMADA;
+}
+const char *agenda_confianca_rotulo(int c) {
+  return c == AG_DATA_CONFIRMADA ? "Data confirmada" : c == AG_DATA_ESTIMADA ? "Data estimada" : "Data desconhecida";
+}
+static int cmpCal(const void *a, const void *b) {
+  long long x = ((const AgEpCal *)a)->instante, y = ((const AgEpCal *)b)->instante;
+  return x < y ? -1 : x > y;
+}
+int agenda_trakt_cal_parse(const char *corpo, AgEpCal *out, int max) {
+  const char *p = corpo ? strchr(corpo, '[') : NULL;
+  int n = 0;
+  if (!p) return -1;
+  for (p++; *p && n < max; ) {
+    const char *f, *ep, *epf, *sh, *shf, *ids, *idsf;
+    char cru[40] = "";
+    AgEpCal *c = &out[n];
+    long long ms;
+    while (*p && *p != '{' && *p != ']') p++;
+    if (*p != '{' || !(f = js_fim(p))) break;
+    memset(c, 0, sizeof *c);
+    js_texto_raiz_em(p, f, "first_aired", cru, sizeof cru);
+    ep = strstr(p, "\"episode\""); ep = ep && ep < f ? strchr(ep, '{') : NULL; epf = ep ? js_fim(ep) : NULL;
+    sh = strstr(p, "\"show\""); sh = sh && sh < f ? strchr(sh, '{') : NULL; shf = sh ? js_fim(sh) : NULL;
+    if (ep && epf && sh && shf) {
+      c->temp = (int)js_num(ep, epf, "season", 0.0);
+      c->ep = (int)js_num(ep, epf, "number", 0.0);
+      js_texto_raiz_em(ep, epf, "title", c->nome, sizeof c->nome);
+      js_texto_raiz_em(sh, shf, "title", c->titulo, sizeof c->titulo);
+      ids = strstr(sh, "\"ids\""); ids = ids && ids < shf ? strchr(ids, '{') : NULL; idsf = ids ? js_fim(ids) : NULL;
+      if (ids && idsf) js_texto(ids, idsf, "imdb", c->imdb, sizeof c->imdb);
+    }
+    ms = js_ms_iso(cru);
+    // Only an exact instant and an IMDb-identified show with a real episode.
+    if (ms > 0 && !strncmp(c->imdb, "tt", 2) && c->ep > 0) {
+      time_t t = (time_t)(ms / 1000);
+      struct tm tmv;
+      if (localtime_r(&t, &tmv)) {
+        snprintf(c->data, sizeof c->data, "%04d-%02d-%02d", tmv.tm_year + 1900, tmv.tm_mon + 1, tmv.tm_mday);
+        snprintf(c->hora, sizeof c->hora, "%02d:%02d", tmv.tm_hour, tmv.tm_min);
+        c->instante = ms;
+        n++;
+      }
+    }
+    p = f + 1;
+  }
+  qsort(out, (size_t)n, sizeof *out, cmpCal);
+  return n;
+}
+int agenda_proximos(const char *imdb, AgEpCal *out, int max) {
+  int n = 0;
+  pthread_mutex_lock(&trava);
+  seguidasGarantir();
+  for (int i = 0; i < nCal && n < max; i++) if (!strcmp(cal[i].imdb, imdb)) out[n++] = cal[i];
+  pthread_mutex_unlock(&trava);
+  return n;
+}
+// Worker: read the account's calendar and give each show its earliest upcoming
+// episode at the exact local date (Trakt's own data wins over the guesses).
+#pragma weak trakt_url   // agenda tests link without the Trakt write helpers
+static char *baixar(const char *url, const char *const *cab, int *st);
+static void calendarioTrakt(const char *hoje) {
+  const char *cab[4];
+  char aut[200], chave[140], url[220], caminho[80];
+  AgEpCal *v;
+  char *corpo;
+  int st = 0, n;
+  if (!trakt_ativo() || !trakt_cabecalhos(cab, aut, sizeof aut, chave, sizeof chave)) return;
+  // One day before today: an episode at 02:00 UTC "tomorrow" can be tonight here.
+  { int y, m, d; struct tm t0; time_t tt;
+    if (sscanf(hoje, "%d-%d-%d", &y, &m, &d) != 3) return;
+    memset(&t0, 0, sizeof t0); t0.tm_year = y - 1900; t0.tm_mon = m - 1; t0.tm_mday = d - 1; t0.tm_hour = 12;
+    tt = mktime(&t0); localtime_r(&tt, &t0);
+    snprintf(caminho, sizeof caminho, "/calendars/my/shows/%04d-%02d-%02d/33", t0.tm_year + 1900, t0.tm_mon + 1, t0.tm_mday); }
+  if (trakt_url) trakt_url(url, sizeof url, caminho);
+  else snprintf(url, sizeof url, "https://api.trakt.tv%s", caminho);
+  corpo = baixar(url, cab, &st);
+  memset(aut, 0, sizeof aut);
+  if (!corpo) { printf("[agenda] calendario do Trakt: sem resposta (http %d)\n", st); fflush(stdout); return; }
+  v = calloc(AG_CAL_MAX, sizeof *v);
+  n = v ? agenda_trakt_cal_parse(corpo, v, AG_CAL_MAX) : -1;
+  free(corpo);
+  if (n < 0) { free(v); return; }
+  { int k = 0;   // past episodes (yesterday's window) out
+    for (int i = 0; i < n; i++) if (strcmp(v[i].data, hoje) >= 0) v[k++] = v[i];
+    n = k; }
+  pthread_mutex_lock(&trava);
+  memcpy(cal, v, sizeof *v * (size_t)n);
+  nCal = n;
+  calQuando = time(NULL);
+  pthread_mutex_unlock(&trava);
+  for (int i = 0; i < n; i++) {
+    const AgItem *r;
+    int primeiro = 1;
+    for (int j = 0; j < i; j++) if (!strcmp(v[j].imdb, v[i].imdb)) primeiro = 0;
+    if (!primeiro) continue;
+    r = agenda_registro(v[i].imdb);
+    if (!r || !r->dataProx[0] || strcmp(v[i].data, r->dataProx) < 0 || strcmp(r->dataProx, hoje) < 0 ||
+        (!strcmp(v[i].data, r->dataProx) && r->episodio <= 0))
+      agenda_registrar(v[i].imdb, v[i].titulo, "", "", v[i].temp, v[i].ep, v[i].nome, v[i].data, "");
+  }
+  printf("[agenda] calendario do Trakt: %d episodio(s) nos proximos 33 dias\n", n);
+  fflush(stdout);
+  free(v);
+}
+
 int agenda_montar(void) {
   int i, n;
   nLista = 0;
@@ -1029,6 +1221,16 @@ int agenda_montar(void) {
       ci = idc >= 0 ? cat_item(idc) : NULL;
       poe(regs[k].contentId, ci ? ci->titulo : NULL, ci ? ci->poster : NULL);
     } }
+
+  // 2b. QR TIME: series followed on their own, and the shows of the Trakt calendar.
+  { char ids[AG_MAX][24], tits[AG_MAX][160];
+    int k, q = 0;
+    pthread_mutex_lock(&trava);
+    seguidasGarantir();
+    for (k = 0; k < nSeguidas && q < AG_MAX; k++) { snprintf(ids[q], 24, "%s", seguidas[k].imdb); snprintf(tits[q], 160, "%s", seguidas[k].titulo); q++; }
+    for (k = 0; k < nCal && q < AG_MAX; k++) { snprintf(ids[q], 24, "%s", cal[k].imdb); snprintf(tits[q], 160, "%s", cal[k].titulo); q++; }
+    pthread_mutex_unlock(&trava);
+    for (k = 0; k < q && nLista < AG_MAX; k++) poe(ids[k], tits[k][0] ? tits[k] : NULL, NULL); }
 
   // 3. Series que so o CACHE conhece (o catalogo ainda nao publicou, ou o
   //    titulo saiu da lista mas o lembrete continua). Um lembrete que some da
@@ -1196,6 +1398,25 @@ static int tmdbLer(AgBusca *b, const char *corpo) {
         js_texto(o, of, "still_path", sp, sizeof sp);
         if (sp[0] == '/')
           snprintf(b->fundo, sizeof b->fundo, "https://image.tmdb.org/t/p/w780%s", sp); }
+    }
+  }
+  // No next episode listed, but an upcoming SEASON with its own air_date: the
+  // provider's season date, kept as such (episode 0 = not an episode date).
+  if (!b->dataProx[0]) {
+    const char *se = js_array(corpo, fim, "seasons");
+    const char *hoje = agenda_hoje();
+    while (se && *se == '{') {
+      const char *sf = js_fim(se);
+      char ad[16] = "";
+      int num;
+      if (!sf) break;
+      js_texto_raiz_em(se, sf, "air_date", ad, sizeof ad);
+      num = (int)js_num(se, sf, "season_number", 0.0);
+      if (num > 0 && ad[0] && strcmp(ad, hoje) >= 0 && (!b->dataProx[0] || strcmp(ad, b->dataProx) < 0)) {
+        snprintf(b->dataProx, sizeof b->dataProx, "%s", ad);
+        b->temp = num; b->ep = 0;
+      }
+      se = js_prox(sf);
     }
   }
   bl = strstr(corpo, "\"last_episode_to_air\"");
@@ -1555,6 +1776,7 @@ static long filaTmdb[AG_MAX];
 static int  nFila;
 static char filaHoje[12];
 static int  versaoFio;
+static int  filaCalendario;
 
 static void *fioAgenda(void *arg) {
   int i;
@@ -1566,6 +1788,7 @@ static void *fioAgenda(void *arg) {
   // no Cinemeta como antes.
   const char *chave = desc_chave_tmdb_reserva();
   (void)arg;
+  if (filaCalendario) calendarioTrakt(filaHoje);
   for (i = 0; i < nFila; i++)
     buscarSerie(filaImdb[i], filaTit[i], filaPoster[i], filaTmdb[i], chave, filaHoje);
   pthread_mutex_lock(&trava);
@@ -1598,9 +1821,14 @@ void agenda_atualizar_seguidas(void) {
     filaTmdb[nFila] = ci ? ci->tmdb : 0;
     nFila++;
   }
+  // The Trakt calendar every 3 h (connected only).
+  pthread_mutex_lock(&trava);
+  seguidasGarantir();
+  filaCalendario = trakt_ativo() && time(NULL) - calQuando > 3 * 3600;
+  pthread_mutex_unlock(&trava);
   // Nada a buscar = nenhum fio. Tambem e o que mantem as capturas (cache todo
   // "fresco") longe da rede.
-  if (!nFila) return;
+  if (!nFila && !filaCalendario) return;
   pthread_mutex_lock(&trava);
   fioVivo = 1;
   pthread_mutex_unlock(&trava);

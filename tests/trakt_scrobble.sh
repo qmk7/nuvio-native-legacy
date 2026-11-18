@@ -11,5 +11,5 @@ if [ "${SANITIZE:-0}" = 1 ]; then
   flags+=(-fsanitize=address,undefined -fno-omit-frame-pointer)
   if [ "$(uname -s)" = Darwin ]; then export ASAN_OPTIONS="${ASAN_OPTIONS:-detect_leaks=0}"; fi
 fi
-"${CC:-cc}" "${flags[@]}" src/traktscrobble.c src/metaep.c src/js.c tests/trakt_scrobble.c -Isrc -o "$dir/teste"
+"${CC:-cc}" "${flags[@]}" src/traktscrobble.c src/traktid.c src/traktdup.c src/metaep.c src/js.c tests/trakt_scrobble.c -Isrc -o "$dir/teste"
 "$dir/teste"

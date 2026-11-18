@@ -81,9 +81,15 @@ static void manual(void) {
   assert(trakt_episodios_marcar_alvos_destino(&d, "tt21975436", alvos, 1, 0));
   assert(calls == 5 && strstr(urls[4], "/sync/history/remove"));
   assert(!strcmp(bodies[4], "{\"episodes\":[{\"ids\":{\"tvdb\":10567809}}]}"));
+  // S2E2 is already in B's history (call 4): marking it again adds no second play.
   assert(trakt_episodios_marcar_destino(&d, "tt21975436", &legado, 1, 1));
-  assert(calls == 6 && !strstr(bodies[5], "\"tvdb\""));
-  assert(!strcmp(bodies[5], "{\"shows\":[{\"ids\":{\"imdb\":\"tt21975436\"},"
+  assert(calls == 5);
+  // Unwatched, then watched again: the legacy (numeric) body goes out.
+  assert(trakt_episodios_marcar_destino(&d, "tt21975436", &legado, 1, 0));
+  assert(calls == 6 && strstr(urls[5], "/sync/history/remove"));
+  assert(trakt_episodios_marcar_destino(&d, "tt21975436", &legado, 1, 1));
+  assert(calls == 7 && !strstr(bodies[6], "\"tvdb\""));
+  assert(!strcmp(bodies[6], "{\"shows\":[{\"ids\":{\"imdb\":\"tt21975436\"},"
     "\"seasons\":[{\"number\":2,\"episodes\":[{\"number\":2}]}]}]}"));
 }
 
