@@ -301,7 +301,8 @@ int rede_pedir(const RedePedido *p, RedeResposta *r) {
     { /* #290: servidor pessoal so na propria origem (ver tls_pessoal em rede.h). */
       char aqui[300];
       int tlsAqui = 0, pessoal = p->tls_pessoal &&
-        pedidoOrigem(url, aqui, sizeof aqui, &tlsAqui) && tlsAqui && !strcmp(aqui, origemPessoal);
+        pedidoOrigem(url, aqui, sizeof aqui, &tlsAqui) && tlsAqui && !strcmp(aqui, origemPessoal)
+        && rede_host_privado(url);   /* QR TIME: never for a public host */
       PEDIDO_OPT(OPT_SSL_VERIFYPEER, pessoal ? 0L : 1L);
       PEDIDO_OPT(OPT_SSL_VERIFYHOST, pessoal ? 0L : 2L);
     }

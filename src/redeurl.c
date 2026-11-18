@@ -176,3 +176,39 @@ const char *rede_url_log(const char *url, char *dst, unsigned tam) {
 #undef RL_POE
   return dst;
 }
+
+// ---------------------------------------------------------------------------
+// QR TIME phase 8: free text (a media-pipeline payload, an error message)
+// with every http(s) link inside reduced to rede_url_publica (scheme + host,
+// no userinfo, path or query). JSON-escaped links ("https:\/\/h\/...") are
+// recognized too. Always NUL-terminates; output is truncated, never overrun.
+const char *rede_texto_redigido(const char *txt, char *dst, unsigned tam) {
+  unsigned o = 0;
+  const char *p = txt;
+  if (!dst || !tam) return "";
+  dst[0] = 0;
+  if (!txt) return dst;
+  while (*p && o + 1 < tam) {
+    int esc = 0;
+    if (!strncasecmp(p, "https://", 8) || !strncasecmp(p, "http://", 7)) esc = 0;
+    else if (!strncasecmp(p, "https:\\/\\/", 10) || !strncasecmp(p, "http:\\/\\/", 9)) esc = 1;
+    else { dst[o++] = *p++; continue; }
+    {
+      char url[2048], pub[300];
+      unsigned n = 0;
+      const char *q = p;
+      while (*q && !isspace((unsigned char)*q) && *q != '"' && *q != '\'' && *q != '<' && *q != '>' &&
+             *q != ',' && *q != '}' && *q != ']' && !(q[0] == '\\' && q[1] == '"')) {
+        if (esc && q[0] == '\\' && q[1] == '/') q++;   // "\/" -> "/"
+        if (n + 1 < sizeof url) url[n++] = *q;
+        q++;
+      }
+      url[n] = 0;
+      rede_url_publica(url, pub, sizeof pub);
+      for (const char *s = pub; *s && o + 1 < tam; s++) dst[o++] = *s;
+      p = q;
+    }
+  }
+  dst[o] = 0;
+  return dst;
+}

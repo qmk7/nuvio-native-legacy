@@ -38,6 +38,8 @@ int dados_gravar(const char *nome, const char *conteudo);
 // 15 s em vez do de 700 ms. So para conteudo RE-OBTIVEL — posicao de cursor,
 // cache de imagem. Dado do usuario continua em dados_gravar.
 int dados_gravar_leve(const char *nome, const char *conteudo);
+// 1 = a credential file (token, password, key): written owner-only (0600).
+int dados_e_secreto(const char *nome);
 
 // Le `nome` inteiro para um buffer novo terminado em NUL (free pelo chamador).
 char *dados_ler(const char *nome);

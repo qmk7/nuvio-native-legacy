@@ -87,3 +87,5 @@ traktauth
 traktauth_429
 agenda:900
 atualizacao_agenda:900
+qrtime_tls
+qrtime_redact

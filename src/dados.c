@@ -541,6 +541,19 @@ char *dados_caminho(char *dst, unsigned tam, const char *nome) {
 // pelo caminho de 700 ms. Andar pela home virava uma descarga a cada movimento.
 // Posicao de cursor e re-obtivel — perde-la ao fechar o app custa uma rolagem,
 // contra 30-52 ms de quadro travado a cada passo.
+// QR TIME phase 8: files that hold a password, token, API key or a provider
+// URL with a key in it are written owner-only (0600). Media files are not on
+// this list on purpose (the TV's media service, another user, reads them).
+int dados_e_secreto(const char *nome) {
+  static const char *const pre[] = {
+    "trakt", "simkl", "conta-", "debrid", "tmdb.txt", "mdblist", "fanart", "youtube", "lastfm", "spotify",
+    "music-sources", "xtream-", "stalker-", "m3u-p", "livetv-contas", "jellyfin", "emby", "plex", "discord",
+    "addons.txt", "sessao", "cliente", "nuvem", "epg-conta-", "p2p.txt", "seekr", "tsdb", NULL };
+  if (!nome) return 0;
+  for (int i = 0; pre[i]; i++) if (!strncmp(nome, pre[i], strlen(pre[i]))) return 1;
+  return 0;
+}
+
 static int gravarInterno(const char *nome, const char *conteudo, int leve) {
   char caminho[600], tmp[600];
   FILE *f;
@@ -550,6 +563,9 @@ static int gravarInterno(const char *nome, const char *conteudo, int leve) {
   NV_FS_TRAVAR();
   f = fopen(tmp, "w");
   if (!f) { NV_FS_LIBERAR(); return 0; }
+#ifndef __EMSCRIPTEN__
+  if (dados_e_secreto(nome)) fchmod(fileno(f), 0600);   // before any byte is written
+#endif
   n = conteudo ? strlen(conteudo) : 0;
   if (n && fwrite(conteudo, 1, n, f) != n) { fclose(f); remove(tmp); NV_FS_LIBERAR(); return 0; }
   // Progress must survive power loss, including the directory entry rename.

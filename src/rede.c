@@ -97,6 +97,50 @@ static uint64_t pedidoAgoraMs(void) {
   return (uint64_t)t.tv_sec * 1000u + (unsigned long)t.tv_nsec / 1000000u;
 }
 #endif
+// QR TIME phase 8: the self-signed exception for a personal server
+// (tls_pessoal) only applies to hosts that cannot hold a public certificate:
+// loopback, RFC 1918 / link-local / ULA addresses, and LAN names (.local,
+// .lan, .home.arpa, a single label). A public host is always verified.
+int rede_host_privado(const char *url) {
+  const char *p, *h, *f;
+  char host[256];
+  size_t n;
+  unsigned a, b, c, d;
+  if (!url) return 0;
+  if (!strncasecmp(url, "https://", 8)) p = url + 8;
+  else if (!strncasecmp(url, "http://", 7)) p = url + 7;
+  else return 0;
+  f = p + strcspn(p, "/?#");
+  { const char *at = memchr(p, '@', (size_t)(f - p)); if (at) p = at + 1; }
+  if (*p == '[') {
+    h = p + 1; f = memchr(h, ']', (size_t)(f - h));
+    if (!f) return 0;
+  } else {
+    h = p;
+    { const char *dp = memchr(h, ':', (size_t)(f - h)); if (dp) f = dp; }
+  }
+  n = (size_t)(f - h);
+  if (!n || n >= sizeof host) return 0;
+  for (size_t i = 0; i < n; i++) host[i] = (char)tolower((unsigned char)h[i]);
+  host[n] = 0;
+  if (strchr(host, ':')) {   // IPv6: loopback, link-local fe80::/10, ULA fc00::/7
+    if (!strcmp(host, "::1")) return 1;
+    if (!strncmp(host, "fe8", 3) || !strncmp(host, "fe9", 3) || !strncmp(host, "fea", 3) || !strncmp(host, "feb", 3)) return 1;
+    return (host[0] == 'f' && (host[1] == 'c' || host[1] == 'd') && isxdigit((unsigned char)host[2]) && isxdigit((unsigned char)host[3]) && host[4] == ':');
+  }
+  {
+    char resto;
+    if (sscanf(host, "%u.%u.%u.%u%c", &a, &b, &c, &d, &resto) == 4) {
+      if (a > 255 || b > 255 || c > 255 || d > 255) return 0;
+      return a == 127 || a == 10 || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168) || (a == 169 && b == 254);
+    }
+  }
+  if (!strcmp(host, "localhost") || !strchr(host, '.')) return 1;
+  n = strlen(host);
+#define SUF(s) (n > sizeof(s) - 1 && !strcmp(host + n - (sizeof(s) - 1), s))
+  return SUF(".local") || SUF(".lan") || SUF(".home.arpa") || SUF(".internal") || SUF(".localhost");
+#undef SUF
+}
 void rede_resposta_limpar(RedeResposta *r) {
   if (!r) return;
   free(r->corpo); free(r->cabecalhos); memset(r, 0, sizeof *r);
@@ -1653,15 +1697,14 @@ static void opcoesComuns(void *c, unsigned long prazoMs) {
   curl_setopt(c, OPT_TCP_KEEPALIVE, (long)1);
   curl_setopt(c, OPT_TCP_KEEPIDLE, (long)15);
   curl_setopt(c, OPT_TCP_KEEPINTVL, (long)5);
-  // Os addons sao servidos por hosts com cadeias que este aparelho de 2019 nao
-  // conhece; o pacote de CAs dele e de fabrica e nao se atualiza. Verificar
-  // recusaria fontes legitimas do dono. O conteudo e midia publica e a escolha
-  // esta escrita aqui de proposito.
-  curl_setopt(c, OPT_SSL_VERIFYPEER, (long)0);
-  curl_setopt(c, OPT_SSL_VERIFYHOST, (long)0);
+  // QR TIME phase 8: certificates are always verified. These generic calls
+  // carry Trakt tokens, Subsonic passwords and Xtream credentials, so an
+  // unauthenticated TLS channel is not acceptable. The factory CA store of an
+  // old TV may be stale, so the app ships its own Mozilla root bundle
+  // (discord-ca.pem) and uses it when present; otherwise the TV's own store.
+  curl_setopt(c, OPT_SSL_VERIFYPEER, (long)1);
+  curl_setopt(c, OPT_SSL_VERIFYHOST, (long)2);
   curl_setopt(c, OPT_USERAGENT, "Nuvio/1.0 (webOS)");
-  // Bundle embarcado como fallback: a verificacao esta desligada acima, mas se
-  // um dia ligar (ou a lib ignorar o VERIFYPEER) nao ha "sem CA" no Android.
   if (discordCa[0]) curl_setopt(c, OPT_CAINFO, discordCa);
   redeErroBuf[0] = 0;
   redeErroTxt[0] = 0;

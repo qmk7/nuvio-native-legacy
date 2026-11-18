@@ -92,6 +92,9 @@ typedef struct {
   int fim_janela, fim_teto; /* intentional discard stops, not transport EOF */
 } RedeResposta;
 unsigned rede_pedido_capacidades(void);
+// 1 = the URL's host is loopback / private LAN (the only hosts where
+// tls_pessoal may skip certificate verification).
+int rede_host_privado(const char *url);
 int rede_pedir(const RedePedido *pedido, RedeResposta *resposta);
 void rede_resposta_limpar(RedeResposta *resposta);
 
@@ -478,6 +481,9 @@ const char *rede_ultimo_erro(void);
 int rede_aquecer_lote(const char *const *origens, int n, unsigned *ms);
 int rede_aquecer_job(const char *const *origens, int n, unsigned *ms, RedeJob *job);
 const char *rede_url_publica(const char *url, char *dst, unsigned tam);
+// Free text with every http(s) link inside (also JSON-escaped) reduced to
+// rede_url_publica. For payloads and messages that may carry a stream URL.
+const char *rede_texto_redigido(const char *txt, char *dst, unsigned tam);
 
 // URL DE IMAGEM/META PARA LOG, mais util que rede_url_publica mas igualmente
 // segura: mantem esquema, host e os segmentos do caminho que nao podem ser

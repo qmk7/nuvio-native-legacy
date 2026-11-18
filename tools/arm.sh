@@ -302,7 +302,10 @@ ARQ_DE_PESSOA="trakt.txt addons.txt tmdb.txt mdblist.txt ajustes.txt
 # trakt-p*/trakt-fluxo*/simkl*: o vinculo do Trakt e do Simkl passou a ser um
 # arquivo POR PERFIL (traktauth.c, simklauth.c) — o trakt.txt da lista de nomes
 # acima deixou de alcancar o token quando a pasta de dados cai na da arte.
-GLOB_DE_PESSOA="livetv-contas-p*.txt epg-conta-*.* m3u-p*.txt m3u-cache-p*.txt stalker-p*.txt xtream-p*.txt listas-p*.txt trakt-p*.txt trakt-fluxo*.txt simkl*.txt conta-*.txt conta-*.txt.tmp discord-p*.txt discord-p*.txt.tmp jellyfin-p*.txt jellyfin-p*.txt.tmp emby-p*.txt emby-p*.txt.tmp plex-p*.txt plex-p*.txt.tmp debrid-*.txt provider-scope-*.txt fontefalha*.txt* fontesmortas-*.txt catalogo-*.bin catalogo-*.bin.tmp* guia-*-p*.txt* guia-cache*.bin* epg-extra.* epg-extra-p*.* epg-extra-m3u-p*.* recomendacoes*.txt recomendacoes*.json amigos-vistos*.txt"
+# QR TIME (fases 5-8): Navidrome/WebDAV com senha (music-sources-p*), chaves
+# e contas do YouTube, Last.fm e Spotify, playlists e copias offline (mo-*),
+# o registro de envio do Trakt, seguidos da agenda e preferencias de esporte.
+GLOB_DE_PESSOA="livetv-contas-p*.txt epg-conta-*.* m3u-p*.txt m3u-cache-p*.txt stalker-p*.txt xtream-p*.txt listas-p*.txt trakt-p*.txt trakt-fluxo*.txt simkl*.txt conta-*.txt conta-*.txt.tmp discord-p*.txt discord-p*.txt.tmp jellyfin-p*.txt jellyfin-p*.txt.tmp emby-p*.txt emby-p*.txt.tmp plex-p*.txt plex-p*.txt.tmp debrid-*.txt provider-scope-*.txt fontefalha*.txt* fontesmortas-*.txt catalogo-*.bin catalogo-*.bin.tmp* guia-*-p*.txt* guia-cache*.bin* epg-extra.* epg-extra-p*.* epg-extra-m3u-p*.* recomendacoes*.txt recomendacoes*.json amigos-vistos*.txt music-*-p*.txt* music-*.txt music-*.txt.tmp mo-*.* lastfm*.txt* youtube*.txt* spotify.txt* trakt-sent-p*.txt* agenda-follows-p*.txt* esporte-p*.txt* lembretes*.txt* agenda*.txt* qrtime-schema.txt*"
 
 # O ACERVO DE QUEM EMPACOTOU, que nao e credencial de login e vaza igual.
 #
@@ -404,6 +407,7 @@ if [ "$1" = "--ipk" ]; then
   printf '%s\n' "$LISTA" | grep -qE "art/(trakt-fluxo|simkl)\.txt$" && VAZOU="$VAZOU trakt-fluxo.txt/simkl.txt"
   printf '%s\n' "$LISTA" | grep -qE '(^|/)(livetv-contas-|epg-conta-|m3u-|debrid|provider-scope|fontefalha|fontesmortas|catalogo-|guia-(fav|modo|preview|cache|addons|lembretes|categorias)|epg-extra|recomendacoes|amigos-vistos)[^/]*\.(txt|json|bin|ts|id)(\.tmp[^/]*)?$' && VAZOU="$VAZOU private profile files"
   printf '%s\n' "$LISTA" | grep -qE '(^|/)conta-[^/]*\.txt(\.tmp)?$' && VAZOU="$VAZOU conta-*.txt/conta-*.txt.tmp"
+  printf '%s\n' "$LISTA" | grep -qE 'art/(music-|mo-|lastfm|youtube|spotify|trakt-sent-|agenda-follows-|esporte-p|qrtime-schema)[^/]*$' && VAZOU="$VAZOU QR TIME music/YouTube/Last.fm/Spotify/Trakt files"
   printf '%s\n' "$LISTA" | grep -qE '(^|/)discord-p[^/]*\.txt(\.tmp)?$' && VAZOU="$VAZOU discord profile tokens"
   printf '%s\n' "$LISTA" | grep -qE '(^|/)(jellyfin|emby|plex)-p[^/]*\.txt(\.tmp)?$' && VAZOU="$VAZOU media-server profile tokens"
   # Diretorio: qualquer caminho DENTRO dele conta como vazamento, nao so a

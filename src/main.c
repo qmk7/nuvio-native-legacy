@@ -1613,6 +1613,16 @@ int main(int argc, char **argv) {
     discordCa[0] = 0;
   }
 #endif
+#if !defined(NV_TPK) && !defined(NV_ANDROID) && !defined(__EMSCRIPTEN__)
+  // QR TIME phase 8: every request now verifies TLS against this bundle. A
+  // CAINFO naming a missing file would fail every https request, so without
+  // the bundle the platform's own trust store is used (still verified).
+  if (discordCa[0] && access(discordCa, R_OK) != 0) {
+    printf("[rede] CA bundle missing: verifying with the system trust store\n");
+    fflush(stdout);
+    discordCa[0] = 0;
+  }
+#endif
   rede_discord_ca(discordCa);
   rede_preparar();
   arranque_enviar();   // #317: se a sessao anterior morreu no arranque, conta isso ao servidor (1x)

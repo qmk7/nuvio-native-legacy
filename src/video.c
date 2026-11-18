@@ -1021,7 +1021,8 @@ static int eventoPayload(const char *p, unsigned minhaSessao) {
       }
     if (strstr(p, "\"error") || strstr(p, "rror\"")) logar = 1;   // erro sempre sai
     while (n && (p[n - 1] == '\n' || p[n - 1] == '\r' || p[n - 1] == ' ')) n--;
-    if (logar) { printf("[video] ev %.*s\n", (int)n, p); fflush(stdout); } }
+    if (logar) { char red_[4096], cp_[4096]; snprintf(cp_, sizeof cp_, "%.*s", (int)n, p);
+      printf("[video] ev %s\n", rede_texto_redigido(cp_, red_, sizeof red_)); fflush(stdout); } }
   if (strstr(p, "seekDone") && seekEnvEm) {
     printf("[video] seek to %ds done in %ums\n", seekEnvAlvo, (unsigned)(SDL_GetTicks() - seekEnvEm));
     fflush(stdout);
@@ -1500,7 +1501,7 @@ static int aoEvento(LSHandle *h, LSMessage *m, void *u) {
 
 static int soLog(LSHandle *h, LSMessage *m, void *u) {
   (void)h; (void)u;
-  printf("[video] %s\n", lsPayload(m)); fflush(stdout);
+  { char red_[4096]; printf("[video] %s\n", rede_texto_redigido(lsPayload(m), red_, sizeof red_)); fflush(stdout); }
   return 1;
 }
 
@@ -1611,7 +1612,7 @@ static int aoCarregar(LSHandle *h, LSMessage *m, void *u) {
   char b[256];
   unsigned minhaSessao = (unsigned)(uintptr_t)u;
   (void)h;
-  printf("[video] load: %s\n", p ? p : "(nulo)"); fflush(stdout);
+  { char red_[4096]; printf("[video] load: %s\n", p ? rede_texto_redigido(p, red_, sizeof red_) : "(nulo)"); fflush(stdout); }
   if (minhaSessao != sessao) {
     printf("[video] load antigo ignorado (sessao %u, atual %u)\n",
            minhaSessao, sessao);
