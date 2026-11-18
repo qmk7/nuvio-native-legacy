@@ -67,7 +67,13 @@ ctr_run_local() {
     esac
   done
   (
-    for e in "${envs[@]}"; do export "$e"; done
+    # The container sees the checkout at /work (the -v above); locally that is
+    # $PWD, so a value pointing under /work (CCACHE_DIR) is mapped the same way.
+    # Without this a non-root host (CI) cannot create /work and the build stops.
+    for e in "${envs[@]}"; do
+      case "${e#*=}" in /work|/work/*) e="${e%%=*}=$PWD${e#*=/work}";; esac
+      export "$e"
+    done
     export PATH="$QRT_WEBOS_SDK/bin:$PATH"
     export NUVIO_SYSROOT="$QRT_WEBOS_SDK/arm-webos-linux-gnueabi/sysroot"
     export NUVIO_ASS_ROOT="${NUVIO_ASS_ROOT:-$QRT_WEBOS_SDK/../nuvio-ass}"
