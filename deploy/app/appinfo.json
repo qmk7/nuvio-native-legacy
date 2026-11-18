@@ -9,7 +9,7 @@
   "largeIcon": "icon-large-20.png",
   "splashBackground": "splash.png",
   "resolution": "1920x1080",
-  "bgColor": "#0E0F12",
+  "bgColor": "#061532",
   "iconColor": "#0D101E",
   "disableBackHistoryAPI": true,
   "requiredPermissions": [
