@@ -8,6 +8,7 @@
 // to that server: they never go to IMDb, TMDB, Trakt or any other service.
 #ifndef NV_MCMODELO_H
 #define NV_MCMODELO_H
+#include <stddef.h>
 
 #define MC_ID 512
 

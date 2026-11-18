@@ -197,6 +197,9 @@ class H(BaseHTTPRequestHandler):
                 if qq in s["artist"].lower():
                     ar[s["artistId"]] = {"id": s["artistId"], "name": s["artist"], "albumCount": 1}
             return self.send(ok(searchResult3={"artist": list(ar.values()), "album": aa, "song": ss[so:so + sc]}))
+        if method == "getRandomSongs":
+            pool = [pub(x) for x in SONGS if not one("genre") or x["genre"] == one("genre")]
+            return self.send(ok(randomSongs={"song": pool[:int(one("size") or 10)]}))
         if method in ("star", "unstar"):
             for i in q.get("id", []):
                 (STATE["starred"].add if method == "star" else STATE["starred"].discard)(i)

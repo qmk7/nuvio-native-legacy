@@ -55,6 +55,8 @@ int ss_playlist_apagar(const SsServidor *s, const char *id);
 int ss_buscar(const SsServidor *s, const char *q, int offsetFaixas,
               McArtista *ar, int maxAr, int *nAr, McAlbum *al, int maxAl, int *nAl,
               McFaixa *fx, int maxFx, int *nFx);
+// getRandomSongs (Party mode); genero may be NULL.
+int ss_aleatorias(const SsServidor *s, const char *genero, McFaixa *out, int max, int *n);
 int ss_favoritar(const SsServidor *s, const char *faixaId, int liga);
 int ss_favoritos(const SsServidor *s, McFaixa *out, int max, int *n);
 int ss_scrobble(const SsServidor *s, const char *faixaId, long long quandoMs, int submissao);
@@ -64,6 +66,9 @@ int ss_letra(const SsServidor *s, const McFaixa *f, char *lrc, size_t n);
 
 // URLs carrying fresh auth (keep them out of logs: ss_redigir).
 void ss_url_stream(const SsServidor *s, const char *id, char *url, size_t n);
+// Cover URLs use a salt derived from the id (not random), so the same cover
+// keeps one URL and the image cache works; the token still never reveals the
+// password.
 void ss_url_capa(const SsServidor *s, const char *capaId, int tamanho, char *url, size_t n);
 // Copy of `url` with u/t/s/p values replaced by "***".
 void ss_redigir(const char *url, char *d, size_t n);

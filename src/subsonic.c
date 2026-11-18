@@ -49,6 +49,7 @@ static void novoSal(char s[17]) {
   s[16] = 0;
 }
 // <url>/rest/<metodo>?<auth>&v=..&c=..&f=json<extra>. `legado`: p=enc:<hex>.
+static __thread const char *salFixo;   // covers: a stable salt (see ss_url_capa)
 static void montar(const SsServidor *s, const char *metodo, const char *extra, int legado, char *url, size_t n) {
   char u[300], base[260], aut[200];
   size_t bl;
@@ -64,7 +65,7 @@ static void montar(const SsServidor *s, const char *metodo, const char *extra, i
     aut[k] = 0;
   } else {
     char sal[17], mat[160], tok[33];
-    novoSal(sal);
+    if (salFixo) snprintf(sal, sizeof sal, "%s", salFixo); else novoSal(sal);
     snprintf(mat, sizeof mat, "%s%s", s->senha, sal);
     md5_hex(mat, strlen(mat), tok);
     snprintf(aut, sizeof aut, "t=%s&s=%s", tok, sal);
@@ -102,7 +103,16 @@ void ss_url_capa(const SsServidor *s, const char *capaId, int tamanho, char *url
   if (!capaId || !capaId[0]) { url[0] = 0; return; }
   urlenc(capaId, e, sizeof e);
   snprintf(x, sizeof x, "&id=%s&size=%d", e, tamanho > 0 ? tamanho : 600);
-  montar(s, "getCoverArt", x, 0, url, n);
+  {
+    char m[400], h[33];
+    snprintf(m, sizeof m, "qrtcover|%s|%s|%s", capaId, s->usuario, s->senha);
+    md5_hex(m, strlen(m), h);
+    h[16] = 0;
+    salFixo = h;
+    montar(s, "getCoverArt", x, 0, url, n);
+    salFixo = NULL;
+    memset(m, 0, sizeof m);
+  }
 }
 
 // Depth-1 number/flag of an object [o, fim): js_num would match a nested key
@@ -529,6 +539,19 @@ int ss_buscar(const SsServidor *s, const char *q, int offsetFaixas,
     if (p && *p == '[') for (p = p + 1; *p && *p != '{' && *p != ']'; p++) {}
     while (p && *p == '{' && *nFx < maxFx) { const char *f = js_fim(p); if (!f) break; if (ss_parse_faixa(p, f, &fx[*nFx])) (*nFx)++; p = js_prox(f); }
   }
+  free(r);
+  return MC_OK;
+}
+int ss_aleatorias(const SsServidor *s, const char *genero, McFaixa *out, int max, int *n) {
+  char x[300] = "";
+  int e;
+  char *r;
+  snprintf(x, sizeof x, "&size=%d", max > 500 ? 500 : max);
+  if (genero && genero[0]) param(x, sizeof x, "genre", genero);
+  r = chamar(s, "getRandomSongs", x, &e);
+  *n = 0;
+  if (!r) return e;
+  *n = ss_parse_faixas(r, "song", out, max);
   free(r);
   return MC_OK;
 }
