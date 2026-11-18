@@ -25,6 +25,9 @@ int nuvem_configurar(const char *dirArte);
 int         nuvem_pronta(void);
 const char *nuvem_url(void);
 const char *nuvem_anon(void);
+// 1 = the configured key is a legacy anon JWT (it may also go as Bearer);
+// 0 = a publishable key (sb_publishable_...), sent in `apikey` only.
+int         nuvem_chave_jwt(void);
 // Base da pagina web que a pessoa abre no celular para autorizar a TV
 // (TV_LOGIN_WEB_BASE_URL no web). "" quando nao configurada.
 const char *nuvem_base_login(void);

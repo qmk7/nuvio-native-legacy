@@ -85,6 +85,7 @@ int         nuvem_pronta(void)     { return url[0] && anon[0]; }
 const char *nuvem_url(void)        { return url; }
 const char *nuvem_anon(void)       { return anon; }
 const char *nuvem_base_login(void) { return baseLogin; }
+int nuvem_chave_jwt(void) { return !strncmp(anon, "eyJ", 3); }
 const char *nuvem_trakt_cliente(void) { return traktCliente; }
 const char *nuvem_trakt_segredo(void) { return traktSegredo; }
 const char *nuvem_simkl_cliente(void) { return simklCliente; }
@@ -104,7 +105,10 @@ char *nuvem_post(const char *caminho, const char *corpoJson,
   snprintf(cabAut, sizeof cabAut, "Authorization: Bearer %s",
            (bearer && *bearer) ? bearer : anon);
   cab[0] = cabApi;
-  cab[1] = cabAut;
+  // A Supabase "publishable" key (sb_publishable_...) is not a JWT: the gateway
+  // takes it from `apikey` and refuses it as a Bearer token. Only a legacy anon
+  // JWT (eyJ...) or the user's own token goes in Authorization.
+  cab[1] = (bearer && *bearer) || nuvem_chave_jwt() ? cabAut : NULL;
   cab[2] = NULL;
   // Content-Type: application/json ja e posto por rede_postar.
   return rede_postar_st(completo, 25, cab, corpoJson ? corpoJson : "{}", status);
@@ -153,7 +157,10 @@ char *nuvem_tabela(const char *tabela, const char *consulta,
   snprintf(cabAut, sizeof cabAut, "Authorization: Bearer %s",
            (bearer && *bearer) ? bearer : anon);
   cab[0] = cabApi;
-  cab[1] = cabAut;
+  // A Supabase "publishable" key (sb_publishable_...) is not a JWT: the gateway
+  // takes it from `apikey` and refuses it as a Bearer token. Only a legacy anon
+  // JWT (eyJ...) or the user's own token goes in Authorization.
+  cab[1] = (bearer && *bearer) || nuvem_chave_jwt() ? cabAut : NULL;
   cab[2] = NULL;
   return rede_baixar_st(completo, 25, cab, status);
 }

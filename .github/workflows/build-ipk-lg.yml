@@ -8,9 +8,12 @@
 #
 # Repository secrets (Settings > Secrets and variables > Actions), all optional;
 # an empty one only switches its feature off:
-#   NUVIO_SUPABASE_URL, NUVIO_SUPABASE_ANON_KEY, TV_LOGIN_WEB_BASE_URL   account login
+#   NUVIO_BACKEND_URL, NUVIO_BACKEND_KEY (publishable key)               account login
+#     (NUVIO_SUPABASE_URL / NUVIO_SUPABASE_ANON_KEY are read too, as before)
+#   TV_LOGIN_WEB_BASE_URL                                                  the QR sign-in page
 #   TMDB_API_KEY                                                           metadata
-#   TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET                                   Trakt
+#   TRAKT_CLIENT_ID                                                        Trakt (via the account)
+#   TRAKT_CLIENT_SECRET   only for linking Trakt on the TV itself (device code)
 #   SIMKL_CLIENT_ID, SIMKL_APP_NAME                                        Simkl
 #   IPK_ZIP_PASSWORD   optional: when set, the artifact is an AES-256 7z with
 #                      this password. This repository is public: without it the
@@ -35,8 +38,8 @@ jobs:
 
       - name: Write local.properties from the secrets (never logged, never committed)
         env:
-          NUVIO_SUPABASE_URL: ${{ secrets.NUVIO_SUPABASE_URL }}
-          NUVIO_SUPABASE_ANON_KEY: ${{ secrets.NUVIO_SUPABASE_ANON_KEY }}
+          NUVIO_SUPABASE_URL: ${{ secrets.NUVIO_BACKEND_URL || secrets.NUVIO_SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY: ${{ secrets.NUVIO_BACKEND_KEY || secrets.NUVIO_SUPABASE_ANON_KEY }}
           TV_LOGIN_WEB_BASE_URL: ${{ secrets.TV_LOGIN_WEB_BASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
