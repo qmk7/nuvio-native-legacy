@@ -41,7 +41,7 @@ static const NovItem ITENS_207[] = {
   { .icone = "aj_hard-drive", .nome = "Cache no pendrive",
     .frase = "Agora no Android e na Samsung, com todos os detalhes do pendrive (Android, Samsung .tpk).", .linhas = 6, .plataformas = NOV_ANDROID | NOV_TPK | NOV_OUTRAS },
   { .icone = "aj_link", .nome = "Links externos",
-    .frase = "Links nuvio-legacy://, stremio:// e do IMDb abrem o título, tocam ou buscam no Nuvio (Android).", .linhas = 6, .plataformas = NOV_ANDROID | NOV_OUTRAS },
+    .frase = "Links nuvio-legacy://, stremio:// e do IMDb abrem o título, tocam ou buscam no QR TIME (Android).", .linhas = 6, .plataformas = NOV_ANDROID | NOV_OUTRAS },
   { .icone = "aj_play", .nome = "Especiais",
     .frase = "Episódios especiais aparecem e podem ser reproduzidos (#556).", .linhas = 6 },
   { .icone = "aj_sliders-horizontal", .nome = "Escala de texto e componentes",
