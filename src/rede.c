@@ -937,6 +937,13 @@ char *rede_colocar_st(const char *url, int segundos, const char *const *cab,
   if (!r && status && *status > 0) return strdup("");
   return r;
 }
+// Any other verb (WebDAV PROPFIND): headers as given, body may be NULL.
+char *rede_metodo_st(const char *verbo, const char *url, int segundos, const char *const *cab,
+                     const char *corpo, int *status) {
+  char *r = pedir2(verbo, url, segundos, cab, NULL, corpo ? corpo : "", NULL, status, NULL, 0, NULL);
+  if (!r && status && *status > 0) return strdup("");
+  return r;
+}
 
 void rede_discord_ca(const char *caminho) { (void)caminho; }
 const char *rede_ultimo_erro(void) { return ""; }
@@ -2886,6 +2893,12 @@ char *rede_postar_st_retry(const char *url, int segundos, const char *const *cab
 char *rede_colocar_st(const char *url, int segundos, const char *const *cab,
                       const char *corpo, int *status) {
   return enviarNativo("PUT", url, segundos, cab, corpo, status, NULL);
+}
+
+// Any other verb (WebDAV PROPFIND). Same contract as rede_postar_st.
+char *rede_metodo_st(const char *verbo, const char *url, int segundos, const char *const *cab,
+                     const char *corpo, int *status) {
+  return enviarNativo(verbo, url, segundos, cab, corpo ? corpo : "", status, NULL);
 }
 
 char *rede_postar_seguro_st(const char *url, int segundos, const char *const *cab,

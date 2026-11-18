@@ -329,6 +329,10 @@ char *rede_postar_st_retry(const char *url, int segundos, const char *const *cab
 // 4xx volta com corpo). Existe para o TorBox, que edita um item so por PUT.
 char *rede_colocar_st(const char *url, int segundos, const char *const *cabecalhos,
                       const char *corpo, int *status);
+// Any verb (WebDAV PROPFIND for the Music Center). Same contract; pass the
+// Content-Type in `cabecalhos` (the default would be JSON).
+char *rede_metodo_st(const char *verbo, const char *url, int segundos, const char *const *cabecalhos,
+                     const char *corpo, int *status);
 #ifdef __EMSCRIPTEN__
 // Authenticated JSON PATCH through the legacy WGT HTTP bridge.
 char *rede_patch_st(const char *url, int segundos, const char *const *cabecalhos,
