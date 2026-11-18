@@ -263,6 +263,8 @@ def contexto(txt, i):
 # "nao sei o que e": sem esta lista a ferramenta nao pode virar teste, e sem
 # virar teste ela nao impede a proxima regressao.
 IGNORAR = {
+    "QR TIME",                       # the app's own name (proper noun, same in every language)
+    "conta-", "epg-conta-",          # dados.c dados_e_secreto: credential filename prefixes, never UI text
     "catalogo-*.bin",                # androidcache.c: cache filename pattern, never UI text
     "ltv-fontes.txt", "ltv-fontes-p%d.txt",  # ltv.c: preference filenames, never UI labels
     "daqui em diante",  # episodios.c nomeModo: so no log [visto] menu, nunca rotulo
