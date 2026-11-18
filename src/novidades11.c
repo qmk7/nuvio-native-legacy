@@ -857,7 +857,7 @@ static void novidades11_desenharCorpo_(Uint32 agora) {
         y += feature(fx, y, fw, "oculto",
               "O aviso é dentro do app",
               "Nenhuma TV acorda um app fechado. No dia do episódio, o aviso "
-              "aparece assim que você abrir o Nuvio.", ap);
+              "aparece assim que você abrir o QR TIME.", ap);
         y += feature(fx, y, fw, "check",
               "O foco ficou mais claro",
               "O que está selecionado agora é preenchido, sem contorno, em "
@@ -866,7 +866,7 @@ static void novidades11_desenharCorpo_(Uint32 agora) {
       case 1:
         y += feature(fx, y, fw, "menu_library",
               "Três fontes, um lugar",
-              "As listas do Trakt, as pastas da sua conta Nuvio e o que você "
+              "As listas do Trakt, as pastas da sua conta QR TIME e o que você "
               "acompanha no Simkl.", ap);
         y += feature(fx, y, fw, "menu_search",
               "Procure a lista de qualquer pessoa",
@@ -927,7 +927,7 @@ static void novidades11_desenharCorpo_(Uint32 agora) {
               "mostra o andamento até o fim.", ap);
         y += feature(fx, y, fw, "oculto",
               "Sem ele, o aviso e o endereço",
-              "O Nuvio não roda como root e não alcança o instalador da TV. O "
+              "O QR TIME não roda como root e não alcança o instalador da TV. O "
               "cartão mostra onde baixar.", ap);
         y += feature(fx, y, fw, "pause",
               "No Samsung, sempre manual",

@@ -340,7 +340,7 @@ typedef struct { int id; const char *icone, *nome, *linha; } Item;
 
 static const Item ITENS[] = {
   { ID_VISUAL,    "aj_palette",    "Cara nova",
-    "Abertura, ícone e telas de entrada com o visual do Nuvio Legacy." },
+    "Abertura, ícone e telas de entrada com o visual do QR TIME." },
   { ID_EMAIL,     "aj_keyboard",   "Entrar com e-mail e senha",
     "Sem celular por perto: e-mail e senha direto na TV, embaixo do QR." },
   { ID_FONTES,    "fontes",        "Fontes na hora",
@@ -593,7 +593,7 @@ void novidades172_desenhar(Uint32 agora) {
     float ya = y0 + N172_PAD, gap, alto, yy;
     int i;
     snprintf(tit, sizeof tit, i18n("Novidades da %s"), N172_VERSAO);
-    { TxtLinha k = txt_linha(TXT_CAPTION2, "NUVIO LEGACY", LARANJA_I, 255);
+    { TxtLinha k = txt_linha(TXT_CAPTION2, "QR TIME", LARANJA_I, 255);
       txt_desenhar_alpha(k, N172_TXT_X, ya, a); }
     txt_bloco(TXT_TITULO2, tit, CREME_I, N172_TXT_X, ya + 30.0f, N172_TXT_W, 62.0f, a, 1);
     listras(N172_TXT_X, ya + 30.0f + 74.0f, 210.0f, a);

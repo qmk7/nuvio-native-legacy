@@ -43,6 +43,7 @@
 #include <signal.h>
 #endif
 #include "qrdados.h"
+#include "qrintro.h"
 #include "qrcontas.h"
 #include <unistd.h>   // dup2 (o stderr no mesmo descritor do log)
 #include "gfx.h"
@@ -462,6 +463,8 @@ static QuadroRelogio quadroRel = { 0, 0, 0, 0.0 };
 static Uint32 soltarMouseEm = 0;
 static SDL_Event soltarMouse;
 
+// The QR TIME intro takes injected keys the same way as the remote's: skip.
+static void introInjetada(const SDL_Event *e) { if (e->type == SDL_KEYDOWN) qrintro_tecla(); }
 static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
   if (soltarMouseEm && SDL_GetTicks() >= soltarMouseEm) {
     soltarMouseEm = 0;
@@ -1254,9 +1257,9 @@ int main(int argc, char **argv) {
   if (pedeW > (int)NV_TELA_W || pedeW < (int)NV_TELA_W)
     android_pedir_superficie(pedeW, pedeH);
 #endif
-  const char *windowTitle = "Nuvio";
+  const char *windowTitle = "QR TIME";
 #ifdef NV_LINUX_DESKTOP
-  windowTitle = "Nuvio - Linux UI preview";
+  windowTitle = "QR TIME - Linux UI preview";
 #endif
 #ifdef NV_ANDROID
   int hdrPedido = ajustes_hdr_interface();
@@ -1675,6 +1678,8 @@ int main(int argc, char **argv) {
   // no lugar em que o splash do sistema a deixou.
   logoapp_iniciar(dirArte);
   abertura_iniciar(dirArte);
+  // QR TIME: the brand intro replaces the old opening when its frames are there.
+  if (qrintro_iniciar(dirArte)) abertura_pular();
   ajustes_texturas_dir(dirArte);   // materiais CC0 do tema Textura (recorte fraco)
 #ifdef __EMSCRIPTEN__
   // O ARRANQUE CEDE AO NAVEGADOR EM DOIS PONTOS (24/09/2026). Do topo do main
@@ -2063,6 +2068,8 @@ int main(int argc, char **argv) {
       // vez de exigir uma build instrumentada de proposito. Cada scancode sai
       // UMA vez por sessao: um controle de TV repete a tecla sozinho e um log
       // por evento afogaria o resto.
+      // QR TIME intro: a key skips it and goes nowhere else.
+      if (qrintro_ativa() && (e.type == SDL_KEYDOWN || e.type == SDL_KEYUP)) { if (e.type == SDL_KEYDOWN) qrintro_tecla(); continue; }
       if (e.type == SDL_KEYDOWN) abertura_tecla();   // a pessoa quer entrar: a marca sai
       if (e.type == SDL_KEYDOWN) {
         static unsigned char visto[512];
@@ -2081,7 +2088,7 @@ int main(int argc, char **argv) {
       app_evento(&e);
     }
     central_tecla_quadro(SDL_GetTicks(), entregarCh);
-    teclasInjetadas(app_evento);
+    teclasInjetadas(qrintro_ativa() ? introInjetada : app_evento);
 #ifdef NV_TOUCH_UI
     // A saved mode change must refresh every target even when SDL keeps the
     // same drawable size and sends no window event.
@@ -2319,7 +2326,8 @@ int main(int argc, char **argv) {
     app_desenhar(agora);
     if (perftv_enabled) snprintf(perfScreen, sizeof perfScreen, "%s", perfTvScreen());
     // A abertura (#213) cobre os primeiros quadros, com a home montando por baixo.
-    if (abertura_ativa()) {
+    if (qrintro_ativa()) qrintro_desenhar(agora);
+    else if (abertura_ativa()) {
       int pend = 0;
       tex_estatisticas(NULL, &pend, NULL, NULL, NULL);
       abertura_fundo_fica(app_no_login());

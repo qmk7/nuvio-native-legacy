@@ -546,7 +546,7 @@ static void ajcCenaTexto(int op) {
     float y = 80 + i * 70 * esc;
     ajc_ret(90, y, 52 * esc, 52 * esc, 12 * esc, 0.17f, 0.18f, 0.21f, 1);
     if (i == 0) ajc_foco(90, y, 52 * esc, 52 * esc, 12 * esc, 1);
-    ajcTexto(op == AJ_FONTE_UI ? "Aa  Nuvio" : "Nuvio", 22 * esc, i == 0, 160 * 1.0f, y + 6 * esc, i == 0 ? 1 : 0.6f);
+    ajcTexto(op == AJ_FONTE_UI ? "Aa  QR TIME" : "QR TIME", 22 * esc, i == 0, 160 * 1.0f, y + 6 * esc, i == 0 ? 1 : 0.6f);
     ajc_barra(160, y + 36 * esc, 200 * esc, 0.4f);
   }
   ajc_fim();

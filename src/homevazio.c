@@ -79,7 +79,7 @@ void homevazio_desenhar(float alfa) {
   l = txt_linha_corta(TXT_HEADLINE, "Sua Home está vazia", 255, 255, 255, 255, tw);
   txt_desenhar_alpha(l, tx, y, alfa);
   y += l.h + 22.0f;
-  y += txt_bloco(TXT_BODY, "Configure seus add-ons no celular, na sua conta Nuvio. A TV acompanha sozinha.",
+  y += txt_bloco(TXT_BODY, "Configure seus add-ons no celular, na sua conta QR TIME. A TV acompanha sozinha.",
                 200, 203, 210, tx, y, tw, 40, alfa, 3) + 14.0f;
   txt_bloco(TXT_CAPTION, "Aponte a câmera do celular para o QR code e siga o guia.",
             160, 163, 172, tx, y, tw, 34, alfa, 2);

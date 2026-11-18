@@ -490,7 +490,7 @@ static int montarNuvio(void) {
   }
   nTabela = n;
   if (!n) snprintf(aviso, sizeof aviso,
-                   "Nenhuma coleção na sua conta Nuvio ainda");
+                   "Nenhuma coleção na sua conta QR TIME ainda");
   return n;
 }
 

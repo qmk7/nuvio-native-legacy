@@ -1,3 +1,4 @@
+#define _GNU_SOURCE   // strcasestr
 #include "mccat.h"
 #include "mcfila.h"
 #include "mcfmt.h"

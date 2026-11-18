@@ -109,6 +109,8 @@ void abertura_tecla(void) {
 }
 
 int abertura_ativa(void) { return estado < 3; }
+// QR TIME: the intro video plays instead; the old opening never shows.
+void abertura_pular(void) { if (estado < 3) { estado = 3; if (marca) { glDeleteTextures(1, &marca); marca = 0; } } }
 
 static void acabar(void) {
   estado = 3;

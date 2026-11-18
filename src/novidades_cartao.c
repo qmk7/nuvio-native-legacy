@@ -646,7 +646,7 @@ static void paginaApoioDesenho(float y0, float a, float dx) {
   { TxtLinha l = txt_linha_corta(TXT_NOV_TITULO, i18n("Apoie o projeto"), 248, 249, 252, 255, textoW());
     txt_desenhar_alpha(l, x, y, a);
     y += (float)l.h + 22.0f; }
-  y += txt_bloco(TXT_V2_26, i18n("O Nuvio Legacy é gratuito. Se ele te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos."),
+  y += txt_bloco(TXT_V2_26, i18n("O QR TIME é gratuito. Se ele te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos."),
                  200, 205, 215, x, y, textoW(), 36.0f, 0.9f * a, 4);
   y += 44.0f;
   // Doacoes + Discord dividem a coluna de texto: com Patreon e Ko-fi sao 3
@@ -863,7 +863,7 @@ static float novTelefoneConteudo(float x, float y, float w, float a) {
     }
   } else {
     y += telefonecartao_titulo("Apoie o projeto", x, y, w, a);
-    y += telefonecartao_texto(TXT_V2_26, "O Nuvio Legacy é gratuito. Se ele te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos.", x, y, w, 36, .7f * a) + 28;
+    y += telefonecartao_texto(TXT_V2_26, "O QR TIME é gratuito. Se ele te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos.", x, y, w, 36, .7f * a) + 28;
     // Discord acompanha as doacoes sem entrar na lista de apoio_qual().
     int nDoacoes = apoio_n(), n = nDoacoes + 1, cols = w >= 648 ? 2 : 1;
     float lado = fminf(300, (w - (cols - 1) * 24) / cols), passo = lado + 22 + 64 + 12 + 30 + 24;

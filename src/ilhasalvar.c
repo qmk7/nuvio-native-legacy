@@ -47,7 +47,7 @@ static int jaFoiPerguntado(void) {
 const char *ilhasalvar_destino(void) {
   if (ajustes_fonte_biblioteca() == AJ_SALVOS_TRAKT) return i18n("Watchlist do Trakt");
   if (ajustes_fonte_biblioteca() == AJ_SALVOS_SIMKL) return i18n("Plan to Watch do Simkl");
-  return i18n("Lista do Nuvio");
+  return i18n("Lista do QR TIME");
 }
 
 typedef struct { CatItem ci; int entrou; } SalvarCtx;
@@ -116,17 +116,17 @@ int ilhasalvar_perguntar(const CatItem *ci, int entrar) {
   // Com conta, a Lista do Nuvio tambem vai para o perfil (contapend.c).
   if (sessao_logada())
     snprintf(m.texto, sizeof m.texto, "%s", nOpcao > 1
-             ? i18n("A Lista do Nuvio fica nesta TV e no seu perfil da conta. O Trakt e o Simkl guardam também nas contas deles. Dá para mudar em Ajustes.")
-             : i18n("O título fica na Lista do Nuvio, nesta TV e no seu perfil da conta."));
+             ? i18n("A Lista do QR TIME fica nesta TV e no seu perfil da conta. O Trakt e o Simkl guardam também nas contas deles. Dá para mudar em Ajustes.")
+             : i18n("O título fica na Lista do QR TIME, nesta TV e no seu perfil da conta."));
   else
   snprintf(m.texto, sizeof m.texto, "%s", nOpcao > 1
-           ? i18n("A Lista do Nuvio fica só nesta TV. O Trakt e o Simkl guardam na sua conta, e a lista desta TV também é gravada. Dá para mudar em Ajustes.")
-           : i18n("O título fica na Lista do Nuvio, nesta TV. Conecte o Trakt ou o Simkl em Ajustes para guardar também na sua conta."));
+           ? i18n("A Lista do QR TIME fica só nesta TV. O Trakt e o Simkl guardam na sua conta, e a lista desta TV também é gravada. Dá para mudar em Ajustes.")
+           : i18n("O título fica na Lista do QR TIME, nesta TV. Conecte o Trakt ou o Simkl em Ajustes para guardar também na sua conta."));
   snprintf(m.icone, sizeof m.icone, "aj_bookmark");
   m.tipo = ILHA_ACENTO;
   m.nBotoes = nOpcao > 1 ? nOpcao : 1;
   for (i = 0; i < nOpcao; i++) {
-    const char *r = opcao[i] == AJ_SALVOS_LOCAL ? (nOpcao > 1 ? i18n("Lista do Nuvio") : i18n("Salvar na Lista do Nuvio"))
+    const char *r = opcao[i] == AJ_SALVOS_LOCAL ? (nOpcao > 1 ? i18n("Lista do QR TIME") : i18n("Salvar na Lista do QR TIME"))
                   : opcao[i] == AJ_SALVOS_TRAKT ? i18n("Trakt") : i18n("Simkl");
     snprintf(m.botao[i], sizeof m.botao[i], "%s", r);
   }

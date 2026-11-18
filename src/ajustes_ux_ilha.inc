@@ -1627,7 +1627,7 @@ static float ajSubInspetor(int op, const char *kick, const char *titulo, const c
   return y;
 }
 static const char *ajSyncAddonsApoio(void) {
-  if (!sessao_logada()) return "Entre na conta Nuvio para sincronizar os addons.";
+  if (!sessao_logada()) return "Entre na conta QR TIME para sincronizar os addons.";
   if (sync_manual_addons_rodando()) return "Sincronizando…";
   return "Busca agora os addons da sua conta, sem esperar a volta automática.";
 }
@@ -1677,7 +1677,7 @@ static void ajDesenharAddons(int foco) {
     }
     snprintf(forn, sizeof forn, "%s", ajAddonFornece(foco));
     y = ajSubInspetor(AJ_ADDONS, k, addons_nome(foco), i18n(conv ? "Este addon está só nesta TV, neste perfil. OK liga ou desliga."
-                                                             : "Os addons vêm da sua conta Nuvio. Ligar e desligar aqui vale só nesta TV, até a próxima sincronização."));
+                                                             : "Os addons vêm da sua conta QR TIME. Ligar e desligar aqui vale só nesta TV, até a próxima sincronização."));
     if (y + 3 * 57.0f <= ir.y + ir.h) {
       y += aj2Meta(i18n("Fornece"), forn, ir.x, y, ir.w, 1);
       y += aj2Meta(i18n("Nesta TV"), i18n(addons_ativo(foco) ? "Ligado" : "Desligado"), ir.x, y, ir.w, 1);
@@ -2134,7 +2134,7 @@ static void ajDesenharPlugins(const AjPluginsVista *v) {
     *l = (AjSubLinha){ "", "", NULL, -1, 0, 1 };
     if (!disp) { l->nome = "Plugins"; l->apoio = "O motor de plugins não roda neste aparelho."; l->icone = "aj_plug"; }
     else if (v->nivel == 0 && i == 0) {
-      l->nome = "Plugins"; l->apoio = "Scrapers dos repositórios Nuvio como mais uma fonte, ao lado dos add-ons"; l->icone = "aj_plug"; l->pilula = plugins_ligado();
+      l->nome = "Plugins"; l->apoio = "Scrapers dos repositórios QR TIME como mais uma fonte, ao lado dos add-ons"; l->icone = "aj_plug"; l->pilula = plugins_ligado();
     } else if (v->nivel == 0 && i == 1) {
       l->nome = "Adicionar repositório"; l->apoio = "Digite a URL do manifest.json"; l->icone = "aj_plus";
     } else if (v->nivel == 0) {
@@ -2194,7 +2194,7 @@ static void ajDesenharPlugins(const AjPluginsVista *v) {
       ajSubInspetor(AJ_PLUGINS, k, "Adicionar repositório", "A URL do manifest.json. Ex.: raw.githubusercontent.com/usuario/repo/main");
     } else {
       ajSubInspetor(AJ_PLUGINS, k, "Plugins", disp
-        ? "Scrapers em JavaScript dos repositórios de plugins do Nuvio, como mais uma fonte na lista, ao lado dos add-ons. Os repositórios vêm da sua conta. Desligado por padrão."
+        ? "Scrapers em JavaScript dos repositórios de plugins do QR TIME, como mais uma fonte na lista, ao lado dos add-ons. Os repositórios vêm da sua conta. Desligado por padrão."
         : "O motor de plugins não roda neste aparelho.");
     } }
 }

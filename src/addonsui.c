@@ -76,7 +76,7 @@ int addonsui_pediu_relogio(void) { int v = pediuRelogio; pediuRelogio = 0; retur
 static void sincronizar(void) {
   if (!sessao_logada()) {
     ilha_avisar("sync-addons", ILHA_INFO, "aj_rotate-cw",
-                i18n("Entre na conta Nuvio para sincronizar os addons."), 4000u, 0);
+                i18n("Entre na conta QR TIME para sincronizar os addons."), 4000u, 0);
     return;
   }
   if (sync_manual_addons_rodando()) return;   // ja no ar: o botao nao empilha

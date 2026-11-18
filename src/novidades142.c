@@ -375,7 +375,7 @@ static void novidades142_desenharCorpo_(Uint32 agora) {
     gfx_cor((GfxRect){ N142_TXT_X, yFilete, N142_TXT_W, 1.5f }, 0.0f,
             1.0f, 1.0f, 1.0f, 0.08f * a);
     txt_bloco(TXT_BODY,
-              i18n("Leva 1 minuto: mede esta TV, ajusta o app sozinho e envia o relatório para melhorarmos o Nuvio para todo mundo."),
+              i18n("Leva 1 minuto: mede esta TV, ajusta o app sozinho e envia o relatório para melhorarmos o QR TIME para todo mundo."),
               214, 219, 230, N142_TXT_X, yFilete + 26.0f, N142_TXT_W, 34.0f, a * 0.98f, 3);
     botao_pilula(bS, rotS, NULL, foco == B_DEPOIS ? 1.0f : 0.0f, 0, 0, a);
     botao_pilula(bP, rotP, NULL, foco == B_DIAGNOSTICO ? 1.0f : 0.0f, 1, 0, a);

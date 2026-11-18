@@ -57,7 +57,7 @@ static const char *const GUIA_CAP_TXT[GUIA_NCAPS] = {
   "Legendas, áudio e o idioma do app e do conteúdo.",
   "A pílula do canto da tela, os avisos que saem dela e a central onde eles ficam.",
   "O que você guarda, as listas da conta e dos serviços, a agenda das séries e o Explorar.",
-  "Amigos no Nuvio, quem pode te encontrar, Trakt e Simkl, perfis e addons.",
+  "Amigos no QR TIME, quem pode te encontrar, Trakt e Simkl, perfis e addons.",
   "O Guia de TV, os canais dos addons e do seu provedor, e o que fazer quando um canal não abre.",
   "Vidro ou sólido, a cor de destaque, a fonte e os cartazes.",
   "Medir esta TV e deixar o app mais leve ou mais bonito, conforme ela aguenta.",

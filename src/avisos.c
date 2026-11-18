@@ -848,7 +848,7 @@ void avisos_iniciar(void) {
     { char id[72], tit[160], txt[420];
       snprintf(id, sizeof id, "crash:%s", crashQuando);
       snprintf(tit, sizeof tit, "%s", i18n("O app fechou sozinho"));
-      snprintf(txt, sizeof txt, i18n("Em %s o Nuvio parou sem avisar. Se quiser, envie o registro daquela sessão para ajudar a encontrar a causa."), crashQuando);
+      snprintf(txt, sizeof txt, i18n("Em %s o QR TIME parou sem avisar. Se quiser, envie o registro daquela sessão para ajudar a encontrar a causa."), crashQuando);
       // SEM CARTAO E SEM TOAST NO ARRANQUE (dono, 23/09/2026: "tira a
       // mensagem de enviar o log quando entra no app, ja temos os logs"). A
       // queda fica so na lista de Avisos, em silencio; quem ligou o envio
@@ -878,7 +878,7 @@ void avisos_iniciar(void) {
       novos += demoAviso("demo:canal", AV_CANAL, "Guia de TV demorando",
                    "Na 1.3.1 o guia espera a rede a cada abertura. A 1.3.2 corrige. — Henrique", NULL);
       novos += demoAviso("demo:crash", AV_CRASH, i18n("O app fechou sozinho"),
-                   "Em 2026-09-19 18:57 o Nuvio parou sem avisar. Se quiser, envie o registro daquela sessão para ajudar a encontrar a causa.", NULL);
+                   "Em 2026-09-19 18:57 o QR TIME parou sem avisar. Se quiser, envie o registro daquela sessão para ajudar a encontrar a causa.", NULL);
       pthread_mutex_unlock(&trava);
       toast(novos);
       cartaoPendente = 1; snprintf(cartaoId, sizeof cartaoId, "demo:crash");
@@ -970,7 +970,7 @@ static void crashPhoneAcao(int i, int b) {
 static float crashPhoneCorpo(float x, float y, float w, float a) {
   float ini = y; char txt[300];
   y += telefonecartao_titulo("O app fechou sozinho", x, y, w, a);
-  snprintf(txt, sizeof txt, i18n("Em %s o Nuvio parou sem avisar. O registro daquela sessão (os últimos 200 KB do log, sem senhas nem chaves) ajuda a achar a causa. Quer enviar?"), crashQuando);
+  snprintf(txt, sizeof txt, i18n("Em %s o QR TIME parou sem avisar. O registro daquela sessão (os últimos 200 KB do log, sem senhas nem chaves) ajuda a achar a causa. Quer enviar?"), crashQuando);
   y += txt_bloco_corta(TXT_BODY, txt, 200, 203, 210, x, y, w, 34, a, 0) + 24;
   if (envioEstado > 0) y += telefonecartao_texto(TXT_BODY, envioEstado == 1 ? "Enviando…"
                                      : envioEstado == 2 ? "Registro enviado. Obrigado." : "Não foi possível enviar agora.", x, y, w, 34, a);
@@ -1011,7 +1011,7 @@ static void cartaoDesenhar(void) {
   gfx_icone((GfxRect){ x + 69.0f, y + 69.0f, 30.0f, 30.0f }, "fluxo", 0.62f, 0.80f, 0.96f, a);
   { TxtLinha t = txt_linha(TXT_TITULO3, i18n("O app fechou sozinho"), 246, 247, 252, 255);
     txt_desenhar_alpha(t, x + 136.0f, y + 52.0f, a); }
-  snprintf(txt, sizeof txt, i18n("Em %s o Nuvio parou sem avisar. O registro daquela sessão (os últimos 200 KB do log, sem senhas nem chaves) ajuda a achar a causa. Quer enviar?"), crashQuando);
+  snprintf(txt, sizeof txt, i18n("Em %s o QR TIME parou sem avisar. O registro daquela sessão (os últimos 200 KB do log, sem senhas nem chaves) ajuda a achar a causa. Quer enviar?"), crashQuando);
   txt_bloco(TXT_BODY, txt, 200, 203, 210, x + 56.0f, y + 132.0f, W - 112.0f, 34.0f, a, 3);
   bx = x + 56.0f;
   if (envioEstado == 1) {

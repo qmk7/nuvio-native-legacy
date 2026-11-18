@@ -727,11 +727,11 @@ static int enfeitar(CatItem *d, const char *tipo, uint64_t sessao) {
     if (corpoCine) {
       MetaEpInfo prox;
       if (metaep_existe(corpoCine, d->temporada, d->episodio)) {
-        printf("[trakt] episodio ausente na ficha Nuvio; Cinemeta tem: %s S%dE%d\n",
+        printf("[trakt] episodio ausente na ficha QR TIME; Cinemeta tem: %s S%dE%d\n",
                serie, d->temporada, d->episodio);
         epc = corpoCine;
       } else if (metaep_proximo(corpoCine, d->temporada, d->episodio, &prox)) {
-        printf("[trakt] episodio ausente na ficha Nuvio; Cinemeta tem: %s S%dE%d\n",
+        printf("[trakt] episodio ausente na ficha QR TIME; Cinemeta tem: %s S%dE%d\n",
                serie, prox.temporada, prox.episodio);
         epc = corpoCine;
       }
@@ -742,7 +742,7 @@ static int enfeitar(CatItem *d, const char *tipo, uint64_t sessao) {
       // A LINHA nao reimprime dentro de 24 h: era o ruido do mapa (155 vezes o
       // mesmo tt SxEy num registro). Outro episodio da mesma serie ainda sai.
       if (!cineNegSabe(chave)) {
-        printf("[trakt] episodio ausente na ficha Nuvio; Cinemeta tambem nao tem: %s S%dE%d\n",
+        printf("[trakt] episodio ausente na ficha QR TIME; Cinemeta tambem nao tem: %s S%dE%d\n",
                serie, d->temporada, d->episodio);
         cineNegMarcar(chave);
       }

@@ -1716,7 +1716,7 @@ static int aoPedidoScreensaver(LSHandle *h, LSMessage *m, void *u) {
   snprintf(b, sizeof b, "{\"clientName\":\"" NV_APP_ID "\",\"ack\":%s,\"timestamp\":%s}",
            segurar ? "false" : "true", ts);
   printf("[video] screensaver pedido: %s timestamp=%s midia=%d tocando=%d pausa=%d fim=%d erro=%d\n",
-         segurar == 2 ? "seguro (tela de descanso do Nuvio)"
+         segurar == 2 ? "seguro (tela de descanso do QR TIME)"
                       : segurar ? "seguro (filme tocando)" : "liberado",
          ts, !!(e & ACK_MIDIA), !!(e & ACK_TOCANDO), !!(e & ACK_PAUSA),
          !!(e & ACK_FIM), !!(e & ACK_ERRO));

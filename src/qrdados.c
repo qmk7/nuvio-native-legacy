@@ -19,7 +19,25 @@
 
 // ---------------------------------------------------------------- schema
 static int disco, maisNovo;
-static int passoV1(void) { return 1; }   // v1 = the phase 1-8 layout; nothing to convert
+// v1 = the phase 1-8 layout. Nothing is converted; the only thing added is
+// the "seen" mark of every what's-new card of the old brand's releases (its
+// changelog and its developer's support page are not QR TIME's). Adds only.
+static int passoV1(void) {
+  static const char *const vistas[] = { "11", "12", "13", "131", "132", "133", "134", "139", "14-celebracao", "142", "150",
+    "152-ui", "160-ui", "170-ui", "172-ui", "174-ui", "180-ui", "20-guia", "201", "202", "208", "guia", NULL };
+  char n[48];
+  for (int i = 0; vistas[i]; i++) {
+    char *t;
+    snprintf(n, sizeof n, "novidades-%s.txt", vistas[i]);
+    if ((t = dados_ler(n))) { free(t); continue; }
+    dados_gravar(n, "1\n");
+  }
+  // The diagnostics presentation and the log-sending question talk about the
+  // old brand's support server; QR TIME has none configured.
+  { char *t = dados_ler("diagnostico-otimizacao-intro.cfg"); if (t) free(t); else dados_gravar("diagnostico-otimizacao-intro.cfg", "versao=1\n"); }
+  { char *t = dados_ler("aviso-log.txt"); if (t) free(t); else dados_gravar("aviso-log.txt", "1\n"); }
+  return 1;
+}
 static const QrdPasso PASSOS[] = { passoV1 };
 static const QrdPasso *passos = PASSOS;
 static int nPassos = (int)(sizeof PASSOS / sizeof *PASSOS), alvo = QRD_ESQUEMA;

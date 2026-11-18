@@ -253,7 +253,7 @@ static void cenaSamsung(float x, float y, float t, float a) {
   // A luz ambiente atras das TVs: a unica cor viva da cena.
   gfx_luz_canto((GfxRect){ x, y, W, N160_PV_H }, rr(N160_PV_RAIO, (GfxRect){0, 0, W, N160_PV_H}),
                 W * 0.5f, 470.0f, 560.0f, ar, ag, ab, 0.16f * a);
-  hTexto = txt_bloco(TXT_TITULO3, i18n("O mesmo Nuvio, agora nativo na Samsung"),
+  hTexto = txt_bloco(TXT_TITULO3, i18n("O mesmo QR TIME, agora nativo na Samsung"),
                      246, 247, 250, x + N160_M, y + 104.0f, W - 2.0f * N160_M, 56.0f, a, 2);
   txt_bloco(TXT_BODY, i18n("Sem navegador no meio: o app roda direto na TV."),
             184, 190, 202, x + N160_M, y + 104.0f + hTexto + 14.0f, W - 2.0f * N160_M, 33.0f,
@@ -831,7 +831,7 @@ static const Item ITENS[] = {
   { ID_NOTAS,   "aj_star",             "Notas no título",
     "Fontes de nota à escolha e mapa dos episódios. Ajustes › Integrações." },
   { ID_AMIGOS,  "recomendar",          "Entre amigos",
-    "Amigos do Nuvio além do Trakt. Perfil público só se você ligar." },
+    "Amigos do QR TIME além do Trakt. Perfil público só se você ligar." },
   { ID_AGENDA,  "menu_agenda",         "Agenda",
     "O que saiu desde o lembrete e notícias abertas na própria TV." },
 };

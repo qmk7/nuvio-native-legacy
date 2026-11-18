@@ -5230,8 +5230,8 @@ void app_atualizar(float dt, Uint32 agora) {
     if (fora && !avisado) {
       ilha_avisar("conta-fora", ILHA_INFO, NULL,
                   fora == 1
-                    ? i18n("Servidor da conta Nuvio fora do ar — usando seus addons salvos")
-                    : i18n("Servidor da conta Nuvio fora do ar — seus addons voltam quando ele responder"),
+                    ? i18n("Servidor da conta QR TIME fora do ar — usando seus addons salvos")
+                    : i18n("Servidor da conta QR TIME fora do ar — seus addons voltam quando ele responder"),
                   9000u, 0);
       avisado = 1;
     } else if (!fora && avisado) {

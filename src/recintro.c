@@ -414,7 +414,7 @@ static void recintro_desenharCorpo_(Uint32 agora) {
     const char *titulo = pagina == 0 ? "A aba Social"
                        : pagina == 1 ? "Recomendar um título"
                                      : "Adicionar um amigo";
-    { TxtLinha t = txt_linha(TXT_CAPTION2, i18n("NOVO NO NUVIO"),
+    { TxtLinha t = txt_linha(TXT_CAPTION2, i18n("NOVO NO QR TIME"),
                              150, 154, 165, 255);
       txt_desenhar_alpha(t, fx, RI_Y + dy + 64.0f, ap * 0.92f); }
     { TxtLinha t = txt_linha_corta(TXT_TITULO3, i18n(titulo),

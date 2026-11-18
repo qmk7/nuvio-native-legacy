@@ -290,7 +290,7 @@ static const char *ROT_VIS[BIB_N_VIS] = { "Cartazes", "Lista" };
 // roda porque e mais uma origem de listas, nao um lugar separado.
 enum { FONTE_TRAKT, FONTE_SIMKL, FONTE_NUVIO, FONTE_FIXADAS, FONTE_PUB, BIB_N_FONTES };
 static const char *ROT_FONTE[BIB_N_FONTES] =
-  { "Trakt", "Simkl", "Nuvio", "Fixadas", "Públicas" };
+  { "Trakt", "Simkl", "QR TIME", "Fixadas", "Públicas" };
 
 // Em que grade o foco esta. Nao e um modo a mais: e o mesmo modo Listas com uma
 // lista aberta por cima.
@@ -2124,7 +2124,7 @@ static void desenhaLinhaTitulo(const CatItem *ci, float y, float f, float a) {
 }
 
 static const char *rotuloFonte(int f) {
-  return f == LST_TRAKT ? "TRAKT" : f == LST_SIMKL ? "SIMKL" : "NUVIO";
+  return f == LST_TRAKT ? "TRAKT" : f == LST_SIMKL ? "SIMKL" : "QR TIME";
 }
 
 // A MARCA DA FONTE SO APARECE QUANDO ELA INFORMA ALGO.
@@ -2297,7 +2297,7 @@ static void desenhaCabecalho(void) {
   // acompanha meus outros aparelhos?".
   { const char *f =
         temAberta ? rotuloFonte(aberta.fonte)
-      : modo == MODO_LISTAS ? (fonte == FONTE_NUVIO ? "NUVIO"
+      : modo == MODO_LISTAS ? (fonte == FONTE_NUVIO ? "QR TIME"
                              : fonte == FONTE_SIMKL ? "SIMKL"
                              : fonte == FONTE_FIXADAS ? "LOCAL"
                              : "TRAKT")

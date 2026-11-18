@@ -3095,7 +3095,7 @@ int recomenda_social_mesclar_sessao(CatItem *itens, int nTrakt, int max, uint64_
     n = rec_social_unir(itens, nTrakt, nu, n, max);
     perfis_sessao_destravar();
   } else n = 0;
-  printf("[recomenda] entre amigos: %d do Trakt + Nuvio = %d\n", nTrakt, n);
+  printf("[recomenda] entre amigos: %d do Trakt + QR TIME = %d\n", nTrakt, n);
   fflush(stdout);
   free(nu);
   recSessaoDefinir(anterior);

@@ -131,10 +131,10 @@ void jf_cabecalho_auth(const JfConta *c, char *dst, size_t tam) {
   campoAuth(devId, sizeof devId, c && c->dispositivoId[0] ? c->dispositivoId : "nuvio");
   campoAuth(tok, sizeof tok, c ? c->token : "");
   if (tok[0])
-    snprintf(dst, tam, "%s: MediaBrowser Client=\"Nuvio\", Device=\"%s\", "
+    snprintf(dst, tam, "%s: MediaBrowser Client=\"QR TIME\", Device=\"%s\", "
              "DeviceId=\"%s\", Version=\"%s\", Token=\"%s\"", nome, dev, devId, NV_JF_VERSAO, tok);
   else
-    snprintf(dst, tam, "%s: MediaBrowser Client=\"Nuvio\", Device=\"%s\", "
+    snprintf(dst, tam, "%s: MediaBrowser Client=\"QR TIME\", Device=\"%s\", "
              "DeviceId=\"%s\", Version=\"%s\"", nome, dev, devId, NV_JF_VERSAO);
   apagarSegredo(tok, sizeof tok);
 }
@@ -625,14 +625,14 @@ int jf_episodios(const JfConta *c, RedeJob *job, const char *serieId, CatEp *out
 int jf_perfil_dispositivo(JfBackend b, char *json, size_t tam) {
   const char *nome, *cont, *vid, *aud;
   switch (b) {
-    case JF_BACKEND_ANDROID: nome = "Nuvio Android TV"; cont = "mp4,m4v,mkv,webm,mov,ts";
+    case JF_BACKEND_ANDROID: nome = "QR TIME Android TV"; cont = "mp4,m4v,mkv,webm,mov,ts";
       vid = "h264,hevc,vp9"; aud = "aac,mp3,ac3,eac3,opus,flac,vorbis"; break;
-    case JF_BACKEND_WEBOS: nome = "Nuvio LG webOS"; cont = "mp4,m4v,mkv,mov,ts";
+    case JF_BACKEND_WEBOS: nome = "QR TIME LG webOS"; cont = "mp4,m4v,mkv,mov,ts";
       vid = "h264,hevc"; aud = "aac,mp3,ac3,eac3"; break;
-    case JF_BACKEND_TPK: nome = "Nuvio Samsung Tizen"; cont = "mp4,m4v,mkv,mov,ts";
+    case JF_BACKEND_TPK: nome = "QR TIME Samsung Tizen"; cont = "mp4,m4v,mkv,mov,ts";
       vid = "h264,hevc"; aud = "aac,mp3,ac3,eac3"; break;
     case JF_BACKEND_WGT: return 0;   // no strict HTTP: never negotiated
-    default: nome = "Nuvio Desktop"; cont = "mp4,m4v"; vid = "h264"; aud = "aac,mp3"; break;
+    default: nome = "QR TIME Desktop"; cont = "mp4,m4v"; vid = "h264"; aud = "aac,mp3"; break;
   }
   return snprintf(json, tam,
     "{\"Name\":\"%s\",\"MaxStreamingBitrate\":%d,\"MaxStaticBitrate\":%d,"

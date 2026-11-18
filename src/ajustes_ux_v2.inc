@@ -233,9 +233,9 @@ static void aj2MenuValor(int sec, char *b, size_t n) {
     case AJS_APARENCIA:   // "Frost · Vidro ligado"
       snprintf(b, n, "%s · %s", i18n(textoValor(AJ_FUNDO)), i18n(lig(AJ_VIDRO) ? "Vidro ligado" : "Sem vidro"));
       return;
-    case AJS_REPRODUCAO:   // "4K · Fonte: o Nuvio escolhe"
+    case AJS_REPRODUCAO:   // "4K · Fonte: o QR TIME escolhe"
       snprintf(b, n, "%s · %s", i18n(textoValor(AJ_QUALIDADE)),
-               i18n(lig(AJ_FONTE_MANUAL) ? "Fonte: você escolhe" : "Fonte: o Nuvio escolhe"));
+               i18n(lig(AJ_FONTE_MANUAL) ? "Fonte: você escolhe" : "Fonte: o QR TIME escolhe"));
       return;
     case AJS_FONTES: snprintf(b, n, "%s", ajEstadoAcao(AJ_ADDONS)); return;
     case AJS_IDIOMAS: {   // "Portugues · Audio: Original do titulo"
@@ -839,7 +839,7 @@ static void aj2GradePilula(int t) {
 static void aj2GradeDescoberta(int t) {
   float k = aj2Suave(aj2TF[t]);
   GfxRect r = aj2GradeSuperficie(aj2TopoR(t), 22.0f, k, 6.0f, 0.42f, 0);
-  const char *tit = t == AJ2_T_TOUR ? "O que o Nuvio faz?" : "Resolver um problema";
+  const char *tit = t == AJ2_T_TOUR ? "O que o QR TIME faz?" : "Resolver um problema";
   const char *sub = t == AJ2_T_TOUR ? "Tour pelas funções, com atalho para ligar cada uma" : "TV lenta, sem som, legenda errada";
   float tile = 65.0f, x = r.x + 25, tw;
   GfxRect tr = { x, r.y + (r.h - tile) * 0.5f, tile, tile };

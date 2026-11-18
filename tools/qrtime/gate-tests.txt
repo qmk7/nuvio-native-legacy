@@ -92,3 +92,4 @@ qrtime_redact
 qrtime_fuzz:1500
 qrtime_dados:900
 qrtime_contas_ui:600
+qrtime_intro:300

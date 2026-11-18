@@ -449,8 +449,8 @@ static void mandarIdentify(void) {
   jsw_chave(&w, "properties");
   jsw_obj_ini(&w);
   jsw_cs(&w, "os", "linux");
-  jsw_cs(&w, "browser", "Nuvio");
-  jsw_cs(&w, "device", "Nuvio TV");
+  jsw_cs(&w, "browser", "QR TIME");
+  jsw_cs(&w, "device", "QR TIME TV");
   jsw_obj_fim(&w);
   jsw_obj_fim(&w);
   jsw_obj_fim(&w);
@@ -470,8 +470,8 @@ static void mandarPresenca(const Presenca *p) {
   jsw_arr_ini(&w);
   if (!p->vazio) {
     jsw_obj_ini(&w);
-    jsw_cs(&w, "name", "Nuvio");
-    jsw_ci(&w, "type", 3);   // 3 = Watching ("Assistindo Nuvio")
+    jsw_cs(&w, "name", "QR TIME");
+    jsw_ci(&w, "type", 3);   // 3 = Watching ("Assistindo QR TIME")
     jsw_cs(&w, "application_id", NV_DISCORD_CLIENT_ID);
     if (p->detalhes[0]) jsw_cs(&w, "details", p->detalhes);
     if (p->estadoTxt[0]) jsw_cs(&w, "state", p->estadoTxt);

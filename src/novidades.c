@@ -164,7 +164,7 @@ static void novidades_desenharCorpo_(Uint32 agora) {
 
   // --- coluna da figura -------------------------------------------------
   { float fx = ND_X + ND_PAD, fy = ND_Y + dy + 178.0f;
-    { TxtLinha t = txt_linha(TXT_CAPTION2, i18n("NOVO NO NUVIO"),
+    { TxtLinha t = txt_linha(TXT_CAPTION2, i18n("NOVO NO QR TIME"),
                            150, 154, 165, 255);
       txt_desenhar_alpha(t, fx, ND_Y + dy + 64.0f, a * 0.92f); }
     { TxtLinha t = txt_linha(TXT_TITULO1, i18n("Guia de TV"),

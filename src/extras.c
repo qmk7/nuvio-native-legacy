@@ -838,7 +838,7 @@ static void *buscar(void *arg) {
       // TV, "quem ainda acha que o episodio foi visto?".
       vistoep_fonte_log(id, "trakt", &fonte);
       { int discordam = 0, daConta = contalib_vistos_do_titulo(id, &discordam);
-        printf("[vistoep] %s: conta Nuvio tem %d episodios (%d deles desmarcados aqui); "
+        printf("[vistoep] %s: conta QR TIME tem %d episodios (%d deles desmarcados aqui); "
                "nao aplicada ao mapa com Trakt ativo\n", id, daConta, discordam); }
       // O TOPO DO TRAKT conta o que a pessoa desmarcou: sem descontar, a serie
       // voltava a "100% assistida" e ao selo de vista com episodios desmarcados.

@@ -536,7 +536,7 @@ static void ajcSvLista(int simkl) {
   }
 }
 static void ajcSvSalvos(void) {
-  static const char *N[3] = { "Nuvio", "Trakt", "Simkl" };
+  static const char *N[3] = { "QR TIME", "Trakt", "Simkl" };
   static const char *I[3] = { "aj_hard-drive", "aj_link", "aj_link" };
   int v = (int)(ajcValor(AJ_SALVOS_DEST) + 0.5f), i;
   float f = ajc_fase(2.8f), t = ajcSvTr(f, 0.2f, 0.7f), ty;
@@ -559,7 +559,7 @@ static void ajcSvSalvos(void) {
   ajc_icone_tinta("aj_bookmark", 195 + (418 - 195) * t, 260 + (ty - 260) * t, 10, f < 0.8f ? 1.0f : 0.0f);
 }
 static void ajcSvContinuar(void) {
-  static const char *N[3] = { "Nuvio", "Trakt", "Simkl" };
+  static const char *N[3] = { "QR TIME", "Trakt", "Simkl" };
   int v = (int)(ajcValor(AJ_CW_FONTE) + 0.5f), i;
   float f = ajc_fase(2.4f);
   for (i = 0; i < 3; i++) {
@@ -582,7 +582,7 @@ static void ajcSvHist(void) {
   ajc_progresso(58, 184, 144, 0.5f, 1);
   ajc_ret(224, 70, 90, 3, 1.5f, 1, 1, 1, 0.18f);
   ajc_ladrilho("aj_cloud", 400, 70, 76, k > 0.5f, 1);
-  ajcTexto("Nuvio", 13, 1, 400 - ajcLargura("Nuvio", 13, 1) * 0.5f, 120, 0.8f);
+  ajcTexto("QR TIME", 13, 1, 400 - ajcLargura("QR TIME", 13, 1) * 0.5f, 120, 0.8f);
   if (k > 0.5f) ajc_bolinha(224 + 90 * f, 71.5f, 10, C.ar, C.ag, C.ab, 1);
   else { ajc_bolinha(224 + 50 * f, 71.5f, 10, 1, 1, 1, 0.5f); ajc_icone("aj_x", 292, 71, 18, 0.9f); }
   // Trakt e Simkl continuam recebendo
@@ -716,7 +716,7 @@ static void ajcSvCinemeta(int op) {
   for (i = 0; i < letras; i++) ajc_ret(100 + i * 18, 56, 12, 16, 3, 1, 1, 1, 0.8f);
   ajc_ret(100 + letras * 18, 52, 2, 24, 1, 1, 1, 1, ajc_onda(0.8f) > 0.5f ? 0.9f : 0.1f);
   // duas origens: Nuvio (sempre) e Cinemeta (pela chave)
-  ajc_neutro(40, 120, 150, 40, 20, 1); ajc_icone("aj_database", 64, 140, 16, 0.9f); ajcTexto("Nuvio", 15, 1, 82, 131, 0.9f);
+  ajc_neutro(40, 120, 150, 40, 20, 1); ajc_icone("aj_database", 64, 140, 16, 0.9f); ajcTexto("QR TIME", 15, 1, 82, 131, 0.9f);
   ajc_neutro(40, 176, 150, 40, 20, 0.35f + 0.65f * k); ajc_icone(k > 0.5f ? "aj_film" : "aj_eye-off", 64, 196, 16, 0.4f + 0.5f * k);
   ajcTexto("Cinemeta", 15, 1, 82, 187, 0.35f + 0.55f * k);
   if (k > 0.5f) ajc_acento_ret(40, 176, 150, 40, 20, 0.35f * k);

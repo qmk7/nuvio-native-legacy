@@ -3,6 +3,7 @@
 // cancela. A lista mostra valor e chevron, a ficha explica alcance e padrao.
 // IDs, chaves persistidas e indices de valores continuam os legados.
 #include "ajustes.h"
+#include "admin.h"
 #include "legfontes.h"
 #include "logrede.h"
 #include "jsw.h"
@@ -739,7 +740,7 @@ _Static_assert(DEBRID_RD == 0 && DEBRID_TB == 1 && DEBRID_PM == 2 && DEBRID_AD =
 static const char *V_PROVEDORES_ESCOPO[] = { "Compartilhada neste aparelho", "Separada para este perfil" };
 static const char *V_HDR_UI[] = { "Automático", "Desligado" };
 static const char *V_LEG_MOSTRAR[] = { "Só meus idiomas", "Todas" };
-static const char *V_SELOS_PACOTE[] = { "Do Nuvio", "Pacote 1", "Pacote 2", "Pacote 3" };
+static const char *V_SELOS_PACOTE[] = { "Do QR TIME", "Pacote 1", "Pacote 2", "Pacote 3" };
 
 // Selo de assistido: a ordem e a do disco (0 = Ligado do V_LIGA antigo vira Icone,
 // 1 = Desligado continua), entao o que ja foi gravado nao precisa migrar.
@@ -945,7 +946,7 @@ static const char *V_FONTE_REPOR[] = { "Desligado", "1 fonte", "2 fontes", "3 fo
 // Nuvio (nome do conteudo em cima, logos de qualidade embaixo, tamanho); 1 =
 // o nome e a descricao como o addon formatou — quem monta o proprio formato no
 // AIOStreams quer ver o dele.
-static const char *V_FONTE_TEXTO[] = { "Do Nuvio", "Do addon", "Logo do título" };
+static const char *V_FONTE_TEXTO[] = { "Do QR TIME", "Do addon", "Logo do título" };
 // #90: o fundo de arte da tela de escolha de perfil (psfundo.c). "Automático"
 // e o comportamento atual (perfil primeiro, catalogo como reserva, com
 // rotacao); "Desligado" volta a tela ao que era antes da issue — psfundo nao
@@ -1051,7 +1052,7 @@ static const char *V_CW[]        = { "Card", "Largo", "P\xc3\xb4ster" };
 // tests/simkl_cw.sh confere rotulo por indice. O rotulo era "Ambas"
 // (ambas o que? #312); agora "Todas as fontes": o Simkl so entra com vinculo
 // feito, e a ajuda da linha diz a regra inteira. O valor gravado nao mudou.
-static const char *V_CW_FONTE[]  = { "Todas as fontes", "Conta Nuvio", "Trakt", "Simkl" };
+static const char *V_CW_FONTE[]  = { "Todas as fontes", "Conta QR TIME", "Trakt", "Simkl" };
 // `continueWatchingSortMode`, normalizado em normalizeContinueWatchingSortMode.
 static const char *V_CW_ORDEM[]  = { "Padrão", "Estilo streaming", "Separar futuros" };
 // Itens por fileira da Home (#163). O INDICE e o que fica gravado; o numero de
@@ -1107,7 +1108,7 @@ static const char *V_HERO_FONTE[] = {
 // V_CW_FONTE: o indice e o gravado ("salvosDestino N"), e 1 tem de continuar
 // sendo o Trakt. Com ele o "+" publica no Plan to Watch, e o Plan to Watch
 // passa a entrar nos Salvos (descoberta.c). Nomes em ajustes.h (AJ_SALVOS_*).
-static const char *V_SALVOS[]    = { "Lista do Nuvio", "Watchlist do Trakt",
+static const char *V_SALVOS[]    = { "Lista do QR TIME", "Watchlist do Trakt",
                                      "Plan to Watch do Simkl" };
 // PAIS DA GRADE DO GUIA (#158). O indice e o gravado ("epgPaisLocal N"):
 // novos entram NO FIM. O nome de cada pais vai na propria lingua dele, que e
@@ -1586,7 +1587,7 @@ static const Opcao OPCOES[AJ_N] = {
   ACAO("Testar chave do Real-Debrid"),
   ACAO("Testar chave do TorBox"),
   ACAO("Testar chave do Premiumize"),
-  ESC("Usar sempre o catálogo do Nuvio",          V_LIGA, 2),   // local: soCinemetaLocal
+  ESC("Usar sempre o catálogo do QR TIME",          V_LIGA, 2),   // local: soCinemetaLocal
   // Notas na linha do titulo (ver o enum). Ligado/Desligado como as demais.
   ESC("IMDb",                       V_LIGA, 2),   // local: notaTituloImdb
   ESC("Rotten Tomatoes (crítica)",  V_LIGA, 2),   // local: notaTituloTomates
@@ -1705,7 +1706,7 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Continuar na escolha de perfil",  V_LIGA, 2),             // local: psContinuarLocal
   ESC("DTS convertido em",               V_DTS_SAIDA, N_DTS_SAIDA), // local: dtsSaidaLocal (.tpk: dtsTpkLocal)
   ESC("Dolby Vision em MKV (experimental)", V_LIGA, 2),          // local: dvMkvLocal
-  ESC("Enviar histórico para a conta Nuvio", V_LIGA, 2),          // por perfil: histContaLocal
+  ESC("Enviar histórico para a conta QR TIME", V_LIGA, 2),          // por perfil: histContaLocal
   ESC("Recursos sociais",                V_LIGA, 2),             // por perfil: socialLocal
   ACAO("Ordem dos add-ons"),                                   // fonteregra.c (local)
   ESC("Usar a ordem",                    V_FONTE_ORDEM_USO, 3), // por perfil: fonteOrdemUsoLocal
@@ -1714,7 +1715,7 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Conferir várias fontes ao mesmo tempo", V_LIGA, 2),   // local: fonteConferirVariasLocal
   ESC("Preparar a fonte ao abrir o título", V_LIGA, 2),   // local: fontePrepararLocal
   ESC("Próximo episódio no Continuar",   V_LIGA, 2),   // por perfil: cwProximoLocal
-  ESC("Resultados do catálogo do Nuvio na busca", V_BUSCA_NUVIO, 3), // local: buscaNuvioLocal
+  ESC("Resultados do catálogo do QR TIME na busca", V_BUSCA_NUVIO, 3), // local: buscaNuvioLocal
   ESC("Mostrar a fonte nos resultados da busca", V_LIGA, 2),   // local: buscaOrigemLocal
   ESC("Layout dos Ajustes",              V_LAYOUT_AJUSTES, 2),   // local: ajustesLayoutLocal (#339)
   ESC("Limite de espaço do P2P",         V_P2P_LIMITE, 5),   // local: p2pLimiteLocal (#334)
@@ -6933,7 +6934,7 @@ static const char *rotuloNovo(int op) {
     case AJ_FONTE_HDR: return "Dolby Vision e HDR";
     case AJ_ATMOS: return "Preferir som Dolby Atmos";
     case AJ_FONTE_MANUAL: return "Escolher a fonte você mesmo";
-    case AJ_FONTE_PRIORIDADE: return "O que o Nuvio prioriza";
+    case AJ_FONTE_PRIORIDADE: return "O que o QR TIME prioriza";
     case AJ_FONTE_PRAZO: return "Quanto espera pelos add-ons";
     case AJ_TAM_MAX: return "Tamanho máximo do arquivo";
     case AJ_TAM_MIN: return "Tamanho mínimo do arquivo";
@@ -7226,7 +7227,7 @@ static const char *textoLeitura(int op) {
   if (op == AJ_SELOS_PACOTE_REM) {
     int a = selospacote_ativo();
     if (a < 0) return i18n("nenhum pacote escolhido");
-    return selospacote_da_tv(a) ? i18n("OK remove") : i18n("só na conta, no Nuvio web");
+    return selospacote_da_tv(a) ? i18n("OK remove") : i18n("só na conta, no QR TIME web");
   }
   if (op == AJ_PERFIL_EDITAR) {
     // static: o texto devolvido e lido DEPOIS do return (era endereco de
@@ -7567,6 +7568,10 @@ static int maisContar(int sec, char *resumo, size_t n) {
 // alcancada pelo cima/baixo.
 static int visivel(int i) {
   if (i >= 0 && i < AJ_N_TELA && TELA[i].tipo == IT_OPC && TELA[i].op == AJ_FALHA_ADDON_LIMITE) return 0;
+  // QR TIME: the old brand's logo picker, opening styles, supporter icons and
+  // the original developer's support page (Ko-fi / Discord) are not offered.
+  if (i >= 0 && i < AJ_N_TELA && TELA[i].tipo == IT_OPC &&
+      (TELA[i].op == AJ_LOGO_APP || TELA[i].op == AJ_ABERTURA || TELA[i].op == AJ_ICONE_APP || TELA[i].op == AJ_APOIAR)) return 0;
   if (i >= 0 && i < AJ_N_TELA && TELA[i].tipo == IT_OPC &&
       TELA[i].op == AJ_ICONE_APP && !apoiador_ativo()) return 0;
   if (i < 0 || i >= AJ_N_TELA) return 0;
@@ -7654,7 +7659,7 @@ static const char *ajudaOpcaoBase(int op) {
     return "Tamanho, fonte, cores, fundo e posição das legendas.";
   if (op >= AJ_LEG2_FONTE && op <= AJ_LEG2_RESTAURAR)
     return "Aparência só da segunda legenda. \"Igual à principal\" segue o estilo da principal, definido no player.";
-  if (op == AJ_ICONE_APP) return "Escolha uma marca alternativa para o Nuvio nesta TV. Um agradecimento a quem apoia o projeto.";
+  if (op == AJ_ICONE_APP) return "Escolha uma marca alternativa para o QR TIME nesta TV. Um agradecimento a quem apoia o projeto.";
   if (inativa(op)) {
     if (op == AJ_AMPLIACAO_ALGO || op == AJ_AMPLIACAO_NITIDEZ) {
       if (!gpun_upscale_suportado()) return "Não disponível nesta TV";
@@ -7702,7 +7707,7 @@ static const char *ajudaOpcaoBase(int op) {
     if (op >= AJ_NT_IMDB && op <= AJ_NT_SCORE)
       return extras_mdblist_tem_chave()
         ? "Ative MDBList para mostrar esta nota."
-        : "Esta nota vem do MDBList e precisa da chave dele na sua conta Nuvio.";
+        : "Esta nota vem do MDBList e precisa da chave dele na sua conta QR TIME.";
     if (op == AJ_ADDON_POSTER)
       return "Sem Pôsteres personalizados ligado o pôster já é o que o addon manda. Escolha um serviço para decidir quem vence.";
     if (op == AJ_ADDON_LOGO)
@@ -7800,17 +7805,17 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_FONTE_PRIORIDADE:
       if (ajustes_fonte_prioridade() == 3) return "Do addon: toca a primeira fonte permitida, sem priorizar qualidade nem reutilizar escolhas anteriores.";
       return "Equilíbrio: HDR e Dolby Vision ganham de SDR na mesma resolução ou numa abaixo, e uma fonte que a sua conexão claramente não sustenta desce. Qualidade máxima: a maior resolução permitida, depois Dolby Vision, HDR10+, HDR10 e SDR, sem rebaixar por velocidade. Começar rápido: prefere fontes em cache e arquivos menores, que abrem mais depressa. Sempre rebaixa uma fonte que a conexão medida não sustenta.";
-    case AJ_LOGO_APP: return "O símbolo que o Nuvio mostra na abertura e nas telas de entrada. Novo é o play em degradê; Clássico é a TV retrô de sempre. Vale só nesta TV.";
+    case AJ_LOGO_APP: return "O símbolo que o QR TIME mostra na abertura e nas telas de entrada. Novo é o play em degradê; Clássico é a TV retrô de sempre. Vale só nesta TV.";
     case AJ_ABERTURA: return "Como o logo some quando o app abre. Padrão para um instante, aproxima e esmaece; Só esmaece não aproxima; Direto abre a Home sem parar. Vale só nesta TV.";
     case AJ_FONTE_HDR: return "Preferir: fontes com HDR ou Dolby Vision vêm na frente. Indiferente: o formato não conta. Evitar: prefere SDR na mesma resolução. O Dolby Vision só entra se estiver ligado em Imagem e som; perfil 5 sem HDR10 fica atrás do HDR10, porque sai com cores erradas fora de TV Dolby Vision. Só vale para a escolha automática.";
     case AJ_FONTE_ORDEM_ADDON: return "Por qualidade: as fontes vêm agrupadas por resolução, da maior para a menor, e do maior arquivo para o menor. Do addon: cada addon na ordem em que você o instalou, e as fontes de cada um na ordem em que ele mandou — para quem já ordena no AIOStreams. A escolha automática não muda.";
-    case AJ_FONTE_TEXTO: return "Do Nuvio: o nome do título em cima e os logos de qualidade embaixo. Do addon: o nome e a descrição exatamente como o addon manda — para quem já formata o texto no AIOStreams. Logo do título: a logo do título no lugar do nome escrito.";
+    case AJ_FONTE_TEXTO: return "Do QR TIME: o nome do título em cima e os logos de qualidade embaixo. Do addon: o nome e a descrição exatamente como o addon manda — para quem já formata o texto no AIOStreams. Logo do título: a logo do título no lugar do nome escrito.";
     case AJ_FONTE_PRAZO: return "As fontes aparecem na lista assim que cada add-on responde. A escolha automática não espera o mais lento: sai quando já há uma fonte boa ou depois deste tempo. Com uma fonte escolhida antes neste título, o add-on dela é sempre esperado.";
     case AJ_FONTE_TOCAR_CONFERINDO: return "Abre o player com a primeira fonte do automático na hora em que a conferência dela começa, em vez de esperar o resultado. Se a conferência reprovar a fonte, volta a esperar e segue para a próxima, sem baixar a qualidade. Torrent e fonte que precisa ser resolvida antes seguem o caminho de sempre.";
     case AJ_FONTE_AQUECER: return "Ao abrir a página de um título e quando as fontes chegam, abre antes a conexão com o debrid e com os hosts das primeiras fontes, para o Play não gastar esse tempo. Não resolve nenhum link e não cria arquivo no debrid.";
     case AJ_FONTE_CONFERIR_VARIAS: return "Confere até 3 fontes já prontas no debrid ao mesmo tempo, em vez de uma por vez, e toca a melhor que servir. Fontes que ainda não estão prontas seguem uma por vez, sem baixar nada a mais. Só vale com a Fonte automática em Melhor fonte.";
     case AJ_FONTE_PREPARAR: return "Escolhe e verifica a fonte automática ao abrir o título. Não carrega vídeo. Pode adicionar o arquivo ao painel do debrid mesmo sem assistir.";
-    case AJ_FONTE_GRUPO: return "Em qualquer episódio, tenta primeiro a mesma fonte: a que você escolheu à mão neste título ou a que tocou (mesmo lançamento ou binge group do addon). Sem nada parecido, o Nuvio escolhe sozinho.";
+    case AJ_FONTE_GRUPO: return "Em qualquer episódio, tenta primeiro a mesma fonte: a que você escolheu à mão neste título ou a que tocou (mesmo lançamento ou binge group do addon). Sem nada parecido, o QR TIME escolhe sozinho.";
     case AJ_FONTE_GRUPO_SESSOES: return "Lembra a fonte escolhida e o grupo mesmo depois de fechar o app. Desligado, só vale enquanto o app está aberto.";
     case AJ_LINK_REUSAR: return "Ao abrir de novo o mesmo filme ou episódio, toca direto o link que funcionou, sem buscar nos addons. Se ele não abrir, a busca normal assume. Os links ficam guardados nesta TV.";
     case AJ_LINK_PRAZO: return "Por quanto tempo o link guardado vale. Links de debrid podem expirar antes; nesse caso a busca normal assume.";
@@ -7851,14 +7856,14 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_LIVETV_SUGERIR: return "Os canais que a lista não separa em categorias são agrupados por sugestão do Jev, que recebe só o nome do canal. As categorias que a lista já traz não mudam.";
     case AJ_LIVETV_MODO: return "Teste para TVs em que o canal chega mas não aparece. A é o modo de sempre; B não escolhe a faixa de vídeo antes de o canal abrir; C também manda o pedido no formato de transmissão ao vivo. O diagnóstico da Live TV testa os três.";
     case AJ_LIVETV_DIAG: return "Mede a rede até o provedor, lê a conta Xtream e testa vários canais: se tocam, em que formato, com que resolução e em quanto tempo. No fim sugere ajustes da Live TV e pode aplicá-los.";
-    case AJ_SELOS_CORES: return "Na lista de fontes, cada selo (4K, HDR, Dolby, codec, serviço) ganha a cor do seu tipo, como no pacote de selos do Nuvio. Desligado, os selos ficam brancos.";
-    case AJ_SELOS_PACOTE: return "Qual pacote de selos desenha a lista de fontes. Do Nuvio é o pacote que vem no app; os outros são os pacotes da sua conta (importados no Nuvio web) e os que você adiciona aqui. Vale para este perfil. Se nenhum selo do pacote combinar com a fonte, ela usa os selos do app.";
+    case AJ_SELOS_CORES: return "Na lista de fontes, cada selo (4K, HDR, Dolby, codec, serviço) ganha a cor do seu tipo, como no pacote de selos do QR TIME. Desligado, os selos ficam brancos.";
+    case AJ_SELOS_PACOTE: return "Qual pacote de selos desenha a lista de fontes. Do QR TIME é o pacote que vem no app; os outros são os pacotes da sua conta (importados no QR TIME web) e os que você adiciona aqui. Vale para este perfil. Se nenhum selo do pacote combinar com a fonte, ela usa os selos do app.";
     case AJ_SELOS_PACOTE_ADD: return "Adiciona um pacote de selos pelo link do JSON dele (no máximo 3 no total, contando os da conta). O pacote entra já escolhido.";
     case AJ_URL_LISTA: return "Listas M3U e guias XMLTV deste perfil. Cada lista M3U vira uma fonte do Guia; cada guia XMLTV serve a programação de todas. Aqui aparece só o servidor; a URL inteira fica só nesta TV.";
     case AJ_URL_M3U_ADD: return "Adiciona uma lista de canais M3U pela URL. Digite no teclado da TV ou pelo celular.";
     case AJ_URL_XMLTV_ADD: return "Adiciona um guia de programação XMLTV pela URL (pode ser .gz).";
     case AJ_URL_REM: return "Tira do Guia a lista ou o guia escolhido.";
-    case AJ_SELOS_PACOTE_REM: return "Tira desta TV o pacote escolhido. Pacote que veio da conta só se remove na conta, no Nuvio web.";
+    case AJ_SELOS_PACOTE_REM: return "Tira desta TV o pacote escolhido. Pacote que veio da conta só se remove na conta, no QR TIME web.";
     case AJ_COL_ARTE_CONTA: return "As pastas de coleção que o app já traz com arte própria passam a usar a capa, o fundo e o logo que estão na sua conta (editor de coleções do site). O que a conta não tiver continua com a arte do app.";
     case AJ_HERO_TRANSICAO: return "Deslizar: quando o destaque troca de título, a arte e o texto saem para o lado e o próximo entra colado, como num carrossel. Esmaecer: a arte apaga e a nova aparece no lugar. Com Animações reduzidas a troca é sempre sem movimento.";
 #ifdef NV_ANDROID
@@ -7876,14 +7881,14 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_RAIL_MODERNA: return "Troca a barra lateral pela versão nova, com ícones maiores. Ela ignora a escolha entre recolhida e fixa.";
     case AJ_RAIL_BLUR: return "Desfoca a arte atrás da barra lateral moderna em vez de usar um fundo sólido.";
 #ifndef NV_ANDROID
-    case AJ_TECLADO_ANDROID: return "Automático: a grade do Nuvio; o teclado da TV abre pelo botão Teclado da TV ou com OK no campo. Do app: só a grade do Nuvio, o teclado da TV nunca abre sozinho. Do sistema: o teclado da TV abre direto em todo campo; Voltar mostra a grade. Vale só nesta TV.";
+    case AJ_TECLADO_ANDROID: return "Automático: a grade do QR TIME; o teclado da TV abre pelo botão Teclado da TV ou com OK no campo. Do app: só a grade do QR TIME, o teclado da TV nunca abre sozinho. Do sistema: o teclado da TV abre direto em todo campo; Voltar mostra a grade. Vale só nesta TV.";
 #else
-    case AJ_TECLADO_ANDROID: return "Automático: o teclado do Android abre sozinho em e-mail, senha e busca. Do app: a grade do Nuvio; o teclado do Android só pelo botão Teclado da TV. Do Android: abre direto em todo campo; Voltar mostra a grade. Vale só neste aparelho.";
+    case AJ_TECLADO_ANDROID: return "Automático: o teclado do Android abre sozinho em e-mail, senha e busca. Do app: a grade do QR TIME; o teclado do Android só pelo botão Teclado da TV. Do Android: abre direto em todo campo; Voltar mostra a grade. Vale só neste aparelho.";
 #endif
     case AJ_MIC_BUSCA: return "Mostra nas buscas um microfone ao lado de Digitar pelo celular: ele abre o teclado da Samsung para você falar pelo microfone do controle. Automático esconde o botão se a TV disser que não tem microfone; Ligado mostra sempre; Desligado esconde.";
     case AJ_HERO: return "O bloco grande no topo da Home, com a arte e o nome de um título em destaque.";
     case AJ_HERO_CATALOGOS: return "De onde vêm os títulos do destaque: os primeiros do catálogo, um sorteio, ou uma fileira da Home. OK troca.";
-    case AJ_PS_FUNDO: return "Fundo da tela de escolha de perfil. Filmes: os cartazes do que cada perfil assistiu, numa parede inclinada. Luz: preto com uma luz na cor do perfil. Projetor: sala de cinema antes da sessão. Arte do perfil: o fundo escolhido ao editar o perfil no app Nuvio; sem ele, o avatar desfocado. Ou as listras do login.";
+    case AJ_PS_FUNDO: return "Fundo da tela de escolha de perfil. Filmes: os cartazes do que cada perfil assistiu, numa parede inclinada. Luz: preto com uma luz na cor do perfil. Projetor: sala de cinema antes da sessão. Arte do perfil: o fundo escolhido ao editar o perfil no app QR TIME; sem ele, o avatar desfocado. Ou as listras do login.";
     case AJ_DESCOBRIR: return "Onde fica a tela Descobrir: junto da Busca, como item próprio na barra lateral, ou em lugar nenhum.";
     case AJ_BIB_HOME: return "Mostra na Tela inicial uma fileira com os títulos salvos na Biblioteca, logo abaixo de Continuar assistindo.";
     case AJ_SELO_VISTO: return "Marca no pôster dos títulos que você já assistiu: um ícone de check ou a palavra Assistido.";
@@ -7898,7 +7903,7 @@ static const char *ajudaOpcaoBase(int op) {
     // --- Continuar assistindo
     case AJ_CW_LIGADO: return "A fileira de retomada, com o que você deixou pela metade e o próximo episódio das séries que acompanha.";
     case AJ_CW_OK: return "O que o OK faz no card da retomada: toca de onde parou, ou abre a página do título. Segurar OK abre o menu nos dois casos.";
-    case AJ_CW_FONTE: return "De onde vem a fileira de retomada. \"Todas as fontes\" usa a conta Nuvio e completa com o Trakt e, se estiver vinculado, com o Simkl.";
+    case AJ_CW_FONTE: return "De onde vem a fileira de retomada. \"Todas as fontes\" usa a conta QR TIME e completa com o Trakt e, se estiver vinculado, com o Simkl.";
     case AJ_CW_ESTILO: return "A forma do card da retomada: quadrado com a arte, deitado largo, ou o cartaz em pé.";
     case AJ_CW_THUMB: return "Usa a imagem do próprio episódio no card, em vez da arte da série.";
     case AJ_CW_BLUR_PROX: case AJ_DET_BLUR_NAO_VISTOS: return "Oculta detalhes da miniatura para evitar spoilers de episódios ainda não assistidos.";
@@ -7921,7 +7926,7 @@ static const char *ajudaOpcaoBase(int op) {
 #else
       return "Mostra o botão de trailer na tela do título, quando existe um trailer conhecido.";
 #endif
-    case AJ_DET_SO_CINEMETA: return "Desligado (padrão): a ficha do título vem primeiro do add-on em cujo catálogo ele apareceu, com episódios e ids próprios (Kitsu, Xperience, AIOMetadata…), e o catálogo do Nuvio completa o que faltar (o Cinemeta só entra se o catálogo do Nuvio falhar). Ligado: só o catálogo do Nuvio, sem os add-ons.";
+    case AJ_DET_SO_CINEMETA: return "Desligado (padrão): a ficha do título vem primeiro do add-on em cujo catálogo ele apareceu, com episódios e ids próprios (Kitsu, Xperience, AIOMetadata…), e o catálogo do QR TIME completa o que faltar (o Cinemeta só entra se o catálogo do QR TIME falhar). Ligado: só o catálogo do QR TIME, sem os add-ons.";
     case AJ_DET_META_EXT: return "Prefere a ficha do addon de metadados à do Cinemeta. Útil quando o seu addon tem sinopse e elenco melhores.";
     case AJ_DET_DATA_CHEIA: return "Escreve a data de estreia por extenso em vez de só o ano.";
     case AJ_DET_VEU: return "Quanto a vinheta escura cobre a arte na tela do título. Cem por cento é o padrão; zero mostra a arte limpa — o texto pode ficar difícil de ler sobre cenas claras.";
@@ -8012,20 +8017,20 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_JF_SERVIDOR: return "IP e porta do servidor, como 192.168.1.5:8096, ou o endereço com https://";
     case AJ_JF_ENTRAR: return "Usa o Quick Connect se o servidor permitir: aprove o código em outro app do Jellyfin. Senão, pede usuário e senha.";
     case AJ_JF_SAIR: return "Pede o OK duas vezes. Encerra a sessão no servidor e apaga o token desta TV.";
-    case AJ_DEBRID_AD: return "Sua chave de API do AllDebrid (alldebrid.com/apikeys). Com ela os torrents das fontes tocam pelo AllDebrid, que precisa de conta premium. Fica só nesta TV, aparece mascarada e vale no lugar da que vier da conta Nuvio.";
+    case AJ_DEBRID_AD: return "Sua chave de API do AllDebrid (alldebrid.com/apikeys). Com ela os torrents das fontes tocam pelo AllDebrid, que precisa de conta premium. Fica só nesta TV, aparece mascarada e vale no lugar da que vier da conta QR TIME.";
     case AJ_DEBRID_RD_TESTAR: case AJ_DEBRID_TB_TESTAR: case AJ_DEBRID_PM_TESTAR:
       return "Consulta se a chave vale e se a conta é premium. O resultado fica em cache por cinco minutos.";
     case AJ_DEBRID_AD_TESTAR: return "Pergunta ao AllDebrid se a chave vale e até quando a conta é premium. Não mostra seu usuário nem e-mail.";
-    case AJ_DEBRID_RD: return "Chave de API do Real-Debrid (real-debrid.com/apitoken). Só precisa se a sua conta Nuvio não a traz. Fica só nesta TV e aparece mascarada.";
-    case AJ_DEBRID_TB: return "Chave de API do TorBox. Só precisa se a sua conta Nuvio não a traz. Fica só nesta TV e aparece mascarada.";
-    case AJ_DEBRID_PM: return "Chave de API do Premiumize. Só precisa se a sua conta Nuvio não a traz. Fica só nesta TV e aparece mascarada.";
+    case AJ_DEBRID_RD: return "Chave de API do Real-Debrid (real-debrid.com/apitoken). Só precisa se a sua conta QR TIME não a traz. Fica só nesta TV e aparece mascarada.";
+    case AJ_DEBRID_TB: return "Chave de API do TorBox. Só precisa se a sua conta QR TIME não a traz. Fica só nesta TV e aparece mascarada.";
+    case AJ_DEBRID_PM: return "Chave de API do Premiumize. Só precisa se a sua conta QR TIME não a traz. Fica só nesta TV e aparece mascarada.";
     case AJ_PERFIL_INFANTIL: return "Marca o perfil em uso como infantil. No Assistir Juntos, o servidor só aceita salas com quem a conta já conhece e o chat livre do celular fica desligado. A marca é só deste perfil, nesta TV. Se o perfil tem PIN, pede o PIN para mudar.";
-    case AJ_PERFIL_PESQ: return "Desligado por padrão. Ligado, outras pessoas do Nuvio podem te achar pelo apelido e ver o que você escolher mostrar: bio, gêneros favoritos, foto e o que assistiu recentemente. Nunca aparecem e-mail, conta, addons nem aparelho. Desligar apaga o perfil do servidor na hora.";
+    case AJ_PERFIL_PESQ: return "Desligado por padrão. Ligado, outras pessoas do QR TIME podem te achar pelo apelido e ver o que você escolher mostrar: bio, gêneros favoritos, foto e o que assistiu recentemente. Nunca aparecem e-mail, conta, addons nem aparelho. Desligar apaga o perfil do servidor na hora.";
     case AJ_PERFIL_EDITAR: return "Apelido, bio, gêneros e o que mostrar no perfil; a atividade compartilhada só com amigos (desligada por padrão); pedidos de amizade recebidos e a lista de bloqueados.";
     case AJ_P2P_LIMITE: return "Quanto do armazenamento da TV o P2P pode usar enquanto toca; Automático usa até metade do espaço livre. Se o vídeo for maior, ele continua tocando e a TV guarda só o trecho perto de onde você está (em pendrive FAT ou exFAT, ele para no limite).";
     case AJ_P2P_DESTINO: return "Onde o motor P2P guarda o cache temporário enquanto toca. Interno usa o armazenamento da TV; Pendrive USB tenta um pendrive conectado e, se não houver ou falhar, volta para o interno. Não é download offline.";
     case AJ_P2P_TESTAR: return "Pergunta ao servidor se ele responde e qual a versão. Funciona mesmo com o P2P desligado, para conferir o endereço antes de ligar.";
-    case AJ_CURADORIA_URL: return "A fileira Herói mostra um único cartão do tamanho da fileira. Com este endereço, o título vem da curadoria do Nuvio Legacy (um JSON com imdb e texto); sem resposta, o primeiro título da fileira. Vazio desliga.";
+    case AJ_CURADORIA_URL: return "A fileira Herói mostra um único cartão do tamanho da fileira. Com este endereço, o título vem da curadoria do QR TIME (um JSON com imdb e texto); sem resposta, o primeiro título da fileira. Vazio desliga.";
     case AJ_POSTER_PROV: return "Troca os cartazes retrato por um pronto de um serviço externo, com notas, selos 4K/HDR e faixa Top 10 no próprio cartaz. SpatialPosters (instância pública ou a sua), RPDB (com chave) ou um modelo de URL seu. Só cartazes de card: o destaque e os fundos não mudam. Se o serviço não responde, volta ao cartaz normal.";
     case AJ_POSTER_INST: return "Endereço da instância do SpatialPosters. Vazio usa a pública (spatial-posters.vercel.app), que é gratuita e compartilhada; para muitos cartazes, rode a sua com Docker.";
     case AJ_POSTER_TOKEN: return "Opcional. Token de configuração do SpatialPosters, ou o endereço do manifest colado inteiro. Um token completo costuma ter mais de 500 letras e não cabe aqui; prefira os parâmetros curtos ao lado ou os padrões da sua instância.";
@@ -8052,10 +8057,10 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_PROPORCAO_PADRAO: return "Como a imagem do filme ocupa a tela quando o vídeo começa. Último usado mantém o que você escolheu por último no player. Os outros modos valem em todo vídeo, e você ainda pode trocar durante a reprodução com a tecla 0 ou o botão Proporção. Em TVs que não recortam a imagem, os modos de zoom caem para Original.";
     case AJ_HDR_UI: return "Com HDR ou Dolby Vision, a interface fica esbranquiçada. Automático reduz o branco em um quinto e adensa os vidros, só com HDR ativo. Onde o player não informa o HDR, não muda nada.";
     case AJ_BRILHO_PLAYER: return "Escurece os controles, o título e a barra do player (as legendas não mudam). Com o filme tocando e a barra parada, ela ainda baixa um degrau até você apertar uma tecla.";
-    case AJ_BUSCA_CINEMETA: return "Só a busca. Ligado (padrão): consulta o catálogo do Nuvio e, se ele falhar, o Cinemeta; um add-on Cinemeta instalado também responde. Desligado: o Cinemeta fica de fora da busca. Não mexe nas fileiras da Home (use Fileiras da Home) nem na ficha do título.";
-    case AJ_BUSCA_NUVIO: return "Onde ficam os resultados do catálogo do Nuvio (os grupos Filmes e Séries da busca). Primeiro (padrão): antes dos seus add-ons. Por último: depois deles, para os seus resultados virem na frente. Desligado: a busca não consulta o catálogo do Nuvio. O Continuar assistindo não muda.";
+    case AJ_BUSCA_CINEMETA: return "Só a busca. Ligado (padrão): consulta o catálogo do QR TIME e, se ele falhar, o Cinemeta; um add-on Cinemeta instalado também responde. Desligado: o Cinemeta fica de fora da busca. Não mexe nas fileiras da Home (use Fileiras da Home) nem na ficha do título.";
+    case AJ_BUSCA_NUVIO: return "Onde ficam os resultados do catálogo do QR TIME (os grupos Filmes e Séries da busca). Primeiro (padrão): antes dos seus add-ons. Por último: depois deles, para os seus resultados virem na frente. Desligado: a busca não consulta o catálogo do QR TIME. O Continuar assistindo não muda.";
     case AJ_BUSCA_ORIGEM: return "Ligado (padrão): cada grupo de resultados diz de qual fonte veio, como de AIOMetadata. Desligado: só o nome do grupo. Com uma única fonte de busca ativa, a fonte nunca aparece.";
-    case AJ_ENQUETES: return "Ligado, o Nuvio pode convidar você a votar numa enquete curta na ilha do relógio. Desligado, nenhuma aparece. A escolha fica na sua conta.";
+    case AJ_ENQUETES: return "Ligado, o QR TIME pode convidar você a votar numa enquete curta na ilha do relógio. Desligado, nenhuma aparece. A escolha fica na sua conta.";
     case AJ_RELOGIO: return "Desligado, a pílula do relógio não fica na tela em repouso. Os avisos continuam saindo dela: ela aparece só para o aviso e some depois.";
     case AJ_SAIDA_PLAYER: return "Ao sair de um filme ou episódio no meio. Home: o vídeo encolhe até a pílula do relógio, que fica com o título para você retomar (CH+). Página do título: volta para onde você estava. Só vale com o relógio na tela; terminar o título segue para o próximo episódio como sempre.";
     case AJ_TAM_MAX: return "Na escolha automática, fontes maiores que este tamanho ficam para o fim da fila. Serve para quem tem franquia de internet limitada. Só vale para arquivos com tamanho conhecido; se só houver fontes fora da faixa, a melhor delas ainda toca.";
@@ -8064,7 +8069,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_FONTE_PLUGINS_PERM: return "Os plugins que o automático usa primeiro. Nenhum marcado = todos os plugins ligados.";
     case AJ_FONTE_OUTROS: return "Ligado: sem fonte nos permitidos dentro da espera, o automático usa os outros. Desligado: só os permitidos; sem fonte neles, a lista de fontes abre.";
     case AJ_FONTE_REGEX: return "Compara uma regex com o nome, a descrição e o add-on de cada fonte, sem diferenciar maiúsculas. Exigir: só toca o que casa. Preferir: o que casa vem primeiro.";
-    case AJ_FONTE_REGEX_PADRAO: return "O padrão da regex, como no Nuvio oficial. Ex.: ESP|Latino|Castellano. Dá para digitar pelo celular. Um padrão inválido é ignorado.";
+    case AJ_FONTE_REGEX_PADRAO: return "O padrão da regex, como no QR TIME oficial. Ex.: ESP|Latino|Castellano. Dá para digitar pelo celular. Um padrão inválido é ignorado.";
     case AJ_FONTE_ORDEM: return "A ordem dos add-ons e plugins no automático: suba e desça cada um. Quem fica fora da ordem vem depois de todos. Só vale com a opção Usar a ordem ligada.";
     case AJ_FONTE_ORDEM_USO: return "Não: a escolha de sempre. Para desempatar: na mesma faixa de qualidade e no mesmo grupo, vence o add-on mais cedo na ordem, sem fazer esperar. Ordem estrita: toma a melhor fonte válida do primeiro add-on da ordem que tiver uma, respeitando teto, tamanho e regex, mesmo que um add-on mais abaixo tenha qualidade maior; decide assim que ele responde. Fontes acima do teto ficam por último.";
     case AJ_FONTE_REGEX_MODELO: return "Padrões prontos: idiomas como os add-ons escrevem, áudio MULTI ou DUAL, 4K e Remux. Escolher um troca o padrão da regex.";
@@ -8083,7 +8088,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_DTS_AC3: return "Como o áudio DTS é entregue à TV quando o app o converte (só na LG). Estéreo (AAC) é o modo provado e serve qualquer TV. 5.1 (Dolby Digital) mantém o som surround para barra de som e receiver por ARC/eARC; vale a partir do próximo vídeo.";
 #endif
     case AJ_PS_CONTINUAR: return "Ligado, cada perfil mostra na escolha de perfil o cartão com o que ele estava assistindo. Desligado, a tela mostra só os perfis.";
-    case AJ_HIST_CONTA: return "Ligado (padrão): o que você assiste neste perfil sobe para a conta Nuvio, com o progresso e os vistos. Desligado: nada disso é enviado à conta; o Trakt e o Simkl vinculados a este perfil continuam recebendo. Vale só para este perfil.";
+    case AJ_HIST_CONTA: return "Ligado (padrão): o que você assiste neste perfil sobe para a conta QR TIME, com o progresso e os vistos. Desligado: nada disso é enviado à conta; o Trakt e o Simkl vinculados a este perfil continuam recebendo. Vale só para este perfil.";
     case AJ_SOCIAL: return "Ligado (padrão): amigos, atividade deles e recomendações. Desligado: tudo isso some, com a fileira de amigos da Home, e o app para de falar com o serviço social. Salvos e Avisos continuam. Vale só para este perfil.";
     case AJ_DV_MKV: return "Arquivos MKV em Dolby Vision perfil 5 ou 8 tocam com o Dolby Vision ligado, em vez de HDR10. O áudio Dolby Digital e Dolby Digital Plus vai direto para a TV. Se a conexão não acompanhar, o vídeo continua em HDR10. Só em TVs LG com webOS 4 ou mais novo.";
     case AJ_DV7: return "Converte MKV Dolby Vision perfil 7 para 8.1. Mantém o vídeo base e os metadados dinâmicos; descarta a camada de melhoria, incluindo FEL. Vale para o próximo vídeo.";
@@ -8116,7 +8121,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_PERFIL_ATIVO: return "Perfil em uso nesta TV. Trocar de perfil é feito na tela de perfis, ao abrir o app.";
     case AJ_SYNC: return "Estado da última troca de dados com a sua conta: addons, progresso, coleções e preferências.";
     case AJ_ADDONS: return "Abre a lista de addons da sua conta, para ligar e desligar cada um nesta TV.";
-    case AJ_PLUGINS: return "Scrapers em JavaScript dos repositórios de plugins do Nuvio, como mais uma fonte na lista, ao lado dos add-ons. Os repositórios vêm da sua conta. Desligado por padrão.";
+    case AJ_PLUGINS: return "Scrapers em JavaScript dos repositórios de plugins do QR TIME, como mais uma fonte na lista, ao lado dos add-ons. Os repositórios vêm da sua conta. Desligado por padrão.";
     case AJ_TRAKT: return "Conecta a sua conta do Trakt para marcar o que assistiu e usar a sua lista.";
     case AJ_SIMKL: return "Conecta a sua conta do Simkl, uma alternativa ao Trakt para acompanhar séries.";
     case AJ_DISCORD: return "Mostra no seu perfil do Discord o que você está assistindo, com o cartaz e o tempo. Só sai alguma coisa enquanto um vídeo toca neste perfil.";
@@ -8131,17 +8136,17 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_ATUALIZAR:
       return atualizacao_nova()[0]
         ? "Abre o cartão da versão nova, com o que mudou e o botão de instalar."
-        : "Procura agora uma versão nova do Nuvio. Se houver, abre o cartão com o que mudou e o botão de instalar. O app também confere sozinho a cada 6 horas.";
+        : "Procura agora uma versão nova do QR TIME. Se houver, abre o cartão com o que mudou e o botão de instalar. O app também confere sozinho a cada 6 horas.";
     case AJ_VER_REGISTRO: return "Abre o registro do app por cima desta tela, ao vivo: o mesmo painel do botão vermelho do controle, para quem não tem esse botão.";
 #ifdef NV_ANDROID
     case AJ_BAIXAR_REGISTRO: return "Salva o registro desta sessão em um arquivo de texto, sem senhas nem chaves.";
 #endif
     case AJ_MEDIDOR: return "Mostra quadros por segundo, o pior quadro e a memória dentro da ilha do relógio, atualizados a cada 3 s. Mínimo fica na linha da hora, Menor ganha uma segunda linha e Grande abre o painel completo. Quando a ilha mostra um aviso, o medidor se recolhe e volta depois.";
     case AJ_AVISO_LEGAL: return "Aviso legal";
-    case AJ_GUIA: return "O que o Nuvio faz, em 12 capítulos. Cada recurso diz onde fica e tem um atalho para ele.";
+    case AJ_GUIA: return "O que o QR TIME faz, em 12 capítulos. Cada recurso diz onde fica e tem um atalho para ele.";
     case AJ_DICASCONTROLE: return "Dicas do controle";
     case AJ_NOVIDADES20: return "O tour do que mudou na 2.0, capítulo por capítulo, com o que vale neste aparelho. Abre do começo.";
-    case AJ_APOIAR: return "Se o Nuvio te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos. É opcional: nada muda no app.";
+    case AJ_APOIAR: return "Se o QR TIME te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos. É opcional: nada muda no app.";
     case AJ_LOG_REDE: return "Mostra o registro desta TV numa página da sua rede: abra o endereço abaixo no celular ou no computador, na mesma rede. Sem senhas nem chaves; endereços vão cortados no host. Desligue quando terminar.";
     case AJ_ENVIAR_LOG: return "Manda os últimos 200 KB do registro desta sessão (sem senhas nem chaves) para quem faz o app. Use quando algo estiver errado agora.";
     case AJ_ENVIO_AUTO: return "Ligado, o app manda o registro sozinho: o da sessão anterior ao abrir e o desta a cada minuto. Sem senhas nem chaves; serve para achar o que trava a Samsung. Desligue quando quiser.";
@@ -8166,7 +8171,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_TMDB_COL: return "A aba de coleção/saga (as outras partes da franquia) na página do filme.";
     case AJ_TMDB_CW: return "Usa o TMDB para preencher os cartazes da fileira de retomada.";
     case AJ_MDB_LIGADO: return "O MDBList junta notas de várias fontes na página do título. Desligar esconde a fileira inteira.";
-    case AJ_MDB_CHAVE: return "A chave vem da sua conta Nuvio ou do arquivo do pacote. Não dá para digitar nesta TV.";
+    case AJ_MDB_CHAVE: return "A chave vem da sua conta QR TIME ou do arquivo do pacote. Não dá para digitar nesta TV.";
     case AJ_SEEKR_LIGADO: case AJ_SEEKR_CHAVE: return seekrAjuda(op);
     case AJ_SEEKR_FITA: return "Mostra o quadro anterior e o seguinte ao lado da miniatura, com o tempo de cada um. Deixa claro que há um quadro a cada 10 segundos.";
     case AJ_SEEKR_AJUSTE: return "Use quando a miniatura mostra sempre a cena de alguns segundos antes ou depois. Acontece quando a sua versão do título é diferente da usada pelo Seekr (outro corte, abertura mais longa). Vale para todos os títulos; volte a 0 ao trocar de filme.";
@@ -8294,7 +8299,7 @@ static const char *efeitoOpcao(int op) {
     case AJ_FONTE_REGEX:
       return "Preferir sobe para o topo as fontes que casam com o padrão; Exigir esconde as outras.";
     case AJ_FONTE_MANUAL:
-      return "Ligado, a lista de fontes abre a cada play. Desligado, o Nuvio escolhe sozinho com as regras logo abaixo.";
+      return "Ligado, a lista de fontes abre a cada play. Desligado, o QR TIME escolhe sozinho com as regras logo abaixo.";
     case AJ_CW_THUMB:
       return "Desfocar o próximo episódio só funciona com esta opção ligada.";
     case AJ_NT_TOMATES: case AJ_NT_AUDIENCIA: case AJ_NT_META: case AJ_NT_METAUSER:
@@ -8304,7 +8309,7 @@ static const char *efeitoOpcao(int op) {
       return "O som do trailer no destaque é uma opção à parte, em Som e imagem.";
 #ifndef __EMSCRIPTEN__
     case AJ_MIC_BUSCA:
-      return "Para digitar, continua o teclado do Nuvio: o da Samsung só abre por este botão.";
+      return "Para digitar, continua o teclado do QR TIME: o da Samsung só abre por este botão.";
 #endif
     default: return NULL;
   }
@@ -8316,19 +8321,19 @@ static const char *efeitoOpcao(int op) {
 // valores ("Equilibrio: ...") ou e longa demais, a frase e propria.
 static const char *beneficioProprio(int op) {
   switch (op) {
-    case AJ_QUALIDADE: return "O teto de resolução das fontes que o Nuvio escolhe.";
+    case AJ_QUALIDADE: return "O teto de resolução das fontes que o QR TIME escolhe.";
     case AJ_FONTE_HDR: return "Se fontes com HDR ou Dolby Vision passam na frente das outras.";
     case AJ_DV: return "Deixa tocar fontes em Dolby Vision quando a TV aceita.";
     case AJ_ATMOS: return "Fontes com som Dolby Atmos passam na frente.";
     case AJ_FONTE_PRIORIDADE: return "O critério da escolha automática: equilíbrio, qualidade ou começar rápido.";
-    case AJ_FONTE_PRAZO: return "Quanto tempo o Nuvio espera os add-ons antes de escolher.";
+    case AJ_FONTE_PRAZO: return "Quanto tempo o QR TIME espera os add-ons antes de escolher.";
     case AJ_PLR_CLASSIF: return "No começo do filme, a ilha mostra a classificação e os avisos.";
     case AJ_TELA_ABERTURA: return "O que aparece enquanto o vídeo abre: a arte do título ou os detalhes da fonte.";
     case AJ_ESTAT_TAMANHO: return "Completo, Compacto ou Mínimo: o tamanho das estatísticas ao vivo no player.";
     case AJ_ESTAT_LADO: return "Direita ou Esquerda: o lado do player onde as estatísticas ao vivo ficam.";
     case AJ_SAIDA_PLAYER: return "O filme pode ficar na ilha do relógio para você voltar depois.";
     case AJ_LEG_FORCADA: return "Placas e falas em outra língua aparecem; o resto, não.";
-    case AJ_BUSCA_CINEMETA: return "A busca também consulta o Cinemeta se o catálogo do Nuvio falhar.";
+    case AJ_BUSCA_CINEMETA: return "A busca também consulta o Cinemeta se o catálogo do QR TIME falhar.";
     case AJ_HOME_LAYOUT: return "Como a Home se organiza: Moderna, Padrão ou Dinâmica.";
     case AJ_MENU_TOPO: return "Onde fica o menu: na esquerda ou no alto da tela.";
     case AJ_ABAS_ESTILO: return "Como as abas de uma coleção de streaming aparecem: chips, menu suspenso, barra central ou páginas.";
@@ -8343,7 +8348,7 @@ static const char *beneficioProprio(int op) {
     case AJ_FOCO_TRAILER: return "Com o foco parado num cartaz, o trailer toca no destaque.";
     case AJ_RESOLUCAO: return "Automática começa em 1080p e só usa 4K se a TV aguentar.";
     case AJ_PERFIL_PESQ: return "Deixa amigos acharem você pela busca.";
-    case AJ_HIST_CONTA: return "O que você assiste neste perfil vai para a conta Nuvio.";
+    case AJ_HIST_CONTA: return "O que você assiste neste perfil vai para a conta QR TIME.";
     case AJ_SOCIAL: return "Amigos, a atividade deles e recomendações.";
     case AJ_LIVETV_DIAG: return "Testa a rede, a conta e vários canais de uma vez.";
     case AJ_LIVETV_RES: return "Qual versão do canal entra primeiro: FHD, HD ou SD.";
@@ -10370,7 +10375,7 @@ static const char *textoValor(int op) {
   if (op == AJ_PLAYER_EXTERNO || op == AJ_PLAYER_ANIME) return ppNome(op, valor[op]);
   if (op == AJ_SELOS_PACOTE) {
     int v = valor[op];
-    return v > 0 && v <= selospacote_n() ? selospacote_nome(v - 1) : "Do Nuvio";
+    return v > 0 && v <= selospacote_n() ? selospacote_nome(v - 1) : "Do QR TIME";
   }
   if (op == AJ_URL_LISTA) return urlNomeValor(valor[op]);
   // FORA DO INTERVALO NAO LE FORA DO VETOR.

@@ -178,7 +178,7 @@ static void piTelefoneEscolher(int i, int b) {
 }
 static float piTelefoneConteudo(float x, float y, float w, float a) {
   float inicio = y, figura = fminf(560, w);
-  y += telefonecartao_texto(TXT_CAPTION2, "NOVO NO NUVIO", x, y, w, 28, .6f * a) + 12;
+  y += telefonecartao_texto(TXT_CAPTION2, "NOVO NO QR TIME", x, y, w, 28, .6f * a) + 12;
   y += telefonecartao_titulo("Canal em miniatura", x, y, w, a);
   if (a > 0) desenhaFigura(x + (w - figura) * .5f, y, figura, a);
   y += 40 + figura * .62f + 24;
@@ -229,7 +229,7 @@ static void pipintro_desenharCorpo_(Uint32 agora) {
 
   // --- coluna da figura -------------------------------------------------
   { float fx = PI_X + PI_PAD, fy = PI_Y + dy + 190.0f;
-    { TxtLinha t = txt_linha(TXT_CAPTION2, i18n("NOVO NO NUVIO"),
+    { TxtLinha t = txt_linha(TXT_CAPTION2, i18n("NOVO NO QR TIME"),
                            150, 154, 165, 255);
       txt_desenhar_alpha(t, fx, PI_Y + dy + 64.0f, a * 0.92f); }
     { TxtLinha t = txt_linha(TXT_TITULO2, i18n("Canal em miniatura"),

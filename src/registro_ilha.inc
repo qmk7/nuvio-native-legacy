@@ -757,7 +757,7 @@ static void rgAparelho(char *tit, size_t nt, char *sub, size_t ns, char *tvLinha
   if (modelo[0] && strcmp(modelo, "-")) snprintf(tit, nt, "%s%s%s", marca, marca[0] ? " " : "", modelo);
   else snprintf(tit, nt, "%s", marca[0] ? marca : "TV");
   if (dot[0] && strcmp(dot, "-")) snprintf(sub, ns, "%s · .NET Core %s · %s", os, dot, tela);
-  else snprintf(sub, ns, "%s · Nuvio %s · %s", os, NV_VERSAO, tela);
+  else snprintf(sub, ns, "%s · QR TIME %s · %s", os, NV_VERSAO, tela);
 }
 static float rgDevCard(float x, float y) {
   char t[96], s[160];
@@ -1171,7 +1171,7 @@ static void inspAparelho(void) {
 #elif defined(NV_TPK)
   snprintf(v, sizeof v, "NuvioTpk · %s", NV_VERSAO);
 #else
-  snprintf(v, sizeof v, "Nuvio %s", NV_VERSAO);
+  snprintf(v, sizeof v, "QR TIME %s", NV_VERSAO);
 #endif
   y += rgStat(i18n("Pacote"), v, x, y, w);
   if (carreg[0]) y += rgStat(i18n("Carregador"), carreg, x, y, w);

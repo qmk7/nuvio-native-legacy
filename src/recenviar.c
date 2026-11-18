@@ -625,7 +625,7 @@ void recenviar_atualizar(float dt, Uint32 agora) {
     // falha de busca, e que ninguem que ele segue instalou o app ainda — e e
     // isso que ele precisa saber para ir atras do codigo.
     else snprintf(aviso, sizeof aviso, "%s",
-                  i18n("Ninguém que você segue no Trakt usa o Nuvio ainda."));
+                  i18n("Ninguém que você segue no Trakt usa o QR TIME ainda."));
     recomenda_trakt_limpar();
     recarregarContatos();
   } else if (est == REC_TRAKT_SEM_CONTA) {

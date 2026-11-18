@@ -8211,7 +8211,7 @@ static void home_desenhar_(Uint32 agora) {
             gfx_cor(b,.055f,ar,ag,ab,1);
             if(f>.01f)gfx_rect(b,0,GFX_ANEL,0,.008f,0,.055f,t1/255.0f,t1/255.0f,t1/255.0f,f);
             txt_desenhar(txt_linha_corta(TXT_CALLOUT,"Nenhuma atividade disponível agora.",t1,t1,t1,255,w-48),px+24,py+24);
-            txt_bloco(TXT_CAPTION,i18n("Siga pessoas no Trakt ou adicione amigos do Nuvio."),t2,t2,t2,px+24,py+91,w-48,30.0f,1.0f,2);
+            txt_bloco(TXT_CAPTION,i18n("Siga pessoas no Trakt ou adicione amigos do QR TIME."),t2,t2,t2,px+24,py+91,w-48,30.0f,1.0f,2);
             txt_desenhar(txt_linha_corta(TXT_CAPTION,"OK · Conferir conexão",t1,t1,t1,255,w-48),px+24,py+h-50);
             if(foco.fileira==r)temItemFoco=0;
             continue;

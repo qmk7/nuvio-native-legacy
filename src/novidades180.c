@@ -496,11 +496,11 @@ static const Item ITENS[] = {
   { ID_FONTES,    "Fontes",          "aj_layers",             "Folha de Fontes",
     "Melhor para esta TV primeiro, grupos por qualidade e filtros Só MP4, Em cache e Dublado." },
   { ID_TEXTO,     NULL,              "aj_type",               "Texto das fontes",
-    "Do Nuvio ou do jeito que o addon manda. Em <b>Ajustes › Reprodução</b>." },
+    "Do QR TIME ou do jeito que o addon manda. Em <b>Ajustes › Reprodução</b>." },
   { ID_AJUSTES,   "Ajustes",         "aj_sliders-horizontal", "Ajustes",
     "Busca, prévia de verdade em cada opção, gráfico de memória e Fileiras da Home." },
   { ID_GUIA,      NULL,              "aj_book-open",          "Guia de uso",
-    "Tudo o que o Nuvio faz, explicado num lugar só. Em <b>Ajustes › Sobre e ajuda</b>." },
+    "Tudo o que o QR TIME faz, explicado num lugar só. Em <b>Ajustes › Sobre e ajuda</b>." },
 };
 #define N180_NI ((int)(sizeof ITENS / sizeof *ITENS))
 
@@ -826,8 +826,8 @@ void novidades180_desenhar(Uint32 agora) {
     float ta = fechado > 0.0f ? NV_TXTGATE_AQUECER : a * textogate_passo(&gateLista, 0, SDL_GetTicks());
     float y = COL_Y + dy;
     if (boasVindas) {
-      snprintf(kick, sizeof kick, "Nuvio %s", N180_VERSAO);
-      snprintf(tit, sizeof tit, "%s", i18n("Boas-vindas ao Nuvio"));
+      snprintf(kick, sizeof kick, "QR TIME %s", N180_VERSAO);
+      snprintf(tit, sizeof tit, "%s", i18n("Boas-vindas ao QR TIME"));
     } else {
       snprintf(kick, sizeof kick, "%s", i18n("Glass UI"));
       snprintf(tit, sizeof tit, i18n("Novidades da %s"), N180_VERSAO);

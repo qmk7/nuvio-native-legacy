@@ -1071,7 +1071,7 @@ static void *fioLista(void *u) {
     l.estado = disp < 0 ? PARTES_SEM_PLANO : PARTES_SEM_CHAVE;
     if (!pd->cedo) {
       printf("[partes] files of the source: %s\n",
-             disp < 0 ? "the TorBox account has no API plan" : "no TorBox key in Nuvio (Settings > Integrations > Debrid)");
+             disp < 0 ? "the TorBox account has no API plan" : "no TorBox key in QR TIME (Settings > Integrations > Debrid)");
       fflush(stdout);
       publicar(pd, &l);
     }

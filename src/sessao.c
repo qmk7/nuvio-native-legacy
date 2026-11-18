@@ -238,9 +238,9 @@ static char *loginRpc(const char *funcao, const char *body, const char *bearer, 
 
 static void erroServidor(int st) {
   if (st) snprintf(erro, sizeof erro,
-                   i18n("O servidor da conta Nuvio não respondeu (HTTP %d). Tente de novo em alguns minutos."), st);
+                   i18n("O servidor da conta QR TIME não respondeu (HTTP %d). Tente de novo em alguns minutos."), st);
   else    snprintf(erro, sizeof erro, "%s",
-                   i18n("O servidor da conta Nuvio não respondeu. Tente de novo em alguns minutos."));
+                   i18n("O servidor da conta QR TIME não respondeu. Tente de novo em alguns minutos."));
   anexarTransporte(erro, sizeof erro, st);
 }
 
@@ -563,7 +563,7 @@ static void *fioPedir(void *u) {
   jsw_obj_ini(&w);
   jsw_cs(&w, "p_device_nonce", nonce);
   jsw_cs(&w, "p_redirect_base_url", nuvem_base_login());
-  jsw_cs(&w, "p_device_name", "LG webOS (Nuvio nativo)");
+  jsw_cs(&w, "p_device_name", "LG webOS (QR TIME nativo)");
   jsw_obj_fim(&w);
   resp = loginRpc("start_tv_login_session", jsw_texto_final(&w), tok, &st);
 
@@ -599,7 +599,7 @@ static void *fioPedir(void *u) {
     if (falhaServidor(st)) erroServidor(st);
     else if (st >= 200 && st < 300) snprintf(erro, sizeof erro, "HTTP %d [response]", st);
     else snprintf(erro, sizeof erro,
-                  i18n("O servidor da conta Nuvio recusou o pedido do código (HTTP %d). Tente de novo em alguns minutos."), st);
+                  i18n("O servidor da conta QR TIME recusou o pedido do código (HTTP %d). Tente de novo em alguns minutos."), st);
     if (!emailPedido && estado != SES_EMAIL) estado = SES_ERRO;
   } else {
     if (!urlLogin[0])
@@ -695,18 +695,18 @@ void sessao_email_erro_de(int st, const char *corpo, char *dst, unsigned tam) {
     if (!desc[0]) js_texto(corpo, fim, "message", desc, sizeof desc);
   }
   if (st == 0 || st >= 500) {
-    if (st) snprintf(dst, tam, i18n("O servidor da conta Nuvio não respondeu (HTTP %d). Tente de novo em alguns minutos."), st);
-    else    snprintf(dst, tam, "%s", i18n("O servidor da conta Nuvio não respondeu. Tente de novo em alguns minutos."));
+    if (st) snprintf(dst, tam, i18n("O servidor da conta QR TIME não respondeu (HTTP %d). Tente de novo em alguns minutos."), st);
+    else    snprintf(dst, tam, "%s", i18n("O servidor da conta QR TIME não respondeu. Tente de novo em alguns minutos."));
   } else if (st == 429 || !strcmp(cod, "over_request_rate_limit") ||
              !strcmp(cod, "over_email_send_rate_limit")) {
     snprintf(dst, tam, "%s", i18n("Muitas tentativas. Espere um minuto e tente de novo."));
   } else if (!strcmp(cod, "email_not_confirmed") || strstr(desc, "not confirmed")) {
-    snprintf(dst, tam, "%s", i18n("Este e-mail ainda não foi confirmado. Abra o link que a Nuvio mandou e tente de novo."));
+    snprintf(dst, tam, "%s", i18n("Este e-mail ainda não foi confirmado. Abra o link que a QR TIME mandou e tente de novo."));
   } else if (!strcmp(cod, "invalid_credentials") || !strcmp(cod, "invalid_grant") ||
              strstr(desc, "Invalid login credentials") || st == 400) {
     snprintf(dst, tam, "%s", i18n("E-mail ou senha incorretos."));
   } else {
-    snprintf(dst, tam, i18n("O servidor da conta Nuvio recusou o login (HTTP %d)."), st);
+    snprintf(dst, tam, i18n("O servidor da conta QR TIME recusou o login (HTTP %d)."), st);
   }
 }
 
@@ -738,7 +738,7 @@ static void *fioEmail(void *u) {
     sessao_email_erro_de(st == 200 ? 0 : st, resp, erroEmail, sizeof erroEmail);
     anexarTransporte(erroEmail, sizeof erroEmail, st);
     if (st >= 200 && st < 300)
-      snprintf(erroEmail, sizeof erroEmail, "%s [response]", i18n("O servidor da conta Nuvio não respondeu. Tente de novo em alguns minutos."));
+      snprintf(erroEmail, sizeof erroEmail, "%s [response]", i18n("O servidor da conta QR TIME não respondeu. Tente de novo em alguns minutos."));
     estado = SES_DESLOGADO;
   }
   if (resp) { apagar(resp, strlen(resp)); free(resp); }
@@ -901,7 +901,7 @@ void sessao_passo(unsigned agoraMs) {
     soltar(fioEmail);
     if (!fioVivo) {
       apagar(emailPend, sizeof emailPend); apagar(senhaPend, sizeof senhaPend);
-      snprintf(erroEmail, sizeof erroEmail, "%s", i18n("O servidor da conta Nuvio não respondeu. Tente de novo em alguns minutos."));
+      snprintf(erroEmail, sizeof erroEmail, "%s", i18n("O servidor da conta QR TIME não respondeu. Tente de novo em alguns minutos."));
       estado = SES_DESLOGADO;
     }
     return;

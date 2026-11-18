@@ -346,7 +346,7 @@ static Pacote pac[SELOS_MAX_PACOTES];
 static int nPac;
 static int ativo = -1;
 static int escolhaExplicita;         // 0 = ainda nao escolheu: vale o ativo da conta
-static char escolhaUrl[512];         // "" = "Do Nuvio" escolhido de proposito
+static char escolhaUrl[512];         // "" = "Do QR TIME" escolhido de proposito
 static unsigned versao = 1;
 
 // O CASAMENTO RODA NUM FIO DE FUNDO (streams.c): sao centenas de regex por
@@ -579,7 +579,7 @@ static void selospacote_iniciar_i(void) {
     free(t);
   }
   reconstruir();
-  printf("[selos] perfil %d: %d pacote(s)%s%s\n", perfil, nPac, ativo >= 0 ? ", ativo: " : ", ativo: Do Nuvio",
+  printf("[selos] perfil %d: %d pacote(s)%s%s\n", perfil, nPac, ativo >= 0 ? ", ativo: " : ", ativo: Do QR TIME",
          ativo >= 0 ? pac[ativo].nome : "");
   fflush(stdout);
 }

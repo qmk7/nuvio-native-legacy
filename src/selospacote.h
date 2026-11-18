@@ -70,7 +70,7 @@ const char *selospacote_nome(int i);            // primeiro grupo, ou o host da 
 const char *selospacote_url(int i);
 int  selospacote_da_tv(int i);                  // 1 = adicionado nesta TV (removivel)
 int  selospacote_n_filtros(int i);              // filtros validos e ativos
-int  selospacote_ativo(void);                   // -1 = "Do Nuvio" (o embutido)
+int  selospacote_ativo(void);                   // -1 = "Do QR TIME" (o embutido)
 void selospacote_escolher(int i);               // -1 ou 0..n-1, guarda no perfil
 unsigned selospacote_versao(void);              // sobe a cada mudanca de lista/escolha
 

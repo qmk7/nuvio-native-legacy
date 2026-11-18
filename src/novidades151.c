@@ -188,7 +188,7 @@ static void desenhoFontes(float x, float y, float a) {
                                 170, 176, 188, 255);
       txt_desenhar_alpha(nome, r.x + 16.0f, r.y + 3.0f, a); }
     { TxtLinha amostra = txt_linha_familia(TXT_HEADLINE,
-                              i18n("Aa  Nuvio  0123"), 241, 243, 247, 255, F[i]);
+                              i18n("Aa  QR TIME  0123"), 241, 243, 247, 255, F[i]);
       txt_desenhar_alpha(amostra, r.x + 16.0f, r.y + 27.0f, a); }
   }
   // A borda branca e o foco de demonstração que passeia entre as amostras;
@@ -212,7 +212,7 @@ static void desenhoFontes(float x, float y, float a) {
     txt_desenhar_alpha(nome, r.x + r.w - (float)nome.w - 18.0f,
                        r.y + 14.0f, a);
     { TxtLinha amostra = txt_linha_familia(TXT_LEG_100,
-                          i18n("Aa  Nuvio  0123"), 242, 242, 244, 255, familiaLeg);
+                          i18n("Aa  QR TIME  0123"), 242, 242, 244, 255, familiaLeg);
       txt_desenhar_alpha(amostra, r.x + 18.0f, r.y + 82.0f, a); }
   }
 }
@@ -479,7 +479,7 @@ static void novidades151_desenharCorpo_(Uint32 agora) {
                   620.0f, ar, ag, ab, 0.16f * a);
     gfx_recorte(cartao.x, cartao.y, cartao.w, cartao.h); }
 
-  { TxtLinha tag = txt_linha(TXT_CAPTION2, i18n("NOVO NO NUVIO"),
+  { TxtLinha tag = txt_linha(TXT_CAPTION2, i18n("NOVO NO QR TIME"),
                              150, 155, 169, 255);
     TxtLinha tit = txt_linha(TXT_TITULO2, i18n("Novidades da 1.5.2"),
                              246, 247, 250, 255);

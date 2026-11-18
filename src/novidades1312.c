@@ -234,7 +234,7 @@ static const N1312Feature n1312_features[] = {
   { "menu_guide", "Guia TV",
     "O Guia de TV abre na hora" },
   { "play", "Trailers dentro do app",
-    "Trailer toca no lugar da arte, sem sair do Nuvio." },
+    "Trailer toca no lugar da arte, sem sair do QR TIME." },
   { "recomendar", "A aba Social",
     "Recomendações de amigos agora chegam em Salvos." },
   { "menu_profile", "Fundo de perfil",

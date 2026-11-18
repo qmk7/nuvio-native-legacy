@@ -1783,7 +1783,7 @@ static void desenhaLista(float a) {
   }
   temQuem = quem[0] != 0;
   snprintf(kick, sizeof kick, "%s \xc2\xb7 %s", i18n("Lista"),
-           l->fonte == LST_TRAKT ? "Trakt" : l->fonte == LST_SIMKL ? "Simkl" : "Nuvio");
+           l->fonte == LST_TRAKT ? "Trakt" : l->fonte == LST_SIMKL ? "Simkl" : "QR TIME");
 
   hw = CTXL_W - 2.0f * (pad + 20.0f);
   n = txt_linha_corta(TXT_ILHA_NOME, l->titulo, 243, 242, 239, 255, hw);

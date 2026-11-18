@@ -36,6 +36,7 @@ void abertura_fundo_fica(int sim);
 void abertura_tecla(void);
 // 1 enquanto ainda cobre a tela.
 int  abertura_ativa(void);
+void abertura_pular(void);   // QR TIME intro plays instead
 
 // Previa viva para os Ajustes: uma volta da abertura em laco em `r` (estilo 0..2 =
 // Padrao/So esmaece/Direto; logo = LOGO_NOVO/LOGO_CLASSICO), `agora` em ms. Desenha

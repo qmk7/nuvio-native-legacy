@@ -184,7 +184,7 @@ static void escapar(char *dst, size_t n, const char *s) {
   "display:flex;align-items:center;justify-content:center;margin:0 0 22px}" \
   ".v h1{margin:0}</style>"
 
-#define CEL_MARCA "<div class=k>NUVIO LEGACY</div>"
+#define CEL_MARCA "<div class=k>QR TIME</div>"
 
 // A cor de realce da TV como variaveis CSS: --a (cor), --at (tinta do rotulo
 // sobre ela: preto ou branco pela luminancia) e --l (a luz do canto).

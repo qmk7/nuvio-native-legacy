@@ -96,12 +96,12 @@ static void voltarQr(void) {
 static void abrirCampo(int c) {
   campoAberto = c;
   if (c == LE_EMAIL) {
-    teclado_abrir_com("E-mail", "O e-mail da sua conta Nuvio.", 120, ALFA_EMAIL, email);
+    teclado_abrir_com("E-mail", "O e-mail da sua conta QR TIME.", 120, ALFA_EMAIL, email);
     teclado_tipo(TECLADO_TIPO_EMAIL);
   } else {
     // A senha VOLTA para a modal (em pontos): errar uma letra no fim de uma
     // senha longa nao pode obrigar a redigitar tudo no D-pad.
-    teclado_abrir_com("Senha", "A senha da sua conta Nuvio. Ela não aparece na tela.", 128, ALFA_SENHA, senha);
+    teclado_abrir_com("Senha", "A senha da sua conta QR TIME. Ela não aparece na tela.", 128, ALFA_SENHA, senha);
     teclado_tipo(TECLADO_TIPO_SENHA);
     teclado_mascarar(!senhaVisivel);
   }
@@ -345,7 +345,7 @@ static void desenharEmail(float y, Uint32 agora) {
   SesEstado st = sessao_estado();
   const char *falha = sessao_erro_email();
   (void)agora;
-  linhaCentrada(TXT_BODY, "Use o e-mail e a senha da sua conta Nuvio.", 176, 178, 186, y, 1.0f);
+  linhaCentrada(TXT_BODY, "Use o e-mail e a senha da sua conta QR TIME.", 176, 178, 186, y, 1.0f);
   y += 84.0f;
   campo(y, LE_EMAIL, "E-mail", email, 0);
   y += 42.0f + LG_CAMPO_H + 30.0f;

@@ -25,7 +25,7 @@
 enum {
   NF_NADA = 0,       // o cartao da 1.8.0 ja foi visto: nada a fazer
   NF_ATUALIZOU = 1,  // havia marca antiga: "Novidades da 1.8.0"
-  NF_NOVA = 2        // nenhuma marca: instalacao nova, "Boas-vindas ao Nuvio"
+  NF_NOVA = 2        // nenhuma marca: instalacao nova, "Boas-vindas ao QR TIME"
 };
 
 // A marca do cartao da 1.8.0 (gravada por novidades180.c ao fechar).

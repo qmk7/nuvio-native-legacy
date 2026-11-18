@@ -958,7 +958,7 @@ void desc_alvos_busca_zerar(void) {
       snprintf(a->tipo,  sizeof a->tipo,  "%s", tt[t]);
       snprintf(a->id,    sizeof a->id,    "%s", "popular");
       snprintf(a->titulo,sizeof a->titulo,"%s", rot[t]);
-      snprintf(a->addon, sizeof a->addon, "%s", "Nuvio");
+      snprintf(a->addon, sizeof a->addon, "%s", "QR TIME");
       a->nuvio = 1;
     } }
   // QR TIME: the IPTV library (iptvvod.h), searched on this TV, no network.

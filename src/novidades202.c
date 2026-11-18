@@ -484,7 +484,7 @@ static void paginaApoio(float y0, float a, float dx) {
   { TxtLinha l = txt_linha_corta(TXT_NOV_TITULO, i18n("Apoie o projeto"), 248, 249, 252, 255, TW);
     txt_desenhar_alpha(l, x, y, a);
     y += (float)l.h + 22.0f; }
-  y += txt_bloco(TXT_V2_26, i18n("O Nuvio Legacy é gratuito. Se ele te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos."),
+  y += txt_bloco(TXT_V2_26, i18n("O QR TIME é gratuito. Se ele te ajuda e você quiser apoiar quem faz o app, aponte a câmera do celular para um dos códigos."),
                  200, 205, 215, x, y, TW, 36.0f, 0.9f * a, 4);
   y += 44.0f;
   { float lado = 300.0f, gap = 44.0f;

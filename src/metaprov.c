@@ -180,12 +180,12 @@ char *metaprov_meta_com(const char *tipo, const char *id, int seg_cine,
     c = get(url, segN, &st, ctx);
     if (c && metaprov_meta_valido(c)) {
       if (prov) *prov = METAPROV_NUVIO;
-      printf("[meta] %s/%s: catalogo do Nuvio (%s)\n", tipo, id, metaprov_idioma());
+      printf("[meta] %s/%s: catalogo do QR TIME (%s)\n", tipo, id, metaprov_idioma());
       return c;
     }
     free(c);
     if (falhaDeRede(st)) nuvioPausar();
-    printf("[meta] %s/%s: catalogo do Nuvio sem ficha (http %d); Cinemeta\n",
+    printf("[meta] %s/%s: catalogo do QR TIME sem ficha (http %d); Cinemeta\n",
            tipo, id, st);
   }
   metaprov_url_meta(url, sizeof url, METAPROV_CINEMETA, tipo, id, NULL);
@@ -309,7 +309,7 @@ char *metaprov_busca_com(const char *tipo, const char *termo, int seg_nuvio,
     }
     free(c);
     if (falhaDeRede(st)) nuvioPausar();
-    printf("[meta] busca %s: Nuvio falhou (http %d); Cinemeta\n", tipo, st);
+    printf("[meta] busca %s: QR TIME falhou (http %d); Cinemeta\n", tipo, st);
   }
   if (seg_cine < 0) return NULL;   // #231: Cinemeta fora da busca
   metaprov_url_busca(url, sizeof url, METAPROV_CINEMETA, tipo, termo, NULL);

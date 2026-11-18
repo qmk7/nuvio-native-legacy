@@ -140,7 +140,7 @@ static const Cap CAP[N20_NCAP] = {
     { "Jellyfin · Quick Connect", "Emby", "Plex · PIN" },
     "Jellyfin, Emby e Plex na Home." },
   { 4, "aj_puzzle", "Plugins e P2P", 0, 1, "08.jpg",
-    { { "<b>Plugins</b>: repositórios de scrapers do Nuvio rodam como mais uma fonte, ao lado dos addons.", "Experimental", TG_AMARELO, ALS },
+    { { "<b>Plugins</b>: repositórios de scrapers do QR TIME rodam como mais uma fonte, ao lado dos addons.", "Experimental", TG_AMARELO, ALS },
       { "<b>P2P</b>: o motor embutido toca o torrent que você escolher à mão. Nunca entra na escolha automática.", "Experimental", TG_AMARELO, ALS },
       { "Os dois vêm <b>desligados</b>. Liga em Ajustes, com limite de disco e de memória.", "Desligado", TG_AMARELO, 0 } },
     { { "Repositórios CloudStream ficam na conta, mas não rodam aqui", 0, 0, 0 },
@@ -509,7 +509,7 @@ static void cenaVisual(int s) {
   { GfxRect a = { 1280 - 34 - 420, 100, 420, 176 };
     sIlha(a, 34);
     sCaps("Atualização", a.x + 26, a.y + 22, 1);
-    sTxt(TXT_G26B, "Nuvio 2.0 pronta", a.x + 26, a.y + 44, 1);
+    sTxt(TXT_G26B, "QR TIME 2.0 pronta", a.x + 26, a.y + 44, 1);
     sTxt(TXT_G18R, "Cresce da ilha do relógio", a.x + 26, a.y + 82, 0.55f);
     sChip("Instalar agora", a.x + 26, a.y + 116, 42, 1, TXT_G18M); }
   { GfxRect p = { 1280 - 34 - 420, 300, 420, 376 };
@@ -1408,12 +1408,12 @@ static void telaHero(float a, float dy) {
   // O simbolo, com a luz violeta do mockup por tras.
   gfx_rect((GfxRect){ 960 - 260, 70 + dy, 520, 420 }, 0, GFX_SOMBRA, 1, 0, 0, 0.5f, 0.47f, 0.31f, 1.0f, 0.32f * a);
   marca(logoapp_caminho(logoapp_atual(), LOGO_F_SIMBOLO), 960, 92 + dy, 320, 330, 1, a);
-  { TxtLinha n = txt(TXT_W20_HERO, "Nuvio "), v = txt_linha(TXT_W20_HERO, N20_VERSAO, 138, 122, 255, 255);
+  { TxtLinha n = txt(TXT_W20_HERO, "QR TIME "), v = txt_linha(TXT_W20_HERO, N20_VERSAO, 138, 122, 255, 255);
     float x = 960 - (n.w + v.w) * 0.5f;
     txt_desenhar_alpha(n, x, 446 + dy, a);
     txt_desenhar_alpha(v, x + n.w, 446 + dy, a); }
   y = 610 + dy;
-  centrado(novo ? "Boas-vindas ao Nuvio. Este tour mostra o que a 2.0 trouxe; o resto do app está no Guia de uso. Dá uns quatro minutos."
+  centrado(novo ? "Boas-vindas ao QR TIME. Este tour mostra o que a 2.0 trouxe; o resto do app está no Guia de uso. Dá uns quatro minutos."
                  : "Visual novo, servidores da sua casa e um monte de coisa que a gente tirou do caminho. Dá uns quatro minutos.",
            TXT_G28R, 960, y, 1100, 42, 0.82f * a, 3);
   { static const char *const R[3] = { "Começar o guia", "Só o que muda pra mim", "Ver depois" };
@@ -1808,9 +1808,9 @@ static float n20TelefoneConteudo(float x, float y, float w, float a) {
     return y - inicio + 24;
   }
   if (t == N20_HERO) {
-    y += telefonecartao_titulo("Nuvio 2.0", x, y, w, a);
+    y += telefonecartao_titulo("QR TIME 2.0", x, y, w, a);
     y += telefonecartao_texto(TXT_G28R,
-       novo ? "Boas-vindas ao Nuvio. Este tour mostra o que a 2.0 trouxe; o resto do app está no Guia de uso. Dá uns quatro minutos."
+       novo ? "Boas-vindas ao QR TIME. Este tour mostra o que a 2.0 trouxe; o resto do app está no Guia de uso. Dá uns quatro minutos."
             : "Visual novo, servidores da sua casa e um monte de coisa que a gente tirou do caminho. Dá uns quatro minutos.",
        x, y, w, 42, .82f * a) + 24;
     y += telefonecartao_texto(TXT_G18R, "Seu aparelho", x, y, w, 28, .6f * a) + 8;

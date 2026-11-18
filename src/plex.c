@@ -715,8 +715,8 @@ int px_ler_fontes(const PxConta *c, const char *rk, const char *corpo, size_t n,
         snprintf(sp->url, sizeof sp->url,
                  "%s/video/:/transcode/universal/start.m3u8?path=%%2Flibrary%%2Fmetadata%%2F%s&mediaIndex=%d"
                  "&partIndex=0&protocol=hls&fastSeek=1&directPlay=0&directStream=1&subtitleSize=100"
-                 "&audioBoost=100&maxVideoBitrate=%d&offset=0&X-Plex-Platform=Nuvio"
-                 "&X-Plex-Product=Nuvio&X-Plex-Client-Identifier=%s&X-Plex-Session-Identifier=%s"
+                 "&audioBoost=100&maxVideoBitrate=%d&offset=0&X-Plex-Platform=QR TIME"
+                 "&X-Plex-Product=QR TIME&X-Plex-Client-Identifier=%s&X-Plex-Session-Identifier=%s"
                  "&X-Plex-Token=%s", c->base, rk, idx, PX_TAXA_MAX, c->dispositivoId, sp->sessaoId, c->token);
       copiar(s->url, sizeof s->url, sp->url);
       copiar(s->provedor, sizeof s->provedor, "Plex");
@@ -762,10 +762,10 @@ static int pedir(const PxConta *c, const char *url, const char *token, const cha
   campoCab(did, sizeof did, c && c->dispositivoId[0] ? c->dispositivoId : "nuvio");
   campoCab(dev, sizeof dev, c && c->dispositivoNome[0] ? c->dispositivoNome : nomeBackend());
   snprintf(cab[0], sizeof cab[0], "Accept: application/json");
-  snprintf(cab[1], sizeof cab[1], "X-Plex-Product: Nuvio");
+  snprintf(cab[1], sizeof cab[1], "X-Plex-Product: QR TIME");
   snprintf(cab[2], sizeof cab[2], "X-Plex-Version: %s", NV_PX_VERSAO);
   snprintf(cab[3], sizeof cab[3], "X-Plex-Client-Identifier: %s", did);
-  snprintf(cab[4], sizeof cab[4], "X-Plex-Platform: Nuvio");
+  snprintf(cab[4], sizeof cab[4], "X-Plex-Platform: QR TIME");
   snprintf(cab[5], sizeof cab[5], "X-Plex-Device-Name: %s", dev);
   for (i = 0; i < 6; i++) cabs[k++] = cab[i];
   tok[0] = 0;

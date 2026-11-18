@@ -1064,7 +1064,7 @@ const char *socialvis_fonte_nome(int fonte) {
     case SV_FONTE_TRAKT:      return "Trakt";
     case SV_FONTE_SIMKL:      return "Simkl";
     case SV_FONTE_LETTERBOXD: return "Letterboxd";
-    default:                  return "Nuvio";
+    default:                  return "QR TIME";
   }
 }
 

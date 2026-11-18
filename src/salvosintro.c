@@ -247,7 +247,7 @@ void sintro_desenhar(Uint32 agora) {
   // Na maquete o lugar deste rotulo e o nome do titulo aberto atras do cartao.
   // Aqui o explicador nasce na HOME, nao sobre um titulo — e nao ha nome para
   // pedir emprestado. O rotulo diz entao o que ele e de verdade.
-  { TxtLinha t = txt_linha(TXT_CAPTION2, "NOVO NO NUVIO", 150, 154, 165, 255);
+  { TxtLinha t = txt_linha(TXT_CAPTION2, "NOVO NO QR TIME", 150, 154, 165, 255);
     txt_desenhar_alpha(t, x, SI_Y + 38.0f, a * 0.92f); }
   { TxtLinha t = txt_linha(TXT_TITULO2, "Salvando com +", 246, 247, 252, 255);
     txt_desenhar_alpha(t, x, SI_Y + 70.0f, a); }
@@ -323,7 +323,7 @@ void sintro_desenhar(Uint32 agora) {
   y += 36.0f;
 
   desenhaOpcao(0, x, y, animFoco[0], !ajustes_salvos_no_trakt(),
-               "Lista do Nuvio",
+               "Lista do QR TIME",
                // Com conta, o "+" tambem vai para o perfil (contapend.c).
                sessao_logada()
                  ? "Fica nesta TV e no seu perfil da conta, em todo aparelho onde você entrar."

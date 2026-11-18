@@ -248,7 +248,7 @@ static float envTelefoneConteudo(const AvisosEnvio *env, float x, float y, float
         txt = "O registro continua aqui. Tente de novo; se repetir, confira a rede da TV."; break;
       case AVISOS_ENVIO_CONTA:
         tit = "Entre na sua conta para enviar";
-        txt = "O servidor de registros só aceita envio de quem entrou com a conta Nuvio ou o Trakt."; break;
+        txt = "O servidor de registros só aceita envio de quem entrou com a conta QR TIME ou o Trakt."; break;
       case AVISOS_ENVIO_INDISPONIVEL:
         tit = "Esta versão não tem servidor de registros";
         txt = "O registro só pode ser lido nesta tela (botão vermelho ou Ajustes › Sobre e ajuda › Ver o registro na tela)."; break;
@@ -402,7 +402,7 @@ static void registro_envio_desenharCorpo_(void) {
         case AVISOS_ENVIO_CONTA:
           icone = "aj_user-round";
           tit = "Entre na sua conta para enviar";
-          txt = "O servidor de registros só aceita envio de quem entrou com a conta Nuvio ou o Trakt.";
+          txt = "O servidor de registros só aceita envio de quem entrou com a conta QR TIME ou o Trakt.";
           break;
         case AVISOS_ENVIO_INDISPONIVEL:
           tit = "Esta versão não tem servidor de registros";

@@ -298,7 +298,7 @@ static const char *rotuloAtiv(int n) {
 }
 
 static const char *tituloLista(int origem) {
-  return origem == 3 ? "Comunidade Nuvio Native" : origem == 2 ? "Gosto parecido" : "Resultados da busca";
+  return origem == 3 ? "Comunidade QR TIME" : origem == 2 ? "Gosto parecido" : "Resultados da busca";
 }
 
 static void marcarHomonimos(void);
@@ -324,7 +324,7 @@ static void montar(void) {
     }
     secao("Descobrir", 0);
     { int pq = recomenda_pesquisavel();
-      navL(A_COMUNIDADE, "aj_users", "Comunidade Nuvio Native",
+      navL(A_COMUNIDADE, "aj_users", "Comunidade QR TIME",
            pq ? "Todo mundo que ligou o Perfil pesquisável" : "Ligue o Perfil pesquisável para ver");
       navL(A_GOSTO, "aj_sparkles", "Gosto parecido",
            pq ? "Quem assiste e curte o mesmo que você" : "Ligue o Perfil pesquisável para ver"); }

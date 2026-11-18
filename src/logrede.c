@@ -246,7 +246,7 @@ static void responderTexto(int c, int codigo, const char *tipo, const char *extr
 static const char PAGINA[] =
 "<!doctype html><html lang=en><head><meta charset=utf-8>"
 "<meta name=viewport content='width=device-width,initial-scale=1'>"
-"<title>Nuvio log</title><style>"
+"<title>QR TIME log</title><style>"
 ":root{color-scheme:dark;--bg:#0e1116;--fg:#d6dbe3;--dim:#7d8590;--fonte:#7ee0a1;--diag:#f2c45a;--next:#7cc4ff;--erro:#ff8a80;--abrir:#e0a8ff}"
 "body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 ui-monospace,Menlo,Consolas,monospace}"
 "header{position:sticky;top:0;background:#151a21;padding:8px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-bottom:1px solid #222a35}"
@@ -256,7 +256,7 @@ static const char PAGINA[] =
 "#st,#cfg{color:var(--dim);font:12px system-ui,sans-serif}#cfg label{margin-right:12px;white-space:nowrap}#cfg{width:100%}"
 "#log{padding:8px 12px 40px;white-space:pre-wrap;word-break:break-word}"
 ".l{padding:1px 0}.f{color:var(--fonte)}.d{color:var(--diag)}.n{color:var(--next)}.e{color:var(--erro)}.a{color:var(--abrir)}.h{color:#fff;font-weight:700;margin-top:10px;border-top:1px solid #333}.x{display:none}"
-"</style></head><body><header><b>Nuvio log</b>"
+"</style></head><body><header><b>QR TIME log</b>"
 "<button id=b1 class=on>Source picking</button><button id=b2>Won't open</button><button id=b3>Error while playing</button><button id=b0>Everything</button>"
 "<input id=q placeholder='Search (e.g. REFUSED, track #, T7)'>"
 "<button id=ba class=on>Auto-scroll</button><button id=bc>Clear</button>"
@@ -358,7 +358,7 @@ static void atender(int c) {
     char msg[160], ip[48] = "?";
     int k;
     if (par.sin_family == AF_INET) inet_ntop(AF_INET, &par.sin_addr, ip, sizeof ip);
-    k = snprintf(msg, sizeof msg, "Nuvio log: this page only answers devices on the home network (your address: %s).\n", ip);
+    k = snprintf(msg, sizeof msg, "QR TIME log: this page only answers devices on the home network (your address: %s).\n", ip);
     printf("[logrede] refused %s (not a home-network address)\n", ip);
     fflush(stdout);
     responderTexto(c, 403, "text/plain; charset=utf-8", NULL, msg, (size_t)k);
