@@ -22,10 +22,10 @@ static void carregarLocked(void) {
   perfilLido = perfis_ativo();
   t = dados_ler(nome);
   for (lin = t ? strtok_r(t, "\n", &sp) : NULL; lin && nFontes < MCF_MAX; lin = strtok_r(NULL, "\n", &sp)) {
-    char *c[6] = { 0 };
+    char *c[7] = { 0 };
     int k = 0;
     McFonte *f = &fontes[nFontes];
-    for (char *p = lin; k < 6; k++) { c[k] = p; p = strchr(p, '\t'); if (!p) { k++; break; } *p++ = 0; }
+    for (char *p = lin; k < 7; k++) { c[k] = p; p = strchr(p, '\t'); if (!p) { k++; break; } *p++ = 0; }
     if (k < 6) continue;
     memset(f, 0, sizeof *f);
     f->tipo = atoi(c[0]);
@@ -36,6 +36,7 @@ static void carregarLocked(void) {
     } else if (f->tipo == MCS_WEBDAV) {
       snprintf(f->dv.url, sizeof f->dv.url, "%s", c[3]); snprintf(f->dv.usuario, sizeof f->dv.usuario, "%s", c[4]); snprintf(f->dv.senha, sizeof f->dv.senha, "%s", c[5]);
     } else continue;
+    f->desligada = k >= 7 && c[6] && !strcmp(c[6], "off");
     if (f->chave[0]) nFontes++;
   }
   free(t);
@@ -52,7 +53,7 @@ static int gravarLocked(void) {
     const McFonte *f = &fontes[i];
     const char *u = f->tipo == MCS_SUBSONIC ? f->ss.url : f->dv.url, *us = f->tipo == MCS_SUBSONIC ? f->ss.usuario : f->dv.usuario,
                *pw = f->tipo == MCS_SUBSONIC ? f->ss.senha : f->dv.senha;
-    k += (size_t)snprintf(t + k, cap - k, "%d\t%s\t%s\t%s\t%s\t%s\n", f->tipo, f->chave, f->nome, u, us, pw);
+    k += (size_t)snprintf(t + k, cap - k, "%d\t%s\t%s\t%s\t%s\t%s%s\n", f->tipo, f->chave, f->nome, u, us, pw, f->desligada ? "\toff" : "");
   }
   arquivo(nome, sizeof nome);
   ok = nFontes ? dados_gravar(nome, t) : (dados_apagar(nome), 1);
@@ -120,4 +121,23 @@ int mcfontes_remover(const char *chave) {
   }
   pthread_mutex_unlock(&trava);
   return ok;
+}
+int mcfontes_ligar(const char *chave, int liga) {
+  int ok = 0;
+  if (!chave) return 0;
+  pthread_mutex_lock(&trava); garantir();
+  for (int i = 0; i < nFontes; i++) if (!strcmp(fontes[i].chave, chave)) {
+    fontes[i].desligada = !liga;
+    ok = gravarLocked();
+    break;
+  }
+  pthread_mutex_unlock(&trava);
+  return ok;
+}
+int mcfontes_ativa(int i) {
+  int r;
+  pthread_mutex_lock(&trava); garantir();
+  r = i >= 0 && i < nFontes && !fontes[i].desligada;
+  pthread_mutex_unlock(&trava);
+  return r;
 }

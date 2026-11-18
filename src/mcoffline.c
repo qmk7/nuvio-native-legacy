@@ -83,7 +83,7 @@ int mco_baixar(const McFaixa *f) {
   Sorvo s;
   int st = 0, ok;
   if (mco_caminho(f->id, url, sizeof url)) return MCOF_OK;
-  if (!mcfontes_partir(f->id, k, sizeof k, &loc) || !mcfontes_achar(k, &fo)) return MCOF_FONTE;
+  if (!mcfontes_partir(f->id, k, sizeof k, &loc) || !mcfontes_achar(k, &fo) || fo.desligada) return MCOF_FONTE;
   cab[0] = 0;
   if (fo.tipo == MCS_SUBSONIC) ss_url_download(&fo.ss, loc, url, sizeof url);
   else { dav_url(&fo.dv, loc, url, sizeof url); dav_cabecalho(&fo.dv, cab, sizeof cab); if (cab[0]) cabs[0] = cab; }

@@ -89,3 +89,5 @@ agenda:900
 atualizacao_agenda:900
 qrtime_tls
 qrtime_redact
+qrtime_fuzz:1500
+qrtime_dados:900

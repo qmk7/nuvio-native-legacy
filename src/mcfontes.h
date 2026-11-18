@@ -15,6 +15,7 @@ typedef struct {
   char nome[64];
   SsServidor ss;        // MCS_SUBSONIC
   DavServidor dv;       // MCS_WEBDAV
+  int  desligada;       // phase 8: 1 = kept but switched off (optional 7th column)
 } McFonte;
 
 void mcfontes_carregar(void);           // this profile's file (again after a profile switch)
@@ -24,6 +25,10 @@ int  mcfontes_achar(const char *chave, McFonte *out); // by key or by a qualifie
 // Adds or replaces (same type + url + user). Fills f->chave. 1 saved.
 int  mcfontes_salvar(McFonte *f);
 int  mcfontes_remover(const char *chave);
+// Switch a source on/off without forgetting it (1 ok). A switched-off source
+// is skipped by the library, search and playback; its data stays.
+int  mcfontes_ligar(const char *chave, int liga);
+int  mcfontes_ativa(int i);              // 1 = exists and is switched on
 // "ss1a2b3c4d:abc" -> fonte "ss1a2b3c4d", local "abc". 1 when well formed.
 int  mcfontes_partir(const char *id, char *fonte, size_t nf, const char **local);
 #endif

@@ -13,6 +13,7 @@
 #include "video.h"
 #include "esmaecer.h"
 #include "dados.h"
+#include "perfis.h"
 #include "gfx.h"
 #include "text.h"
 #include "layout.h"
@@ -802,7 +803,12 @@ void mcui_abrir(void) {
     mcp_definir_saida(mcsaida_padrao());
     mcp_definir_ganchos(mccat_ganchos());
     {
-      char *t = dados_ler("music-settings.txt");
+      // Phase 8: music preferences are per profile; the pre-phase-8 file
+      // (one for the whole TV) is read only when this profile has none yet.
+      char nome[40];
+      snprintf(nome, sizeof nome, "music-settings-p%d.txt", perfis_ativo() > 0 ? perfis_ativo() : 1);
+      char *t = dados_ler(nome);
+      if (!t) t = dados_ler("music-settings.txt");
       festaLig = t && strstr(t, "festa=1");
       mcp_festa(festaLig);
       free(t);
@@ -898,7 +904,8 @@ static void ativar(Pagina *pg, int i) {
           for (int k = 0; k < pg->n; k++) if (pg->v[k].tipo == L_YTVIDEO) { ativar(pg, k); break; }
           break;
         case A_YTMUSIC: { extern void app_ir_youtube(void) __attribute__((weak)); if (app_ir_youtube) app_ir_youtube(); break; }
-        case A_FESTA: festaLig = !festaLig; mcp_festa(festaLig); dados_gravar("music-settings.txt", festaLig ? "festa=1\n" : "festa=0\n"); construirLocal(pg); break;
+        case A_FESTA: festaLig = !festaLig; mcp_festa(festaLig); { char nome[40]; snprintf(nome, sizeof nome, "music-settings-p%d.txt", perfis_ativo() > 0 ? perfis_ativo() : 1);
+          dados_gravar(nome, festaLig ? "festa=1\n" : "festa=0\n"); } construirLocal(pg); break;
         case A_LRCLIB: lrclibLig = !lrclibLig; construirLocal(pg); break;
         case A_FILA_ALEATORIO: mcq_aleatorio(!mcq_eh_aleatorio()); mcq_salvar(); construirLocal(pg); break;
         case A_FILA_REPETIR: mcq_repetir((mcq_repeticao() + 1) % 3); mcq_salvar(); construirLocal(pg); break;

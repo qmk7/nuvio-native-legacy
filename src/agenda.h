@@ -179,6 +179,7 @@ int agenda_seguir(const char *imdb, const char *titulo, const char *poster, int 
 // upcoming episode of the shows the account follows, at the exact instant.
 // Instants are UTC; the date and time shown are this TV's local ones.
 typedef struct { char imdb[24], titulo[160], nome[120]; int temp, ep; char data[12], hora[6]; long long instante; } AgEpCal;
+void agenda_seguidas_recarregar(void);   // after a reset removed the follows file
 int agenda_trakt_cal_parse(const char *corpo, AgEpCal *out, int max);
 // Upcoming episodes of one series from the last calendar read (sorted).
 int agenda_proximos(const char *imdb, AgEpCal *out, int max);

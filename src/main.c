@@ -42,6 +42,7 @@
 #define NV_SINAL_TERMINAR 1
 #include <signal.h>
 #endif
+#include "qrdados.h"
 #include <unistd.h>   // dup2 (o stderr no mesmo descritor do log)
 #include "gfx.h"
 #include "fundo.h"
@@ -1146,6 +1147,9 @@ int main(int argc, char **argv) {
   // ja esta resolvido desde o topo do main.
   NV_ETAPA("dados_iniciar");
   dados_iniciar(dirArte);
+  // QR TIME phase 8: data schema check. Upgrades only rewrite/add, one
+  // version at a time; newer data is left untouched; nothing is deleted.
+  qrdados_esquema_iniciar();
 #ifdef NV_ANDROID
   nv_android_cache_migrate(dados_dir());
   nv_android_cache_trim(NV_ANDROID_CACHE_BYTES);

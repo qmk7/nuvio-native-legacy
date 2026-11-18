@@ -1012,6 +1012,8 @@ static int nSeguidas, seguidasPerfil = -1;
 static AgEpCal cal[AG_CAL_MAX];
 static int nCal;
 static time_t calQuando;
+// Phase 8 reset: the follows file was removed; read it again on next use.
+void agenda_seguidas_recarregar(void) { pthread_mutex_lock(&trava); seguidasPerfil = -1; nSeguidas = 0; pthread_mutex_unlock(&trava); }
 static void seguidasArq(char *d, size_t n) { int p = perfis_ativo(); snprintf(d, n, "agenda-follows-p%d.txt", p > 0 ? p : 1); }
 // trava held.
 static void seguidasGarantir(void) {

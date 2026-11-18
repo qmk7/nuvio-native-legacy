@@ -34,7 +34,8 @@ static void qualAlbum(McAlbum *a, const char *chave) {
 // The source of a qualified id. 1 ok.
 static int fonteDe(const char *id, McFonte *f, const char **local) {
   char k[16];
-  return mcfontes_partir(id, k, sizeof k, local) && mcfontes_achar(k, f);
+  // A switched-off source answers nothing (no request reaches its server).
+  return mcfontes_partir(id, k, sizeof k, local) && mcfontes_achar(k, f) && !f->desligada;
 }
 // Merge-keep: the first error is the answer only when nothing worked.
 
@@ -42,7 +43,7 @@ int mccat_artistas(McArtista *out, int max, int *n) {
   int e = MC_ERRO_NAO_SUPORTA, algum = 0;
   McFonte f;
   *n = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int m = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     r = ss_artistas(&f.ss, out + *n, max - *n, &m);
@@ -73,7 +74,7 @@ int mccat_albuns(const char *tipo, int offset, McAlbum *out, int max, int *n) {
   int e = MC_ERRO_NAO_SUPORTA, algum = 0, fontes = 0;
   McFonte f;
   *n = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int m = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     fontes++;
@@ -103,7 +104,7 @@ int mccat_faixas(int offset, McFaixa *out, int max, int *n) {
   McArtista ar[1];
   McAlbum al[1];
   *n = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int a, b, c = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     r = ss_buscar(&f.ss, "", offset, ar, 0, &a, al, 0, &b, out + *n, max - *n, &c);
@@ -119,7 +120,7 @@ int mccat_generos(McGenero *out, int max, int *n) {
   McFonte f;
   McGenero tmp[200];
   *n = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int m = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     r = ss_generos(&f.ss, tmp, 200, &m);
@@ -138,7 +139,7 @@ int mccat_genero_faixas(const char *genero, int offset, McFaixa *out, int max, i
   int e = MC_ERRO_NAO_SUPORTA, algum = 0;
   McFonte f;
   *n = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int m = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     r = ss_genero_faixas(&f.ss, genero, offset, out + *n, max - *n, &m);
@@ -153,7 +154,7 @@ int mccat_playlists(McPlaylist *out, int max, int *n) {
   int e = MC_OK;
   McFonte f;
   *n = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int m = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     r = ss_playlists(&f.ss, out + *n, max - *n, &m);
@@ -194,7 +195,7 @@ int mccat_buscar(const char *q, McArtista *ar, int maxAr, int *nAr, McAlbum *al,
   int e = MC_ERRO_NAO_SUPORTA, algum = 0;
   McFonte f;
   *nAr = *nAl = *nFx = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int a = 0, b = 0, c = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     r = ss_buscar(&f.ss, q, 0, ar + *nAr, maxAr - *nAr, &a, al + *nAl, maxAl - *nAl, &b, fx + *nFx, maxFx - *nFx, &c);
@@ -219,7 +220,7 @@ int mccat_favoritos(McFaixa *out, int max, int *n) {
   int e = MC_OK;
   McFonte f;
   *n = 0;
-  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+  for (int i = 0; mcfontes_copiar(i, &f); i++) { if (f.desligada) continue;   // phase 8: switched off by the person
     int m = 0, r;
     if (f.tipo != MCS_SUBSONIC) continue;
     r = ss_favoritos(&f.ss, out + *n, max - *n, &m);
@@ -257,7 +258,7 @@ int mccat_salvar_playlist(const char *nome, const McFaixa *f, int n, int *servid
     const char **ids = malloc(sizeof *ids * (size_t)n);
     char novo[96];
     int r;
-    if (!ids || !mcfontes_achar(k0, &fo)) { free(ids); return MC_ERRO_OUTRO; }
+    if (!ids || !mcfontes_achar(k0, &fo) || fo.desligada) { free(ids); return MC_ERRO_OUTRO; }
     for (int i = 0; i < n; i++) ids[i] = strchr(f[i].id, ':') + 1;
     r = ss_playlist_criar(&fo.ss, nome, ids, n, novo, sizeof novo);
     free(ids);
@@ -292,7 +293,7 @@ int mccat_pasta(const char *fonte, const char *href, DavItem *pastas, int maxP, 
   DavItem *v;
   int n = 0, r;
   *nP = *nA = 0;
-  if (!mcfontes_achar(fonte, &f) || f.tipo != MCS_WEBDAV) return MC_ERRO_NAO_SUPORTA;
+  if (!mcfontes_achar(fonte, &f) || f.desligada || f.tipo != MCS_WEBDAV) return MC_ERRO_NAO_SUPORTA;
   v = calloc(600, sizeof *v);
   if (!v) return MC_ERRO_OUTRO;
   r = dav_listar(&f.dv, href, v, 600, &n);
