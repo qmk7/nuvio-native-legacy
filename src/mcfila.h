@@ -3,9 +3,9 @@
 // local playlists (any mix of sources) and the resume point. Pure logic and
 // files; no network, no audio. UI-thread only.
 //
-// Files (per profile): musica-fila-p<N>.txt (queue, position, shuffle,
-// repeat, seconds into the current track), musica-historico-p<N>.txt (200),
-// musica-favoritos-p<N>.txt, musica-listas-p<N>.txt.
+// Files (per profile): music-queue-p<N>.txt (queue, position, shuffle,
+// repeat, seconds into the current track), music-history-p<N>.txt (200),
+// music-favorites-p<N>.txt, music-playlists-p<N>.txt.
 #ifndef NV_MCFILA_H
 #define NV_MCFILA_H
 #include "mcmodelo.h"

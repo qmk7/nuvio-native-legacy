@@ -16,7 +16,7 @@ import hashlib, json, os, sys, threading, time, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 PORT = int(sys.argv[1]); WORK = sys.argv[2]; AUDIO = sys.argv[3]
-USERS = {"qrtuser": "qrt pass+1", "ldapuser": "ldappw"}
+USERS = {"qrtuser": "qrt pass+1", "ldapuser": "ldappw", "listener": "listenpw"}   # listener: no download role
 DAVUSER, DAVPASS = "davuser", "davpass"
 LOCK = threading.Lock()
 STATE = {"starred": {"s3"}, "scrobbles": [], "playlists": {}, "next_pl": 1, "plays": {}}
@@ -308,6 +308,13 @@ class H(BaseHTTPRequestHandler):
             if one("format") != "raw":
                 self.log("TRANSCODE-REQUESTED " + one("format"))
             return self.file(os.path.join(AUDIO, s["_file"]), s["contentType"])
+        if method == "download":
+            if one("u") == "listener":
+                return self.send(fail(50, "User is not authorized for the given operation."))
+            s = BYID.get(one("id"))
+            if not s:
+                return self.send(fail(70, "Song not found"))
+            return self.file(os.path.join(AUDIO, s["_file"]), "application/octet-stream")
         if method == "getCoverArt":
             return self.send(b"\xff\xd8\xff\xe0" + b"\x00" * 64, "image/jpeg")
         return self.send(fail(0, "Unknown method " + method), code=404)

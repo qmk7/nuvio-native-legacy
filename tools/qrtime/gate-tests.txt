@@ -63,3 +63,10 @@ qrtime_sportcenter:900
 # YouTube section (data layer + end to end on Xvfb)
 qrtime_youtube
 qrtime_youtube_ui:900
+
+# Music Center (formats, providers, player, Last.fm/lyrics, end to end)
+qrtime_mcfmt
+qrtime_subsonic
+qrtime_mcplayer
+qrtime_mclfm
+qrtime_music_ui:1100

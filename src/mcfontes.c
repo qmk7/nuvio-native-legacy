@@ -11,7 +11,7 @@ static pthread_mutex_t trava = PTHREAD_MUTEX_INITIALIZER;
 static McFonte fontes[MCF_MAX];
 static int nFontes, perfilLido = -1;
 
-static void arquivo(char *d, size_t n) { int p = perfis_ativo(); snprintf(d, n, "musica-fontes-p%d.txt", p > 0 ? p : 1); }
+static void arquivo(char *d, size_t n) { int p = perfis_ativo(); snprintf(d, n, "music-sources-p%d.txt", p > 0 ? p : 1); }
 // Tabs and newlines never reach the file (fields are tab-separated).
 static int limpo(const char *s) { for (; s && *s; s++) if (*s == '\t' || *s == '\n' || *s == '\r') return 0; return 1; }
 

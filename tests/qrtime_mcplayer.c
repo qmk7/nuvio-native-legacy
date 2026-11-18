@@ -12,6 +12,7 @@
 #include "mcfila.h"
 #include "mcfontes.h"
 #include "mcplayer.h"
+#include "mcoffline.h"
 #include "mcsaida.h"
 #include "dados.h"
 #include <SDL2/SDL.h>
@@ -244,7 +245,7 @@ static int real(const char *base, const char *audio, const char *disco) {
   mcfontes_carregar();
   CONFERE(mcfontes_n() == 2, "sources reload from disk");
   {
-    char *t = dados_ler("musica-fontes-p1.txt");
+    char *t = dados_ler("music-sources-p1.txt");
     CONFERE(t && strstr(t, "davpass"), "passwords kept on this TV (file), like the IPTV ones");
     free(t);
   }
@@ -310,7 +311,7 @@ static int real(const char *base, const char *audio, const char *disco) {
     }
   }
   {
-    char *t = dados_ler("musica-historico-p1.txt");
+    char *t = dados_ler("music-history-p1.txt");
     CONFERE(t && strstr(t, "Track 05") && strstr(t, "Midnight Line"), "history recorded");
     free(t);
   }
@@ -328,6 +329,43 @@ static int real(const char *base, const char *audio, const char *disco) {
     CONFERE(esperar(MCP_TOCANDO, 10000), "WebDAV track plays (Basic auth sent with the download)");
     mcp_parar();
     CONFERE(mccat_favoritar(&v[0], 1) == MC_OK && mcv_fav(v[0].id), "WebDAV favourite kept locally");
+  }
+  // ---- offline copies ----
+  {
+    McFaixa nb2[5];
+    int k = 0;
+    char u[700];
+    size_t na2, nb3;
+    unsigned char *a2, *b3;
+    mccat_album(al[2].id, NULL, nb2, 5, &k);   // Night Sessions: s1 (a16), s2 (a24)
+    CONFERE(mco_baixar(&nb2[1]) == MCOF_OK && mco_caminho(nb2[1].id, u, sizeof u) && !strncmp(u, "file://", 7), "offline copy saved");
+    snprintf(arq, sizeof arq, "%s/a24.flac", audio);
+    a2 = ler(arq, &na2);
+    b3 = ler(u + 7, &nb3);
+    CONFERE(a2 && b3 && na2 == nb3 && !memcmp(a2, b3, na2), "the copy is the original file, byte for byte");
+    free(a2); free(b3);
+    CONFERE(mco_n() == 1 && mco_usado() == (long long)nb3, "offline list and space used");
+    {
+      McFaixa l;
+      CONFERE(mco_item(0, &l) && !strcmp(l.titulo, "Midnight Line"), "offline list keeps the metadata");
+    }
+    mcq_definir(&nb2[1], 1, 0);
+    mcp_tocar(0);
+    CONFERE(esperar(MCP_TOCANDO, 10000), "the offline copy plays (from disk)");
+    mcp_parar();
+    CONFERE(mco_apagar(nb2[1].id) && !mco_caminho(nb2[1].id, u, sizeof u) && mco_n() == 0, "remove the offline copy");
+    {   // a user without the download role: refused, nothing kept
+      McFonte x;
+      memset(&x, 0, sizeof x);
+      x.tipo = MCS_SUBSONIC;
+      snprintf(x.ss.url, sizeof x.ss.url, "%s", base);
+      snprintf(x.ss.usuario, sizeof x.ss.usuario, "listener");
+      snprintf(x.ss.senha, sizeof x.ss.senha, "listenpw");
+      mcfontes_salvar(&x);
+      snprintf(nb2[0].id, sizeof nb2[0].id, "%s:s1", x.chave);
+      CONFERE(mco_baixar(&nb2[0]) == MCOF_SEM_PERMISSAO && mco_n() == 0, "server without download permission: refused, nothing saved");
+      mcfontes_remover(x.chave);
+    }
   }
   // ---- Party mode adds tracks before the queue runs out ----
   {

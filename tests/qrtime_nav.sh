@@ -99,9 +99,9 @@ espera "tela=home" 60 || { erro "home never drawn"; exit 1; }
 espera "Nav Movies|qrtnav-movies" 60 || echo "note: catalog name not seen in log yet"
 sleep 6
 
-# Visible order for a guest with default settings (Music hidden until phase 7):
-# 0 Home 1 Live TV 2 Movies 3 Series 4 Sport 5 YouTube 6 Agenda 7 Search
-# 8 Add-ons 9 Library 10 Explore 11 Profile 12 Settings
+# Visible order for a guest with default settings:
+# 0 Home 1 Live TV 2 Movies 3 Series 4 Sport 5 Music 6 YouTube 7 Agenda
+# 8 Search 9 Add-ons 10 Library 11 Explore 12 Profile 13 Settings
 vai() {   # vai <index>: open the menu, move down <index> rows, OK
   local k
   # On the hero, Left steps the carousel back until its first slide and only
@@ -150,22 +150,27 @@ a=$(transicao 16); vai 4; foto sport
 [ "$(transicao 16)" -gt "$a" ] && ok "Sport Center opens its screen" || erro "Sport Center"
 volta_home 16 && ok "Back from Sport Center returns Home" || erro "Back from Sport Center"
 
-# 5 YouTube -> its own section (TELA_YOUTUBE = 17, ytui.c); videos still play
+# 5 Music -> the Music Center (TELA_MUSICA = 18, mcui.c)
+a=$(transicao 18); vai 5; foto music
+[ "$(transicao 18)" -gt "$a" ] && ok "Music opens the Music Center" || erro "Music Center"
+volta_home 18 && ok "Back from Music returns Home" || erro "Back from Music"
+
+# 6 YouTube -> its own section (TELA_YOUTUBE = 17, ytui.c); videos still play
 # in the TV's official app, from the video page
-a=$(transicao 17); vai 5; foto youtube
+a=$(transicao 17); vai 6; foto youtube
 [ "$(transicao 17)" -gt "$a" ] && ok "YouTube opens its own section" || erro "YouTube section"
 volta_home 17 && ok "Back from YouTube returns Home" || erro "Back from YouTube"
 
-# 6 Agenda (13), 7 Search (5), 9 Library (6), 10 Explore (3), 11 Profile (7), 12 Settings (8)
-for par in "6 13 Agenda" "7 5 Search" "9 6 Library" "10 3 Explore" "11 7 Profile" "12 8 Settings"; do
+# 7 Agenda (13), 8 Search (5), 10 Library (6), 11 Explore (3), 12 Profile (7), 13 Settings (8)
+for par in "7 13 Agenda" "8 5 Search" "10 6 Library" "11 3 Explore" "12 7 Profile" "13 8 Settings"; do
   set -- $par
   a=$(transicao "$2"); vai "$1"; foto "$(echo "$3" | tr 'A-Z' 'a-z')"
   [ "$(transicao "$2")" -gt "$a" ] && ok "$3 opens its screen" || erro "$3 (expected screen $2)"
   volta_home "$2" && ok "Back from $3 returns Home" || erro "Back from $3"
 done
 
-# 8 Add-ons (12): Back goes Home (not to Settings) when opened from the menu
-a=$(transicao 12); vai 8; foto addons
+# 9 Add-ons (12): Back goes Home (not to Settings) when opened from the menu
+a=$(transicao 12); vai 9; foto addons
 [ "$(transicao 12)" -gt "$a" ] && ok "Add-ons opens its screen" || erro "Add-ons"
 b=$(conta "\[transicao\] tela 12 -> 2 ")
 tecla back 2

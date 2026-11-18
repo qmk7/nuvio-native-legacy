@@ -66,6 +66,9 @@ int ss_letra(const SsServidor *s, const McFaixa *f, char *lrc, size_t n);
 
 // URLs carrying fresh auth (keep them out of logs: ss_redigir).
 void ss_url_stream(const SsServidor *s, const char *id, char *url, size_t n);
+// "download": the original file, and only when the server's download role
+// allows this user (the server answers error 50 otherwise).
+void ss_url_download(const SsServidor *s, const char *id, char *url, size_t n);
 // Cover URLs use a salt derived from the id (not random), so the same cover
 // keeps one URL and the image cache works; the token still never reveals the
 // password.

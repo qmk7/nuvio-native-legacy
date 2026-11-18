@@ -12,7 +12,7 @@ bash tests/qrtime_music_fixtures.sh "$W/audio"; r=$?
 [ "$r" = 3 ] && { echo "SKIP: ffmpeg not installed (fixture generator)"; exit 0; }
 [ "$r" = 0 ] || { echo "FAIL: fixtures"; exit 1; }
 cc -std=gnu11 -O1 -g -Wall -Wextra -Wno-format-truncation -Isrc -DNV_LINUX_DESKTOP $(pkg-config --cflags sdl2) tests/qrtime_mcplayer.c \
-  src/mccat.c src/mcfila.c src/mcfontes.c src/mcplayer.c src/mcsaida_sdl.c src/mcsaida_ums.c src/mcdec.c src/mcfmt.c \
+  src/mccat.c src/mcoffline.c src/mcfila.c src/mcfontes.c src/mcplayer.c src/mcsaida_sdl.c src/mcsaida_ums.c src/mcdec.c src/mcfmt.c \
   src/subsonic.c src/webdav.c src/md5.c src/js.c src/dados.c src/rede.c src/redeurl.c \
   $(pkg-config --libs sdl2) -lpthread -ldl -lz -lm -o "$W/t" || { echo "FAIL: test build"; exit 1; }
 fail=0

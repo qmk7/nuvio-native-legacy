@@ -98,6 +98,12 @@ void ss_url_stream(const SsServidor *s, const char *id, char *url, size_t n) {
   snprintf(x, sizeof x, "&id=%s&format=raw&maxBitRate=0", e);
   montar(s, "stream", x, 0, url, n);
 }
+void ss_url_download(const SsServidor *s, const char *id, char *url, size_t n) {
+  char e[200], x[260];
+  urlenc(id, e, sizeof e);
+  snprintf(x, sizeof x, "&id=%s", e);
+  montar(s, "download", x, 0, url, n);
+}
 void ss_url_capa(const SsServidor *s, const char *capaId, int tamanho, char *url, size_t n) {
   char e[200], x[260];
   if (!capaId || !capaId[0]) { url[0] = 0; return; }

@@ -31,7 +31,7 @@ typedef enum {
   MENU_FILMES,      // Movies: every movie catalog of the active add-ons
   MENU_SERIES,      // Series: every series catalog
   MENU_ESPORTES,    // Sport Center (interim: the guide on its sports section)
-  MENU_MUSICA,      // Music: hidden until the Music Center exists (phase 7)
+  MENU_MUSICA,      // QR TIME Music Center (mcui.c)
   MENU_YOUTUBE,     // QR TIME YouTube section (ytui.c); videos play in the TV app
   // AGENDA — o calendario das series acompanhadas.
   MENU_AGENDA,

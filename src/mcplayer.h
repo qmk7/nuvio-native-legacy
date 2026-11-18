@@ -33,6 +33,10 @@ int  mcp_proxima(void);
 int  mcp_anterior(void);
 void mcp_buscar(double seg);
 void mcp_parar(void);
+// Profile switch: stop the output WITHOUT saving (the queue belongs to the
+// profile that is leaving and is already saved; saving now would write it
+// into the new profile's file).
+void mcp_descartar(void);
 void mcp_atualizar(unsigned agoraMs);
 void mcp_festa(int liga);
 int  mcp_eh_festa(void);

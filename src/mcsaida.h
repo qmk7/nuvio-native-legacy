@@ -13,7 +13,8 @@
 #define NV_MCSAIDA_H
 #include "mcmodelo.h"
 
-enum { MCO_CARREGANDO = 0, MCO_TOCANDO = 1, MCO_FIM = 2, MCO_TRANSICAO = 3, MCO_ERRO = -1 };
+// MCO_PERDEU: another player (a movie, a channel, a trailer) took the output.
+enum { MCO_CARREGANDO = 0, MCO_TOCANDO = 1, MCO_FIM = 2, MCO_TRANSICAO = 3, MCO_ERRO = -1, MCO_PERDEU = -2 };
 
 typedef struct {
   char backend[24];        // "webOS media pipeline", "SDL (pulseaudio)"...

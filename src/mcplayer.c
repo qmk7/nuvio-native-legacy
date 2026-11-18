@@ -65,13 +65,16 @@ int mcp_retomar(void) {
   if (!mcq_n() && !mcq_carregar()) return 0;
   s = mcq_posicao_salva();
   retomarPausado = 1;
+  printf("[musica] retomar a fila na faixa %d em %ds\n", mcq_atual() + 1, (int)s);
+  fflush(stdout);
   return abrirAtual(s > 3 ? s - 2 : 0);   // two seconds of context
 }
 void mcp_alternar_pausa(void) {
   if (!saida) return;
   if (estado == MCP_PARADO) { if (mcq_n()) abrirAtual(0); return; }
-  if (estado == MCP_TOCANDO) { saida->pausar(1); estado = MCP_PAUSADO; mcq_posicao(saida->pos()); mcq_salvar(); }
-  else if (estado == MCP_PAUSADO) { saida->pausar(0); estado = MCP_TOCANDO; }
+  if (estado == MCP_TOCANDO) { saida->pausar(1); estado = MCP_PAUSADO; mcq_posicao(saida->pos()); mcq_salvar(); printf("[musica] pausa em %ds\n", (int)saida->pos()); }
+  else if (estado == MCP_PAUSADO) { saida->pausar(0); estado = MCP_TOCANDO; printf("[musica] continua\n"); }
+  fflush(stdout);
 }
 int mcp_proxima(void) {
   if (mcq_proxima(0) < 0) return 0;
@@ -90,6 +93,10 @@ void mcp_buscar(double seg) {
   if (seg < 0) seg = 0;
   if (d > 0 && seg > d - 1) seg = d - 1;
   saida->buscar(seg);
+}
+void mcp_descartar(void) {
+  if (saida && estado != MCP_PARADO) saida->parar();
+  estado = MCP_PARADO;
 }
 void mcp_parar(void) {
   if (saida && estado != MCP_PARADO) { mcq_posicao(saida->pos()); saida->parar(); }
@@ -156,6 +163,13 @@ void mcp_atualizar(unsigned agora) {
   if (!saida || estado == MCP_PARADO || estado == MCP_ERRO) return;
   if (saida->bombear) saida->bombear();
   st = saida->estado();
+  if (st == MCO_PERDEU) {
+    printf("[musica] outro player assumiu a saida de audio; musica parada\n");
+    fflush(stdout);
+    estado = MCP_PARADO;
+    mcq_salvar();
+    return;
+  }
   if (st == MCO_ERRO) {
     printf("[musica] a saida falhou nesta faixa; seguindo para a proxima\n");
     fflush(stdout);

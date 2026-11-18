@@ -105,6 +105,8 @@
 #include "espn.h"
 #include "tsdb.h"
 #include "ytapi.h"
+#include "mclfm.h"
+#include "mclrc.h"
 #include "trakt.h"
 #include "player.h"
 #include "retomamorna.h"
@@ -1776,6 +1778,9 @@ int main(int argc, char **argv) {
   if (getenv("QRT_TSDB_BASE") && getenv("QRT_TSDB_BASE")[0]) tsdb_definir_base(getenv("QRT_TSDB_BASE"));
   // ... and the YouTube section at a local Data API / OAuth fixture.
   if (getenv("QRT_YT_BASE") && getenv("QRT_YT_BASE")[0]) yt_definir_base(getenv("QRT_YT_BASE"), getenv("QRT_OAUTH_BASE"));
+  // ... and the Music Center at local Last.fm / LRCLIB fixtures.
+  if (getenv("QRT_LFM_BASE") && getenv("QRT_LFM_BASE")[0]) mclfm_definir_base(getenv("QRT_LFM_BASE"));
+  if (getenv("QRT_LRCLIB_BASE") && getenv("QRT_LRCLIB_BASE")[0]) mclrc_definir_base(getenv("QRT_LRCLIB_BASE"));
 #endif
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);

@@ -64,7 +64,14 @@ static void *fioCarga(void *u) {
   free(u);
   snprintf(linhas, sizeof linhas, "%s", p.cab);
   for (l = strtok_r(linhas, "\n", &sp); l && k < 3; l = strtok_r(NULL, "\n", &sp)) cab[k++] = l;
-  ok = rede_baixar_fluxo(p.url, 120, k ? cab : NULL, juntar, &b, 0, &st, NULL);
+  if (!strncmp(p.url, "file://", 7)) {   // an offline copy
+    FILE *f = fopen(p.url + 7, "rb");
+    char blk[65536];
+    size_t r;
+    ok = f != NULL;
+    while (f && (r = fread(blk, 1, sizeof blk, f)) > 0) if (!juntar(blk, r, &b)) { ok = 0; break; }
+    if (f) fclose(f);
+  } else ok = rede_baixar_fluxo(p.url, 120, k ? cab : NULL, juntar, &b, 0, &st, NULL);
   memset(p.url, 0, sizeof p.url);
   memset(linhas, 0, sizeof linhas);
   if (ok && b.n) d = mcdec_abrir(b.v, b.n, &in);

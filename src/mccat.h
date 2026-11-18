@@ -17,6 +17,8 @@ int mccat_artista_albuns(const char *id, McAlbum *out, int max, int *n);
 // tipo: newest, recent, frequent, random, alphabeticalByName, starred
 int mccat_albuns(const char *tipo, int offset, McAlbum *out, int max, int *n);
 int mccat_album(const char *id, McAlbum *info, McFaixa *out, int max, int *n);
+// Every track (search3 with an empty query, paged).
+int mccat_faixas(int offset, McFaixa *out, int max, int *n);
 int mccat_generos(McGenero *out, int max, int *n);
 int mccat_genero_faixas(const char *genero, int offset, McFaixa *out, int max, int *n);
 int mccat_playlists(McPlaylist *out, int max, int *n);

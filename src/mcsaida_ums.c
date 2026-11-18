@@ -14,8 +14,10 @@
 #include "video.h"
 #include "audioinfo.h"
 
+#include "md5.h"
 static McFaixa faixa;
 static int aberto, buscarAo;
+static char minhaUrl[33];   // md5 of our URL (the URL itself carries a token)
 static double inicioPendente;
 
 static int abrir(const char *url, const char *cab, const McFaixa *f, double inicio) {
@@ -26,6 +28,7 @@ static int abrir(const char *url, const char *cab, const McFaixa *f, double inic
   video_definir_mp4(!strcmp(f->formato, "m4a") || !strcmp(f->formato, "alac") || !strcmp(f->formato, "aac") || strstr(f->mime, "mp4") != NULL);
   video_volume(100);
   if (!video_tocar(url)) return 0;
+  md5_hex(url, strlen(url), minhaUrl);
   aberto = 1;
   inicioPendente = inicio;
   buscarAo = inicio > 0;
@@ -33,11 +36,25 @@ static int abrir(const char *url, const char *cab, const McFaixa *f, double inic
 }
 static void pausar(int p) { if (aberto) video_pausar(p); }
 static void buscar(double s) { if (aberto) video_buscar(s); }
-static void parar(void) { if (aberto) { video_parar(); video_definir_cabecalhos(""); } aberto = 0; }
+static void parar(void) {
+  if (aberto) {
+    const char *u = video_url_atual();
+    char h[33];
+    md5_hex(u ? u : "", u ? strlen(u) : 0, h);
+    if (!strcmp(h, minhaUrl)) { video_parar(); video_definir_cabecalhos(""); }   // never stop someone else's video
+  }
+  aberto = 0;
+}
 static double pos(void) { return aberto ? video_pos() : 0; }
 static double dur(void) { return aberto ? video_duracao() : 0; }
 static int estado(void) {
   if (!aberto) return MCO_FIM;
+  {
+    const char *u = video_url_atual();
+    char h[33];
+    md5_hex(u ? u : "", u ? strlen(u) : 0, h);
+    if (strcmp(h, minhaUrl)) { aberto = 0; return MCO_PERDEU; }   // the pipeline plays something else now
+  }
   if (video_falhou()) return MCO_ERRO;
   if (video_terminou()) return MCO_FIM;
   if (video_tocando() || video_pronto()) {

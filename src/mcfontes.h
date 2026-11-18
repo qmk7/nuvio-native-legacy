@@ -1,5 +1,5 @@
 // MUSIC CENTER: the music sources this profile configured (Navidrome /
-// Subsonic servers and WebDAV folders), in "musica-fontes-p<N>.txt".
+// Subsonic servers and WebDAV folders), in "music-sources-p<N>.txt".
 // Passwords are kept on this TV like the IPTV ones and never logged.
 #ifndef NV_MCFONTES_H
 #define NV_MCFONTES_H

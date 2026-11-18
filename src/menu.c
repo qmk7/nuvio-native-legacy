@@ -148,14 +148,8 @@ static int mostra(int i) {
     case MENU_GUIA:     return ajustes_menu_guia();
     case MENU_AGENDA:   return ajustes_menu_agenda();
     case MENU_PERFIL:   return ajustes_menu_perfil();
-    // QR TIME: no decorative entry. Music appears once the Music Center exists
-    // (phase 7); until then its saved soundtracks need an account server that
-    // a guest build does not have. See docs/qrtime/UI-SPEC.md §3.1.
-#ifdef QRT_MUSICA_PRONTA
+    // QR TIME: the Music Center (mcui.c) is its own section.
     case MENU_MUSICA:   return 1;
-#else
-    case MENU_MUSICA:   return 0;
-#endif
     default:            return 1;
   }
 }

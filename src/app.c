@@ -860,6 +860,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "addonslocal.h"
 #include "esporteui.h"
 #include "ytui.h"
+#include "mcui.h"
 #include "jfid.h"
 #include "partes.h"
 #include "logrede.h"
@@ -1063,6 +1064,7 @@ static void trocarTela(Tela nova) {
     case TELA_AGENDA:     agendaui_iniciar();   break;
     case TELA_ESPORTES:   esporteui_abrir();    break;
     case TELA_YOUTUBE:    ytui_abrir();         break;
+    case TELA_MUSICA:     mcui_abrir();         break;
     case TELA_PERFIL:     perfil_abrir(); pedirPerfil(); break;
     case TELA_AJUSTES:    ajustes_iniciar();    break;
     case TELA_DIAGNOSTICO: diagnostico_iniciar(); break;
@@ -1070,6 +1072,8 @@ static void trocarTela(Tela nova) {
     default: break;
   }
 }
+// Music Center -> "YouTube Music": the YouTube section (no public YouTube Music API).
+void app_ir_youtube(void) { trocarTela(TELA_YOUTUBE); menu_definir_destino(MENU_YOUTUBE); }
 
 static void alvoPlayer(char *alvo, size_t tam) {
   const CatItem *c = cat_item(player_indice());
@@ -3711,6 +3715,7 @@ static void perfilAbrirSessao(int antes) {
   addons_abrir_sessao();
   esporteui_perfil_trocou();   // Sport Center: this profile's follows and links
   ytui_perfil_trocou();        // YouTube: this profile's account
+  mcui_perfil_trocou();        // Music Center: this profile's sources, queue, Last.fm
   // QR TIME guest: this profile's add-ons are the ones saved on this TV.
   if (!sessao_logada() && convidado_ativo()) addonslocal_carregar();
   trakt_abrir_sessao();
@@ -4339,6 +4344,7 @@ static int relogioPedidoPagina(void) {
     case TELA_AGENDA: return agendaui_pediu_relogio();
     case TELA_ESPORTES: return 0;
     case TELA_YOUTUBE: return 0;
+    case TELA_MUSICA: return 0;
     case TELA_PERFIL: return perfil_pediu_relogio();
     case TELA_SOCIAL: return amigoperfil_pediu_relogio();
     case TELA_ADDONS: return addonsui_pediu_relogio();
@@ -4795,6 +4801,7 @@ void app_evento(const SDL_Event *e) {
     case TELA_AGENDA:     agendaui_evento(e);   break;
     case TELA_ESPORTES:   esporteui_evento(e);  break;
     case TELA_YOUTUBE:    ytui_evento(e);       break;
+    case TELA_MUSICA:     mcui_evento(e);       break;
     case TELA_PERFIL:     perfil_evento(e);     break;
     case TELA_SOCIAL:     amigoperfil_evento(e); break;
     case TELA_ADDONS:     addonsui_evento(e);   break;
@@ -4987,6 +4994,7 @@ static void recuperarErroFonte(void) {
 }
 
 void app_atualizar(float dt, Uint32 agora) {
+  mcui_fundo(agora);   // the Music Center keeps playing while the person browses
   relogioFocoValidar();
   ajustes_fontes_atualizar();
   { static int morno = -1; int ligado = ajustes_retomada_morna();
@@ -5762,6 +5770,7 @@ void app_atualizar(float dt, Uint32 agora) {
               || (tela == TELA_AGENDA     && agendaui_quer_sair())
               || (tela == TELA_ESPORTES   && esporteui_quer_sair())
               || (tela == TELA_YOUTUBE    && ytui_quer_sair())
+              || (tela == TELA_MUSICA     && mcui_quer_sair())
               || (tela == TELA_PERFIL      && perfil_quer_sair())
               || (tela == TELA_SOCIAL      && amigoperfil_quer_sair())
               || (tela == TELA_AJUSTES    && ajustes_quer_sair())
@@ -5835,6 +5844,9 @@ void app_atualizar(float dt, Uint32 agora) {
         break; }
       case MENU_ESPORTES:
         trocarTela(TELA_ESPORTES);
+        break;
+      case MENU_MUSICA:
+        trocarTela(TELA_MUSICA);
         break;
       case MENU_YOUTUBE:
         // QR TIME: its own section (ytui.c). Videos still PLAY in the TV's
@@ -7069,6 +7081,7 @@ void app_atualizar(float dt, Uint32 agora) {
       if (esporteui_pediu_canal(&it)) { if (player_mini_ativo()) player_fechar_mini(); tocarCanal(&it); }
       break; }
     case TELA_YOUTUBE:    ytui_atualizar(dt, agora);       break;
+    case TELA_MUSICA:     mcui_atualizar(dt, agora);       break;
     case TELA_PERFIL:     break;
     case TELA_AJUSTES:    ajustes_atualizar(dt, agora);    break;
     case TELA_DIAGNOSTICO: diagnostico_atualizar(dt, agora); break;
@@ -7185,6 +7198,7 @@ static void desenharAtrasDoPainel(void *ctx) {
       case TELA_AGENDA:     agendaui_desenhar(agora);   break;
       case TELA_ESPORTES:   esporteui_desenhar(agora);  break;
       case TELA_YOUTUBE:    ytui_desenhar(agora);       break;
+      case TELA_MUSICA:     mcui_desenhar(agora);       break;
       case TELA_PERFIL:     perfil_desenhar(agora);     break;
       case TELA_SOCIAL:     amigoperfil_desenhar(agora);     break;
       case TELA_ADDONS:     addonsui_desenhar(agora);   break;

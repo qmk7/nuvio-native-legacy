@@ -40,7 +40,7 @@ int mcfila_ler_linha(const char *s, McFaixa *f) {
   f->taxa = atoi(c[15]); f->bits = atoi(c[16]); f->canais = atoi(c[17]); f->tam = atoll(c[18]); f->fav = atoi(c[19]);
   return f->id[0] != 0;
 }
-static void nomeArq(char *d, size_t n, const char *base) { int p = perfis_ativo(); snprintf(d, n, "musica-%s-p%d.txt", base, p > 0 ? p : 1); }
+static void nomeArq(char *d, size_t n, const char *base) { int p = perfis_ativo(); snprintf(d, n, "music-%s-p%d.txt", base, p > 0 ? p : 1); }
 
 // A growable list of tracks, written as one file.
 typedef struct { McFaixa *v; int n, cap; } Lista;
@@ -201,7 +201,7 @@ int mcq_salvar(void) {
   char *t;
   int ok;
   Lista emOrdem = { NULL, 0, 0 };
-  nomeArq(nome, sizeof nome, "fila");
+  nomeArq(nome, sizeof nome, "queue");
   if (!fila.n) { dados_apagar(nome); return 1; }
   // Written in play order (the shuffle survives a restart as it was).
   for (int i = 0; i < fila.n; i++) listaPor(&emOrdem, &fila.v[ordem[i]], -1);
@@ -216,7 +216,7 @@ int mcq_carregar(void) {
   char nome[48], *t, *lin, *sp;
   int p = -1, a = 0, r = 0;
   double s = 0;
-  nomeArq(nome, sizeof nome, "fila");
+  nomeArq(nome, sizeof nome, "queue");
   mcq_limpar();
   aleat = 0; repete = 0;
   t = dados_ler(nome);
@@ -254,24 +254,24 @@ static void gravarLista(const Lista *l, const char *base) {
   if (t) { if (l->n) dados_gravar(nome, t); else dados_apagar(nome); }
   free(t);
 }
-static void garantirHist(void) { if (histLido != perfis_ativo()) { carregarLista(&hist, "historico"); histLido = perfis_ativo(); } }
-static void garantirFav(void) { if (favLido != perfis_ativo()) { carregarLista(&favs, "favoritos"); favLido = perfis_ativo(); } }
+static void garantirHist(void) { if (histLido != perfis_ativo()) { carregarLista(&hist, "history"); histLido = perfis_ativo(); } }
+static void garantirFav(void) { if (favLido != perfis_ativo()) { carregarLista(&favs, "favorites"); favLido = perfis_ativo(); } }
 void mch_tocou(const McFaixa *f) {
   garantirHist();
   for (int i = 0; i < hist.n; i++) if (!strcmp(hist.v[i].id, f->id)) { listaTirar(&hist, i); break; }
   listaPor(&hist, f, 0);
   while (hist.n > MCH_MAX) hist.n--;
-  gravarLista(&hist, "historico");
+  gravarLista(&hist, "history");
 }
 int mch_n(void) { garantirHist(); return hist.n; }
 const McFaixa *mch_item(int i) { garantirHist(); return i >= 0 && i < hist.n ? &hist.v[i] : NULL; }
 int mcv_fav(const char *id) { garantirFav(); for (int i = 0; i < favs.n; i++) if (!strcmp(favs.v[i].id, id)) return 1; return 0; }
 int mcv_alternar(const McFaixa *f) {
   garantirFav();
-  for (int i = 0; i < favs.n; i++) if (!strcmp(favs.v[i].id, f->id)) { listaTirar(&favs, i); gravarLista(&favs, "favoritos"); return 0; }
+  for (int i = 0; i < favs.n; i++) if (!strcmp(favs.v[i].id, f->id)) { listaTirar(&favs, i); gravarLista(&favs, "favorites"); return 0; }
   listaPor(&favs, f, 0);
   favs.v[0].fav = 1;
-  gravarLista(&favs, "favoritos");
+  gravarLista(&favs, "favorites");
   return 1;
 }
 int mcv_n(void) { garantirFav(); return favs.n; }
@@ -285,7 +285,7 @@ static void carregarListas(void) {
   char nome[48], *t, *lin, *sp;
   for (int i = 0; i < nListas; i++) listas[i].l.n = 0;
   nListas = 0;
-  nomeArq(nome, sizeof nome, "listas");
+  nomeArq(nome, sizeof nome, "playlists");
   t = dados_ler(nome);
   for (lin = t ? strtok_r(t, "\n", &sp) : NULL; lin; lin = strtok_r(NULL, "\n", &sp)) {
     McFaixa f;
@@ -313,7 +313,7 @@ static void gravarListas(void) {
     k += (size_t)snprintf(t + k, cap - k, "L\t%s\n%s", listas[i].nome, c ? c : "");
     free(c);
   }
-  nomeArq(nome, sizeof nome, "listas");
+  nomeArq(nome, sizeof nome, "playlists");
   if (nListas) dados_gravar(nome, t); else dados_apagar(nome);
   free(t);
 }

@@ -2,6 +2,7 @@
 #include "mcfila.h"
 #include "mcfmt.h"
 #include "mcfontes.h"
+#include "mcoffline.h"
 #include "subsonic.h"
 #include <pthread.h>
 #include <stdio.h>
@@ -95,6 +96,23 @@ int mccat_album(const char *id, McAlbum *info, McFaixa *out, int max, int *n) {
   if (info && r == MC_OK) qualAlbum(info, f.chave);
   for (int i = 0; i < *n; i++) qualFaixa(&out[i], f.chave);
   return r;
+}
+int mccat_faixas(int offset, McFaixa *out, int max, int *n) {
+  int e = MC_ERRO_NAO_SUPORTA, algum = 0;
+  McFonte f;
+  McArtista ar[1];
+  McAlbum al[1];
+  *n = 0;
+  for (int i = 0; mcfontes_copiar(i, &f); i++) {
+    int a, b, c = 0, r;
+    if (f.tipo != MCS_SUBSONIC) continue;
+    r = ss_buscar(&f.ss, "", offset, ar, 0, &a, al, 0, &b, out + *n, max - *n, &c);
+    if (r != MC_OK) { e = r; continue; }
+    algum = 1;
+    for (int k = *n; k < *n + c; k++) qualFaixa(&out[k], f.chave);
+    *n += c;
+  }
+  return algum ? MC_OK : e;
 }
 int mccat_generos(McGenero *out, int max, int *n) {
   int e = MC_ERRO_NAO_SUPORTA, algum = 0;
@@ -366,6 +384,7 @@ static int ganchoUrl(const McFaixa *t, char *url, size_t n, char *cab, size_t nc
   McFonte f;
   const char *loc;
   url[0] = cab[0] = 0;
+  if (mco_caminho(t->id, url, n)) return 1;   // an offline copy plays from disk
   if (!fonteDe(t->id, &f, &loc)) return 0;
   if (f.tipo == MCS_SUBSONIC) { ss_url_stream(&f.ss, loc, url, n); return 1; }
   dav_url(&f.dv, loc, url, n);

@@ -57,7 +57,7 @@ lista() { espera "\[youtube\] lista tipo=$1 itens=$2 erro=$3" "${4:-20}"; }
 espera "tela=home" 60 || { erro "home never drawn"; exit 1; }
 sleep 4
 for k in 1 2 3 4; do tecla left 0.8; done
-for k in 1 2 3 4 5; do tecla down 0.6; done
+for k in 1 2 3 4 5 6; do tecla down 0.6; done
 tecla ok 2.5
 espera "\[transicao\] tela 2 -> 17 " 10 && ok "menu YouTube opens its own section (screen 17)" || erro "YouTube section did not open"
 lista 0 0 6 && ok "no API key: Trending says how to set it up, shows no list" || erro "no-key state"
