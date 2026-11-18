@@ -1,0 +1,83 @@
+# QR TIME for LG webOS: builds the .ipk with the account / metadata keys kept
+# as repository secrets, so the Nuvio account login (QR + e-mail), TMDB and
+# Trakt work in the package, and "Continue without an account" stays offered.
+#
+# Run it from the Actions tab ("Build LG IPK" > Run workflow).
+#
+# Repository secrets (Settings > Secrets and variables > Actions), all optional;
+# an empty one only switches its feature off:
+#   NUVIO_SUPABASE_URL, NUVIO_SUPABASE_ANON_KEY, TV_LOGIN_WEB_BASE_URL   account login
+#   TMDB_API_KEY                                                           metadata
+#   TRAKT_CLIENT_ID, TRAKT_CLIENT_SECRET                                   Trakt
+#   SIMKL_CLIENT_ID, SIMKL_APP_NAME                                        Simkl
+#   IPK_ZIP_PASSWORD   REQUIRED: the artifact is an AES-256 encrypted 7z with
+#                      this password. This repository is public and the package
+#                      carries the keys above; without the password nobody else
+#                      can open what is uploaded.
+name: Build LG IPK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ipk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Refuse to upload an unencrypted package
+        env:
+          IPK_ZIP_PASSWORD: ${{ secrets.IPK_ZIP_PASSWORD }}
+        run: |
+          if [ -z "$IPK_ZIP_PASSWORD" ]; then
+            echo "::error::Add the repository secret IPK_ZIP_PASSWORD first (the package carries your keys and this repository is public)."
+            exit 1
+          fi
+
+      - name: Write local.properties from the secrets (never logged, never committed)
+        env:
+          NUVIO_SUPABASE_URL: ${{ secrets.NUVIO_SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY: ${{ secrets.NUVIO_SUPABASE_ANON_KEY }}
+          TV_LOGIN_WEB_BASE_URL: ${{ secrets.TV_LOGIN_WEB_BASE_URL }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          SIMKL_APP_NAME: ${{ secrets.SIMKL_APP_NAME }}
+        run: |
+          umask 077
+          {
+            for k in NUVIO_SUPABASE_URL NUVIO_SUPABASE_ANON_KEY TV_LOGIN_WEB_BASE_URL \
+                     TMDB_API_KEY TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SIMKL_CLIENT_ID SIMKL_APP_NAME; do
+              printf '%s=%s\n' "$k" "${!k}"
+            done
+          } > local.properties
+          # Which features are on (names only, never values).
+          for k in NUVIO_SUPABASE_URL NUVIO_SUPABASE_ANON_KEY TV_LOGIN_WEB_BASE_URL \
+                   TMDB_API_KEY TRAKT_CLIENT_ID TRAKT_CLIENT_SECRET SIMKL_CLIENT_ID; do
+            if [ -n "${!k}" ]; then echo "$k: set"; else echo "$k: empty (feature off)"; fi
+          done
+
+      - name: Build the .ipk (webOS SDK, pinned and checksummed by the script)
+        run: bash tools/qrtime/build-ipk.sh
+
+      - name: Encrypt the package
+        env:
+          IPK_ZIP_PASSWORD: ${{ secrets.IPK_ZIP_PASSWORD }}
+        run: |
+          set -e
+          cd build/ipk
+          ls -la *.ipk
+          sha256sum *.ipk | tee SHA256SUMS.txt
+          7z a -t7z -mhe=on -p"$IPK_ZIP_PASSWORD" ../QR_TIME_LG_ipk.7z *.ipk SHA256SUMS.txt >/dev/null
+          rm -f ../../local.properties
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: QR_TIME_LG_ipk
+          path: build/QR_TIME_LG_ipk.7z
+          retention-days: 3
