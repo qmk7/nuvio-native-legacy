@@ -24,7 +24,7 @@
 | بيئة بناء قابلة للتكرار (webOS SDK + IPK) | ✅ | `tools/qrtime/build-ipk.sh`، SHA-256 مثبّت |
 | هوية التطبيق `com.qrtime.tv` ومجلد بيانات معزول | ✅ | `tests/atualizacao.sh`، `tests/dts_debug.sh` |
 | التحديث الذاتي والإعلانات لا تشير إلى المشروع الأصلي | ✅ | `tests/atualizacao.sh` |
-| الهوية البصرية (شعار، أيقونات، ألوان QR TIME) | ✅📺 | ملفات العلامة + المقدمة؛ لا \"Nuvio\" ظاهر؛ `qrtime_intro` |
+| الهوية البصرية (شعار، أيقونات، ألوان QR TIME) | ✅📺 | ملفات العلامة + المقدمة؛ لا "Nuvio" ظاهر؛ `qrtime_intro` |
 | القائمة الرئيسية (12 وجهة، كل زر له سلوك) | ✅ | `tests/qrtime_nav.sh` 25/25 |
 | وضع الضيف (بلا حساب) | ✅ | `tests/convidado*.sh`، `tests/qrtime_livetv.sh` |
 | مكونات واجهة مشتركة و tokens | 🟡 | موثّقة في `UI-SPEC.md` §5 |
