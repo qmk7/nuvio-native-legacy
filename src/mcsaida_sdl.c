@@ -244,7 +244,8 @@ static void info(McSaidaInfo *o) {
   o->convertido = conv != NULL;
   if (conv) snprintf(o->nota, sizeof o->nota, "The device took %d Hz / %d-bit / %dch: converted from %d Hz / %dch.",
                      obtido.freq, o->bits, obtido.channels, atual.in.taxa, atual.in.canais);
-  else snprintf(o->nota, sizeof o->nota, "Sent to the device unchanged (source %d-bit in a 32-bit container).", atual.in.bits ? atual.in.bits : 32);
+  else if (atual.in.bits) snprintf(o->nota, sizeof o->nota, "Sent to the device unchanged (source %d-bit in a 32-bit container).", atual.in.bits);
+  else snprintf(o->nota, sizeof o->nota, "Sent to the device unchanged (decoded from a lossy source).");
 }
 static const McSaida SDLX = { "desktop", abrir, preparar, pausar, buscar, parar, pos, dur, estado, info, NULL };
 const McSaida *mcsaida_sdl(void) { return &SDLX; }

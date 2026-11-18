@@ -56,6 +56,9 @@ int  yt_definir_cliente(const char *id, const char *segredo);   // NULL keeps th
 // ---- calls (BLOCK; worker thread). Return YT_OK or YT_ERRO_*; *n items ----
 int yt_em_alta(const char *regiao, const char *pagina, YtItem *out, int max, int *n, char *prox, size_t np);
 int yt_buscar(const char *q, const char *pagina, YtItem *out, int max, int *n, char *prox, size_t np);
+// Search in YouTube's "Music" category (videoCategoryId 10): music videos,
+// official audio and YouTube Music uploads.
+int yt_buscar_musica(const char *q, const char *pagina, YtItem *out, int max, int *n, char *prox, size_t np);
 int yt_detalhes(YtItem *itens, int n);  // fills duration, views, description (videos)
 // One video's page. YT_INDISPONIVEL: removed, private or blocked here.
 int yt_video(const char *id, YtItem *out);

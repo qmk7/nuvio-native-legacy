@@ -26,6 +26,13 @@ typedef struct {
 // what was given (a big ID3 tag, a cover-art block): read that much and call
 // again.
 int mcfmt_ler(const unsigned char *b, size_t n, long long total, McFmt *fmt, McFaixa *f, size_t *precisa);
+// Quality class from what the source reports (never guessed):
+// MCQ_HIRES = lossless above CD (more than 16-bit or more than 48 kHz),
+// MCQ_LOSSLESS = FLAC/WAV/AIFF/ALAC (or a bit depth reported by the server),
+// MCQ_PERDA = MP3/AAC/Ogg/Opus, MCQ_DESCONHECIDA = no format reported.
+enum { MCQ_DESCONHECIDA = 0, MCQ_PERDA, MCQ_LOSSLESS, MCQ_HIRES };
+int mcfmt_classe(const McFaixa *f);
+const char *mcfmt_selo(int classe);   // "Hi-Res", "Lossless", "Lossy", ""
 // "FLAC 24-bit / 96 kHz · 2.0", "MP3 320 kbps · 44.1 kHz", "" when unknown.
 void mcfmt_descrever(const McFaixa *f, char *d, size_t n);
 #endif

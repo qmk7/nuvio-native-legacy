@@ -63,6 +63,8 @@ int  ondever_abrir(const char *nome);
 // YouTube video id (11 chars) -> the official YouTube app. ONDE_ABRIR when
 // launched, ONDE_INFO on hosts without a launcher, ONDE_PROCURAR bad id.
 int  ondever_youtube_video(const char *videoId);
+// The same with its playlist, so the official app keeps playing the list.
+int  ondever_youtube_lista(const char *videoId, const char *playlistId);
 
 // Exposto para o teste: a chave que casa servico com app ("HBO Max" -> "max",
 // "Disney+" -> "disneyplus", "Amazon Prime Video" -> "primevideo").

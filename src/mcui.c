@@ -8,6 +8,10 @@
 #include "mcoffline.h"
 #include "mcplayer.h"
 #include "mcspotify.h"
+#include "ytapi.h"
+#include "ondever.h"
+#include "video.h"
+#include "esmaecer.h"
 #include "dados.h"
 #include "gfx.h"
 #include "text.h"
@@ -28,11 +32,11 @@
 #define LOTE 60
 
 // ---------------------------------------------------------------- rows and pages
-enum { L_FAIXA, L_ALBUM, L_ARTISTA, L_PLAYLIST, L_GENERO, L_PASTA, L_FONTE, L_ACAO, L_TITULO, L_INFO };
+enum { L_FAIXA, L_ALBUM, L_ARTISTA, L_PLAYLIST, L_GENERO, L_PASTA, L_FONTE, L_ACAO, L_TITULO, L_INFO, L_YTVIDEO, L_YTLISTA };
 enum {
   A_NADA, A_RETOMAR, A_TOCAR_TUDO, A_ALEATORIO_TUDO, A_ADD_SUBSONIC, A_ADD_WEBDAV, A_LFM_CHAVE, A_LFM_SEGREDO,
   A_LFM_CONECTAR, A_LFM_SAIR, A_YTMUSIC, A_FESTA, A_LRCLIB, A_FILA_ALEATORIO, A_FILA_REPETIR, A_FILA_LIMPAR,
-  A_FILA_SALVAR, A_NOVA_BUSCA, A_SIMILAR, A_TOCANDO, A_SP_ID, A_SP_SEGREDO, A_SP_IMPORTAR
+  A_FILA_SALVAR, A_NOVA_BUSCA, A_SIMILAR, A_TOCANDO, A_SP_ID, A_SP_SEGREDO, A_SP_IMPORTAR, A_YT_BUSCA, A_YT_LISTA_TOCAR, A_YTM_ABRIR
 };
 typedef struct {
   int tipo, acao;
@@ -40,11 +44,12 @@ typedef struct {
   char ref[MC_ID];           // id of the album / artist / playlist / genre / folder href / source key
   char t1[200], t2[220];
   char capa[96];
+  char thumb[256], lista[64];   // YouTube rows: https thumbnail, playlist id
 } Linha;
 enum {
   P_INICIO, P_RECENTES, P_ARTISTAS, P_ALBUNS, P_FAIXAS, P_GENEROS, P_PLAYLISTS, P_FAVORITOS, P_OFFLINE, P_FILA,
   P_BUSCAR, P_SERVICOS, P_AJUSTES, P_SECOES,
-  P_ALBUM = 100, P_ARTISTA, P_PLAYLIST, P_GENERO, P_PASTA
+  P_ALBUM = 100, P_ARTISTA, P_PLAYLIST, P_GENERO, P_PASTA, P_YTM, P_YTM_BUSCA, P_YTM_LISTA
 };
 static const char *const SECOES[P_SECOES] = {
   "Início", "Tocadas recentemente", "Artistas", "Álbuns", "Faixas", "Gêneros", "Playlists", "Favoritos",
@@ -95,8 +100,11 @@ static void linhaFaixa(Linha *l, const McFaixa *f) {
   snprintf(l->t1, sizeof l->t1, "%s", f->titulo);
   durTexto(f->dur, d, sizeof d);
   mcfmt_descrever(f, fmt, sizeof fmt);
-  snprintf(l->t2, sizeof l->t2, "%s%s%s%s%s%s%s", f->artista, f->album[0] ? "  ·  " : "", f->album, d[0] ? "  ·  " : "", d,
-           fmt[0] ? "  ·  " : "", fmt);
+  {
+    const char *selo = mcfmt_selo(mcfmt_classe(f));
+    snprintf(l->t2, sizeof l->t2, "%s%s%s%s%s%s%s%s%s", f->artista, f->album[0] ? "  ·  " : "", f->album, d[0] ? "  ·  " : "", d,
+             fmt[0] ? "  ·  " : "", fmt, selo[0] ? "  ·  " : "", selo);
+  }
   snprintf(l->ref, sizeof l->ref, "%s", f->id);
   snprintf(l->capa, sizeof l->capa, "%s", f->capa);
 }
@@ -239,6 +247,53 @@ static void *fioCarga(void *u) {
       n = na + nl + nf;
       free(al); free(fx);
       break; }
+    case P_YTM: case P_YTM_BUSCA: case P_YTM_LISTA: {
+      YtItem *v = calloc(50, sizeof *v);
+      char prox[64];
+      if (!v) { e = MC_ERRO_OUTRO; break; }
+      yt_carregar();
+      if (!yt_tem_chave()) {
+        info(&tmp, i18n("Para buscar música do YouTube, adicione a chave da YouTube Data API em YouTube > Conta."));
+        acao(&tmp, A_YTMUSIC, i18n("Abrir a seção YouTube"), NULL);
+        free(v);
+        break;
+      }
+      if (p.tipo == P_YTM) {
+        acao(&tmp, A_YT_BUSCA, i18n("Buscar música no YouTube"), i18n("Clipes, áudios oficiais e envios do YouTube Music"));
+        if (yt_logado()) {
+          int r = yt_playlists(v, 50, &n);
+          titulo(&tmp, i18n("Suas playlists (YouTube e YouTube Music)"));
+          if (r != YT_OK) info(&tmp, i18n("Não foi possível ler as suas playlists agora."));
+          for (int i = 0; i < n; i++) {
+            Linha *l = novaLinha(&tmp);
+            if (!l) break;
+            l->tipo = L_YTLISTA;
+            snprintf(l->ref, sizeof l->ref, "%s", v[i].id);
+            snprintf(l->t1, sizeof l->t1, "%s", v[i].titulo);
+            snprintf(l->t2, sizeof l->t2, i18n("Playlist · %d vídeo(s)"), v[i].itens);
+            snprintf(l->thumb, sizeof l->thumb, "%s", v[i].thumb);
+          }
+        } else info(&tmp, i18n("Entre com a sua conta Google em YouTube > Conta para ver as suas playlists aqui."));
+        info(&tmp, i18n("Toca no app oficial do YouTube (aba Música). Qualidade do YouTube Music: até 256 kbps AAC, com perda."));
+      } else {
+        int r = p.tipo == P_YTM_BUSCA ? yt_buscar_musica(p.arg, NULL, v, 40, &n, prox, sizeof prox)
+                                      : yt_playlist_itens(p.arg, NULL, v, 50, &n, prox, sizeof prox);
+        if (r == YT_OK && n) yt_detalhes(v, n);
+        if (r != YT_OK) e = r == YT_ERRO_REDE ? MC_ERRO_REDE : r == YT_ERRO_LOGIN ? MC_ERRO_LOGIN : MC_ERRO_SERVIDOR;
+        if (p.tipo == P_YTM_LISTA && n) acao(&tmp, A_YT_LISTA_TOCAR, i18n("Tocar a playlist no app do YouTube"), NULL);
+        for (int i = 0; i < n; i++) {
+          Linha *l = novaLinha(&tmp);
+          if (!l) break;
+          l->tipo = L_YTVIDEO;
+          snprintf(l->ref, sizeof l->ref, "%s", v[i].id);
+          if (p.tipo == P_YTM_LISTA) snprintf(l->lista, sizeof l->lista, "%.63s", p.arg);
+          snprintf(l->t1, sizeof l->t1, "%s", v[i].titulo);
+          snprintf(l->t2, sizeof l->t2, "%s%s%s", v[i].canal, v[i].duracao[0] ? "  ·  " : "", v[i].duracao);
+          snprintf(l->thumb, sizeof l->thumb, "%s", v[i].thumb);
+        }
+      }
+      free(v);
+      break; }
     case P_PASTA: {
       DavItem *pa = calloc(200, sizeof *pa);
       McFaixa *ar = calloc(300, sizeof *ar);
@@ -367,7 +422,11 @@ static void construirLocal(Pagina *pg) {
         acao(pg, A_LFM_SAIR, i18n("Desconectar o Last.fm"), t);
       } else acao(pg, A_LFM_CONECTAR, i18n("Conectar o Last.fm (scrobbling)"), i18n("Aprovação pelo celular"));
       titulo(pg, i18n("Outros serviços"));
-      acao(pg, A_YTMUSIC, "YouTube Music", i18n("Sem API pública: abre a seção YouTube do QR TIME"));
+      {
+        Linha *l = novaLinha(pg);
+        if (l) { l->tipo = L_ACAO; l->acao = A_YTM_ABRIR; snprintf(l->t1, sizeof l->t1, "YouTube Music");
+                 snprintf(l->t2, sizeof l->t2, "%s", i18n("Busca e as suas playlists; toca no app oficial do YouTube")); }
+      }
       acao(pg, A_SP_ID, i18n("Spotify: Client ID"), i18n(mcsp_tem_chave() ? "definido" : "não definido"));
       acao(pg, A_SP_SEGREDO, i18n("Spotify: Client secret"), NULL);
       acao(pg, A_SP_IMPORTAR, i18n("Importar uma playlist pública do Spotify"),
@@ -383,6 +442,12 @@ static void construirLocal(Pagina *pg) {
       snprintf(b, sizeof b, "%s: %s", i18n("Saída"), mcp_backend()[0] ? mcp_backend() : "-");
       info(pg, b);
       info(pg, i18n("Na TV, o som é decodificado pela própria TV. O formato que sai pelo HDMI/eARC é definido nas configurações de som da TV e não é visível para apps: confira no visor do receptor."));
+      titulo(pg, i18n("Para a melhor qualidade na TV LG + barra de som eARC"));
+      info(pg, i18n("1. Ajustes da TV > Som > Saída de som: HDMI (eARC)."));
+      info(pg, i18n("2. Som > Ajustes adicionais > Saída de som digital: Pass Through (ou Automático)."));
+      info(pg, i18n("3. Som > Ajustes adicionais > eARC: ligado. Na barra de som, a entrada HDMI eARC."));
+      info(pg, i18n("4. Prefira faixas Lossless ou Hi-Res (selo na lista). MP3, AAC e YouTube Music têm perda."));
+      info(pg, i18n("5. Confira o formato recebido no visor da barra de som."));
       break; }
   }
   // The queue opens on the playing track; a rebuild of the same page keeps the focus.
@@ -543,7 +608,7 @@ static void emFio(const McFaixa *f, int liga, int baixar) {
   pthread_detach(t);
 }
 static int tecladoCampo = -1;
-enum { TC_BUSCA = 1, TC_LFM_CHAVE, TC_LFM_SEGREDO, TC_NOVA_LISTA, TC_FILA_LISTA, TC_FORM, TC_SP_ID, TC_SP_SEGREDO, TC_SP_URL };
+enum { TC_BUSCA = 1, TC_LFM_CHAVE, TC_LFM_SEGREDO, TC_NOVA_LISTA, TC_FILA_LISTA, TC_FORM, TC_SP_ID, TC_SP_SEGREDO, TC_SP_URL, TC_YT_BUSCA };
 static void executarAcao(int a) {
   Pagina *pg = topo();
   zona = Z_LISTA;
@@ -770,6 +835,12 @@ static void ativar(Pagina *pg, int i) {
     case L_PLAYLIST: empilhar(P_PLAYLIST, l->ref, l->t1); break;
     case L_GENERO: empilhar(P_GENERO, l->ref, l->t1); break;
     case L_PASTA: empilhar(P_PASTA, l->ref, l->t1); break;
+    case L_YTLISTA: empilhar(P_YTM_LISTA, l->ref, l->t1); break;
+    case L_YTVIDEO: {
+      int e = ondever_youtube_lista(l->ref, l->lista[0] ? l->lista : NULL);
+      ilha_avisar("mcyt", ILHA_INFO, NULL, i18n(e == ONDE_INFO ? "O YouTube abre no app da própria TV, que não está disponível neste aparelho." :
+                                                "Abrindo no app oficial do YouTube…"), 4000u, 0);
+      break; }
     case L_FONTE: {
       McFonte f;
       if (mcfontes_achar(l->ref, &f)) {
@@ -815,6 +886,16 @@ static void ativar(Pagina *pg, int i) {
             teclado_permitir_vazio(1);
             if (l->acao == A_SP_SEGREDO) teclado_mascarar(1);
           }
+          break;
+        case A_YTM_ABRIR: empilhar(P_YTM, "", "YouTube Music"); break;
+        case A_YT_BUSCA:
+          tecladoCampo = TC_YT_BUSCA;
+          teclado_contexto("YouTube Music");
+          teclado_abrir_com(i18n("Buscar música no YouTube"), i18n("Artista, música ou álbum"), 100, NULL, NULL);
+          teclado_aceitar_utf8(1);
+          break;
+        case A_YT_LISTA_TOCAR:
+          for (int k = 0; k < pg->n; k++) if (pg->v[k].tipo == L_YTVIDEO) { ativar(pg, k); break; }
           break;
         case A_YTMUSIC: { extern void app_ir_youtube(void) __attribute__((weak)); if (app_ir_youtube) app_ir_youtube(); break; }
         case A_FESTA: festaLig = !festaLig; mcp_festa(festaLig); dados_gravar("music-settings.txt", festaLig ? "festa=1\n" : "festa=0\n"); construirLocal(pg); break;
@@ -878,7 +959,43 @@ static void pedirLetra(const McFaixa *f) {
   if (pthread_create(&t, NULL, fioLetra, c) != 0) { free(c); return; }
   pthread_detach(t);
 }
-enum { TB_ALEAT, TB_ANT, TB_PLAY, TB_PROX, TB_REPETIR, TB_FAV, TB_LETRA, TB_FILA, TB_N };
+enum { TB_ALEAT, TB_ANT, TB_PLAY, TB_PROX, TB_REPETIR, TB_FAV, TB_LETRA, TB_FILA, TB_TELA, TB_N };
+
+// SCREEN OFF while the music plays (webOS stops an app's sound when the app
+// is closed, so the music keeps going with the app open and the screen off).
+// 1 = the TV turned its panel off (LG tvpower service); 2 = the TV refused,
+// so the app draws pure black (OLED pixels off). Any key turns it back on and
+// does nothing else.
+#if !defined(__APPLE__) && !defined(NV_LINUX_DESKTOP) && !defined(NV_TPK) && !defined(NV_ANDROID) && !defined(__EMSCRIPTEN__)
+#define MC_WEBOS 1
+#endif
+static volatile int telaOff;
+static Uint32 telaToque;
+#ifdef MC_WEBOS
+static void respTela(const char *payload, void *u) {
+  (void)u;
+  if (telaOff && payload && strstr(payload, "\"returnValue\":true")) telaOff = 1;
+  printf("[musica] tvpower turnOffScreen: %s\n", payload && strstr(payload, "\"returnValue\":true") ? "aceito" : "recusado (tela preta do app)");
+  fflush(stdout);
+}
+#endif
+static void desligarTela(void) {
+  telaOff = 2;
+  telaToque = SDL_GetTicks();
+  printf("[musica] tela desligada; a musica continua\n");
+  fflush(stdout);
+#ifdef MC_WEBOS
+  video_luna("luna://com.webos.service.tvpower/power/turnOffScreen", "{}", respTela, NULL);
+#endif
+}
+static void ligarTela(void) {
+#ifdef MC_WEBOS
+  if (telaOff == 1) video_luna("luna://com.webos.service.tvpower/power/turnOnScreen", "{}", NULL, NULL);
+#endif
+  telaOff = 0;
+  printf("[musica] tela ligada\n");
+  fflush(stdout);
+}
 
 void mcui_evento(const SDL_Event *e) {
   SDL_Keycode k;
@@ -886,6 +1003,7 @@ void mcui_evento(const SDL_Event *e) {
   int voltar, ok;
   if (teclado_aberto()) { teclado_evento(e); return; }
   if (e->type != SDL_KEYDOWN) return;
+  if (telaOff) { ligarTela(); return; }   // the key only wakes the screen
   k = e->key.keysym.sym;
   voltar = k == SDLK_AC_BACK || k == SDLK_ESCAPE || k == SDLK_BACKSPACE;
   ok = k == SDLK_RETURN || k == SDLK_KP_ENTER;
@@ -947,6 +1065,7 @@ void mcui_evento(const SDL_Event *e) {
         case TB_FAV: if (f) { int liga = !(f->fav || mcv_fav(f->id)); emFio(f, liga, 0); ((McFaixa *)f)->fav = liga; } break;
         case TB_LETRA: verLetra = !verLetra; if (verLetra && f && strcmp(letraDe, f->id)) pedirLetra(f); break;
         case TB_FILA: abrirSecao(P_FILA); zona = Z_LISTA; break;
+        case TB_TELA: desligarTela(); break;
       }
     }
     return;
@@ -995,6 +1114,9 @@ static const char *mensagem(int e) {
 void mcui_atualizar(float dt, Uint32 agora) {
   Pagina *pg;
   aplicar();
+  // Screen off: keep the app's own screensaver from drawing (posters, a clock)
+  // over the black, by telling it someone is here every 10 s.
+  if (telaOff && agora - telaToque > 10000u) { telaToque = agora; esmaecer_entrada(agora, 0); }
   if (tecladoCampo >= 0) {
     int r;
     if (teclado_aberto()) teclado_atualizar(dt, agora);
@@ -1031,6 +1153,9 @@ void mcui_atualizar(float dt, Uint32 agora) {
           ilha_avisar("mcsp", ILHA_INFO, NULL, i18n(okk ? "Salvo neste aparelho." : "Valor inválido: use só letras e números."), 3000u, 0);
           if (pg) construirLocal(pg);
           break; }
+        case TC_YT_BUSCA:
+          if (t[0]) empilhar(P_YTM_BUSCA, t, t);
+          break;
         case TC_SP_URL: {
           char id[64];
           if (!mcsp_id_playlist(t, id, sizeof id)) { ilha_avisar("mcsp", ILHA_INFO, NULL, i18n("Isso não parece um link de playlist do Spotify."), 4000u, 0); break; }
@@ -1191,7 +1316,12 @@ static void desenharTocando(Uint32 agora) {
       corta(TXT_TITULO2, f->artista, cx, cy, cw, 0.85f); cy += 60;
       corta(TXT_CALLOUT, f->album, cx, cy, cw, 0.65f); cy += 70;
       mcfmt_descrever(f, b, sizeof b);
-      { char t[300]; snprintf(t, sizeof t, "%s: %s", i18n("Arquivo"), b[0] ? b : i18n("formato não informado pela fonte")); texto(TXT_CAPTION, t, cx, cy, 0.75f); }
+      {
+        char t[300];
+        const char *selo = mcfmt_selo(mcfmt_classe(f));
+        snprintf(t, sizeof t, "%s: %s%s%s", i18n("Arquivo"), b[0] ? b : i18n("formato não informado pela fonte"), selo[0] ? "  ·  " : "", selo);
+        texto(TXT_CAPTION, t, cx, cy, 0.75f);
+      }
       cy += 40;
       mcp_saida(&si);
       if (si.medido) snprintf(b, sizeof b, "%s: %s · %d Hz / %d-bit / %dch%s", i18n("Saída"), si.backend, si.taxa, si.bits, si.canais,
@@ -1224,6 +1354,7 @@ static void desenharTocando(Uint32 agora) {
     rot[TB_FAV] = f->fav || mcv_fav(f->id) ? "♥" : "♡";
     rot[TB_LETRA] = verLetra ? "Letra da música ✓" : "Letra da música";
     rot[TB_FILA] = "Fila";
+    rot[TB_TELA] = "Desligar a tela";
     for (int i = 0; i < TB_N; i++) {
       int foco = !focoBarra && i == focoTocando;
       TxtLinha l = txt_linha(TXT_CALLOUT, i18n(rot[i]), foco ? 20 : 240, foco ? 20 : 242, foco ? 24 : 248, 255);
@@ -1262,6 +1393,7 @@ void mcui_desenhar(Uint32 agora) {
   Pagina *pg = topo();
   int tocando = mcp_estado() != MCP_PARADO;
   float base = NV_TELA_H - (tocando ? 110 : 40);
+  if (telaOff) { gfx_cor((GfxRect){ 0, 0, NV_TELA_W, NV_TELA_H }, 0, 0, 0, 0, 1); return; }   // pure black: OLED pixels off
   gfx_cor((GfxRect){ 0, 0, NV_TELA_W, NV_TELA_H }, 0, 0.05f, 0.052f, 0.064f, 1);
   if (zona == Z_TOCANDO) { desenharTocando(agora); if (teclado_aberto()) teclado_desenhar(agora); return; }
   if (lfmEstado) {
@@ -1309,6 +1441,12 @@ void mcui_desenhar(Uint32 agora) {
         corta(TXT_BODY, l->t1, x + 100, ry + 8, w - 120, foco ? 1 : 0.88f);
         corta(TXT_CAPTION, l->t2, x + 100, ry + 50, w - 120, 0.6f);
         if (l->tipo == L_FAIXA && (l->f.fav || mcv_fav(l->f.id))) texto(TXT_CAPTION, "♥", x + w - 30, ry + 10, 0.8f);
+      } else if (l->tipo == L_YTVIDEO || l->tipo == L_YTLISTA) {
+        GLuint tx = l->thumb[0] ? tex_obter_larg(l->thumb, 142) : 0;
+        if (tx) gfx_textura((GfxRect){ x, ry, 142, 80 }, tx);
+        else gfx_cor((GfxRect){ x, ry, 142, 80 }, 0.12f, 1, 1, 1, 0.07f);
+        corta(TXT_BODY, l->t1, x + 162, ry + 8, w - 180, foco ? 1 : 0.88f);
+        corta(TXT_CAPTION, l->t2, x + 162, ry + 50, w - 180, 0.6f);
       } else if (l->tipo == L_INFO) {
         txt_bloco_corta(TXT_CAPTION, l->t1, 200, 202, 210, x, ry + 8, w, 32, 0.7f, 2);
       } else {

@@ -327,6 +327,13 @@ int yt_buscar(const char *q, const char *pagina, YtItem *out, int max, int *n, c
   snprintf(c, sizeof c, "search?part=snippet&type=video&maxResults=%d&q=%s%s", max > 50 ? 50 : max, e, pg);
   return lista(c, 0, out, max, n, prox, np);
 }
+int yt_buscar_musica(const char *q, const char *pagina, YtItem *out, int max, int *n, char *prox, size_t np) {
+  char c[600], e[400], pg[64];
+  urlenc(q, e, sizeof e);
+  pag(pg, sizeof pg, pagina);
+  snprintf(c, sizeof c, "search?part=snippet&type=video&videoCategoryId=10&maxResults=%d&q=%s%s", max > 50 ? 50 : max, e, pg);
+  return lista(c, 0, out, max, n, prox, np);
+}
 int yt_detalhes(YtItem *itens, int n) {
   char c[900], ids[700] = "";
   size_t k = 0;

@@ -376,3 +376,22 @@ void mcfmt_descrever(const McFaixa *f, char *d, size_t n) {
   if (q[0] && k < n) k += (size_t)snprintf(d + k, n - k, " %s", q);
   if (ch[0] && k < n) snprintf(d + k, n - k, " · %s", ch);
 }
+
+int mcfmt_classe(const McFaixa *f) {
+  static const char *const SEM_PERDA[] = { "flac", "wav", "aif", "aiff", "alac", "wv", "ape", NULL };
+  static const char *const PERDA[] = { "mp3", "aac", "ogg", "oga", "opus", "wma", "mpc", NULL };
+  int sem = 0;
+  if (!f->formato[0]) return MCQ_DESCONHECIDA;
+  for (int i = 0; SEM_PERDA[i]; i++) if (!strcasecmp(f->formato, SEM_PERDA[i])) sem = 1;
+  // m4a can be AAC or ALAC: only a reported bit depth (lossless sources have one) says ALAC.
+  if (!sem && !strcasecmp(f->formato, "m4a") && f->bits > 0) sem = 1;
+  if (!sem) {
+    for (int i = 0; PERDA[i]; i++) if (!strcasecmp(f->formato, PERDA[i])) return MCQ_PERDA;
+    if (!strcasecmp(f->formato, "m4a")) return MCQ_PERDA;
+    return MCQ_DESCONHECIDA;
+  }
+  return f->bits > 16 || f->taxa > 48000 ? MCQ_HIRES : MCQ_LOSSLESS;
+}
+const char *mcfmt_selo(int c) {
+  return c == MCQ_HIRES ? "Hi-Res" : c == MCQ_LOSSLESS ? "Lossless" : c == MCQ_PERDA ? "Lossy" : "";
+}

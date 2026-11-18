@@ -79,6 +79,28 @@ int main(int argc, char **argv) {
     CONFERE(mcfmt_ler(lixo, sizeof lixo, 64, &m, &f, NULL) == MCF_DESCONHECIDO, "garbage: unknown");
   }
 
+  // ---- quality class (from what the source reports) ----
+  {
+    McFaixa q;
+    memset(&q, 0, sizeof q);
+    snprintf(q.formato, sizeof q.formato, "flac"); q.bits = 16; q.taxa = 44100;
+    CONFERE(mcfmt_classe(&q) == MCQ_LOSSLESS, "FLAC 16/44.1 -> Lossless (not Hi-Res)");
+    q.bits = 24; q.taxa = 96000;
+    CONFERE(mcfmt_classe(&q) == MCQ_HIRES, "FLAC 24/96 -> Hi-Res");
+    q.bits = 16; q.taxa = 96000;
+    CONFERE(mcfmt_classe(&q) == MCQ_HIRES, "16-bit at 96 kHz -> Hi-Res (rate above CD)");
+    q.bits = 0; q.taxa = 0;
+    CONFERE(mcfmt_classe(&q) == MCQ_LOSSLESS, "FLAC with nothing else reported -> Lossless, not Hi-Res");
+    snprintf(q.formato, sizeof q.formato, "mp3"); q.kbps = 320;
+    CONFERE(mcfmt_classe(&q) == MCQ_PERDA, "MP3 320 -> Lossy");
+    snprintf(q.formato, sizeof q.formato, "m4a");
+    CONFERE(mcfmt_classe(&q) == MCQ_PERDA, "m4a without a bit depth -> AAC -> Lossy");
+    q.bits = 24; q.taxa = 96000;
+    CONFERE(mcfmt_classe(&q) == MCQ_HIRES, "m4a with a 24-bit depth reported -> ALAC -> Hi-Res");
+    q.formato[0] = 0;
+    CONFERE(mcfmt_classe(&q) == MCQ_DESCONHECIDA && !mcfmt_selo(MCQ_DESCONHECIDA)[0], "no format: no badge");
+  }
+
   // ---- decoding (desktop / tests) ----
   {
     size_t n;
