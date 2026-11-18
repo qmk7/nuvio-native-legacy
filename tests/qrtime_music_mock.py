@@ -147,6 +147,46 @@ def lrclib(q):
         return 200, {"id": 2, "instrumental": True, "plainLyrics": None, "syncedLyrics": None}
     return 404, {"code": 404, "name": "TrackNotFound", "message": "Failed to find specified track"}
 
+# ---- Spotify Web API (metadata only): client credentials + playlists ----
+SP_ID, SP_SECRET = "qrtspid", "qrtspsecret"
+
+
+def sp_items():
+    it = [{"track": {"name": "Blue Hour", "duration_ms": 5000, "album": {"name": "Night Sessions"}, "artists": [{"name": "QRT Quartet"}, {"name": "Guest"}]}},
+          {"track": {"name": "Morning Tone (Remastered 2011)", "duration_ms": 5000, "album": {"name": "Day Album"}, "artists": [{"name": "Sun Trio"}]}},
+          {"track": None},
+          {"track": {"name": "Midnight Line - Live", "duration_ms": 5000, "album": {"name": "Live"}, "artists": [{"name": "QRT Quartet"}]}}]
+    for k in range(100):
+        it.append({"track": {"name": "Unknown Song %d" % k, "duration_ms": 200000, "album": {"name": "Elsewhere"}, "artists": [{"name": "Nobody %d" % k}]}})
+    it.append({"track": None})
+    it.append({"track": {"name": "Blue", "duration_ms": 1000, "album": {"name": "X"}, "artists": [{"name": "Somebody"}]}})
+    return it
+
+
+def spotify_token(headers, form):
+    import base64
+    h = headers.get("Authorization", "")
+    ok = h == "Basic " + base64.b64encode(("%s:%s" % (SP_ID, SP_SECRET)).encode()).decode()
+    if not ok or form.get("grant_type") != "client_credentials":
+        return 400, {"error": "invalid_client", "error_description": "Invalid client"}
+    return 200, {"access_token": "SPTOK", "token_type": "Bearer", "expires_in": 3600}
+
+
+def spotify_api(headers, path, q):
+    if headers.get("Authorization") != "Bearer SPTOK":
+        return 401, {"error": {"status": 401, "message": "Invalid access token"}}
+    parts = path.split("/")   # /spapi/v1/playlists/<id>[/tracks]
+    pid = parts[4] if len(parts) > 4 else ""
+    if pid != "5QrtPublicMix00000001":
+        return 404, {"error": {"status": 404, "message": "Resource not found"}}
+    if len(parts) == 5:
+        return 200, {"name": "QRT Road Mix"}
+    items = sp_items()
+    off = int(q.get("offset", "0")); lim = int(q.get("limit", "100"))
+    page = items[off:off + lim]
+    nxt = "https://api.spotify.com/v1/playlists/%s/tracks?offset=%d&limit=%d" % (pid, off + lim, lim) if off + lim < len(items) else None
+    return 200, {"items": page, "next": nxt, "total": len(items)}
+
 
 class H(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -384,6 +424,9 @@ class H(BaseHTTPRequestHandler):
         self.log("GET " + redact(self.path) + (" RANGE " + self.headers["Range"] if self.headers.get("Range") else ""))
         if u.path.startswith("/lfm/"):
             return self.send(lastfm(dict(urllib.parse.parse_qsl(u.query))))
+        if u.path.startswith("/spapi/v1/"):
+            code, body = spotify_api(self.headers, u.path, dict(urllib.parse.parse_qsl(u.query)))
+            return self.send(body, code=code)
         if u.path == "/lrclib/api/get":
             if self.headers.get("User-Agent", "") != "QRTIME/1.0":
                 self.log("LRCLIB-UA " + self.headers.get("User-Agent", ""))
@@ -403,6 +446,9 @@ class H(BaseHTTPRequestHandler):
         self.log("POST %s %s method=%s" % (self.path, self.headers.get("Content-Type", ""), params.get("method", "")))
         if self.path.startswith("/lfm/"):
             return self.send(lastfm(params))
+        if self.path == "/spaccounts/api/token":
+            code, body = spotify_token(self.headers, params)
+            return self.send(body, code=code)
         return self.send(b"not found", "text/plain", 404)
 
     def do_HEAD(self):

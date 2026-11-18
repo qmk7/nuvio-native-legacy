@@ -51,7 +51,9 @@ const McFaixa *mch_item(int i);
 int  mcv_fav(const char *id);
 int  mcv_alternar(const McFaixa *f);         // returns the new state
 int  mcv_n(void);
-const McFaixa *mcv_item(int i);
+const McFaixa *mcv_item(int i);              // UI thread
+// Worker threads: copies under the lock (the UI may be changing them).
+int  mcv_copiar(McFaixa *out, int max);
 
 // ---- local playlists ----
 #define MCL_MAX 50
@@ -64,6 +66,9 @@ int  mcl_apagar(int i);
 int  mcl_adicionar(int i, const McFaixa *f);
 int  mcl_remover(int i, int faixa);
 int  mcl_mover(int i, int de, int para);
+// Worker threads: copies under the lock.
+int  mcl_copiar_nomes(char (*nomes)[96], int *faixas, int max);
+int  mcl_copiar(int i, McFaixa *out, int max);
 
 // Reload everything for the active profile (profile switch).
 void mcfila_perfil_trocou(void);

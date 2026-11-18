@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 // ---------------------------------------------------------------- lines
 static void campo(char *d, size_t n, size_t *k, const char *s) {
@@ -234,6 +235,7 @@ int mcq_carregar(void) {
 }
 
 // ---------------------------------------------------------------- history / favourites
+static pthread_mutex_t travaLocal = PTHREAD_MUTEX_INITIALIZER;   // favs + listas
 static Lista hist, favs;
 static int histLido = -1, favLido = -1;
 static void carregarLista(Lista *l, const char *base) {
@@ -255,7 +257,11 @@ static void gravarLista(const Lista *l, const char *base) {
   free(t);
 }
 static void garantirHist(void) { if (histLido != perfis_ativo()) { carregarLista(&hist, "history"); histLido = perfis_ativo(); } }
-static void garantirFav(void) { if (favLido != perfis_ativo()) { carregarLista(&favs, "favorites"); favLido = perfis_ativo(); } }
+static void garantirFav(void) {
+  pthread_mutex_lock(&travaLocal);
+  if (favLido != perfis_ativo()) { carregarLista(&favs, "favorites"); favLido = perfis_ativo(); }
+  pthread_mutex_unlock(&travaLocal);
+}
 void mch_tocou(const McFaixa *f) {
   garantirHist();
   for (int i = 0; i < hist.n; i++) if (!strcmp(hist.v[i].id, f->id)) { listaTirar(&hist, i); break; }
@@ -268,11 +274,21 @@ const McFaixa *mch_item(int i) { garantirHist(); return i >= 0 && i < hist.n ? &
 int mcv_fav(const char *id) { garantirFav(); for (int i = 0; i < favs.n; i++) if (!strcmp(favs.v[i].id, id)) return 1; return 0; }
 int mcv_alternar(const McFaixa *f) {
   garantirFav();
-  for (int i = 0; i < favs.n; i++) if (!strcmp(favs.v[i].id, f->id)) { listaTirar(&favs, i); gravarLista(&favs, "favorites"); return 0; }
+  pthread_mutex_lock(&travaLocal);
+  for (int i = 0; i < favs.n; i++) if (!strcmp(favs.v[i].id, f->id)) { listaTirar(&favs, i); gravarLista(&favs, "favorites"); pthread_mutex_unlock(&travaLocal); return 0; }
   listaPor(&favs, f, 0);
   favs.v[0].fav = 1;
   gravarLista(&favs, "favorites");
+  pthread_mutex_unlock(&travaLocal);
   return 1;
+}
+int mcv_copiar(McFaixa *out, int max) {
+  int n = 0;
+  garantirFav();
+  pthread_mutex_lock(&travaLocal);
+  for (; n < favs.n && n < max; n++) out[n] = favs.v[n];
+  pthread_mutex_unlock(&travaLocal);
+  return n;
 }
 int mcv_n(void) { garantirFav(); return favs.n; }
 const McFaixa *mcv_item(int i) { garantirFav(); return i >= 0 && i < favs.n ? &favs.v[i] : NULL; }
@@ -299,7 +315,11 @@ static void carregarListas(void) {
   free(t);
   listasLido = perfis_ativo();
 }
-static void garantirListas(void) { if (listasLido != perfis_ativo()) carregarListas(); }
+static void garantirListas(void) {
+  pthread_mutex_lock(&travaLocal);
+  if (listasLido != perfis_ativo()) carregarListas();
+  pthread_mutex_unlock(&travaLocal);
+}
 static void gravarListas(void) {
   char nome[48];
   size_t cap = 256, k = 0;
@@ -330,8 +350,7 @@ int mcl_faixas(int i, const McFaixa **out) {
   if (out) *out = listas[i].l.v;
   return listas[i].l.n;
 }
-int mcl_criar(const char *nome) {
-  garantirListas();
+static int mcl_criar_(const char *nome) {
   if (!nomeOk(nome) || nListas == MCL_MAX) return -1;
   snprintf(listas[nListas].nome, sizeof listas[0].nome, "%s", nome);
   listas[nListas].l.n = 0;
@@ -339,16 +358,30 @@ int mcl_criar(const char *nome) {
   gravarListas();
   return nListas - 1;
 }
-int mcl_renomear(int i, const char *nome) {
+int mcl_criar(const char *nome) {
+  int r;
   garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  r = mcl_criar_(nome);
+  pthread_mutex_unlock(&travaLocal);
+  return r;
+}
+static int mcl_renomear_(int i, const char *nome) {
   if (i < 0 || i >= nListas || !nomeOk(nome)) return 0;
   snprintf(listas[i].nome, sizeof listas[0].nome, "%s", nome);
   gravarListas();
   return 1;
 }
-int mcl_apagar(int i) {
-  Lista l;
+int mcl_renomear(int i, const char *nome) {
+  int r;
   garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  r = mcl_renomear_(i, nome);
+  pthread_mutex_unlock(&travaLocal);
+  return r;
+}
+static int mcl_apagar_(int i) {
+  Lista l;
   if (i < 0 || i >= nListas) return 0;
   l = listas[i].l;
   memmove(&listas[i], &listas[i + 1], sizeof listas[0] * (size_t)(nListas - i - 1));
@@ -358,24 +391,45 @@ int mcl_apagar(int i) {
   gravarListas();
   return 1;
 }
-int mcl_adicionar(int i, const McFaixa *f) {
+int mcl_apagar(int i) {
+  int r;
   garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  r = mcl_apagar_(i);
+  pthread_mutex_unlock(&travaLocal);
+  return r;
+}
+static int mcl_adicionar_(int i, const McFaixa *f) {
   if (i < 0 || i >= nListas || listas[i].l.n >= MCQ_MAX) return 0;
   listaPor(&listas[i].l, f, -1);
   gravarListas();
   return 1;
 }
-int mcl_remover(int i, int faixa) {
+int mcl_adicionar(int i, const McFaixa *f) {
+  int r;
   garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  r = mcl_adicionar_(i, f);
+  pthread_mutex_unlock(&travaLocal);
+  return r;
+}
+static int mcl_remover_(int i, int faixa) {
   if (i < 0 || i >= nListas || faixa < 0 || faixa >= listas[i].l.n) return 0;
   listaTirar(&listas[i].l, faixa);
   gravarListas();
   return 1;
 }
-int mcl_mover(int i, int de, int para) {
+int mcl_remover(int i, int faixa) {
+  int r;
+  garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  r = mcl_remover_(i, faixa);
+  pthread_mutex_unlock(&travaLocal);
+  return r;
+}
+static int mcl_mover_(int i, int de, int para) {
   Lista *l;
   McFaixa t;
-  garantirListas();
   if (i < 0 || i >= nListas) return 0;
   l = &listas[i].l;
   if (de < 0 || de >= l->n || para < 0 || para >= l->n || de == para) return 0;
@@ -384,6 +438,30 @@ int mcl_mover(int i, int de, int para) {
   listaPor(l, &t, para);
   gravarListas();
   return 1;
+}
+int mcl_mover(int i, int de, int para) {
+  int r;
+  garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  r = mcl_mover_(i, de, para);
+  pthread_mutex_unlock(&travaLocal);
+  return r;
+}
+int mcl_copiar_nomes(char (*nomes)[96], int *faixas, int max) {
+  int n = 0;
+  garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  for (; n < nListas && n < max; n++) { snprintf(nomes[n], 96, "%s", listas[n].nome); if (faixas) faixas[n] = listas[n].l.n; }
+  pthread_mutex_unlock(&travaLocal);
+  return n;
+}
+int mcl_copiar(int i, McFaixa *out, int max) {
+  int n = 0;
+  garantirListas();
+  pthread_mutex_lock(&travaLocal);
+  if (i >= 0 && i < nListas) for (; n < listas[i].l.n && n < max; n++) out[n] = listas[i].l.v[n];
+  pthread_mutex_unlock(&travaLocal);
+  return n;
 }
 void mcfila_perfil_trocou(void) {
   histLido = favLido = listasLido = -1;

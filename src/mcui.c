@@ -7,6 +7,7 @@
 #include "mclrc.h"
 #include "mcoffline.h"
 #include "mcplayer.h"
+#include "mcspotify.h"
 #include "dados.h"
 #include "gfx.h"
 #include "text.h"
@@ -31,7 +32,7 @@ enum { L_FAIXA, L_ALBUM, L_ARTISTA, L_PLAYLIST, L_GENERO, L_PASTA, L_FONTE, L_AC
 enum {
   A_NADA, A_RETOMAR, A_TOCAR_TUDO, A_ALEATORIO_TUDO, A_ADD_SUBSONIC, A_ADD_WEBDAV, A_LFM_CHAVE, A_LFM_SEGREDO,
   A_LFM_CONECTAR, A_LFM_SAIR, A_YTMUSIC, A_FESTA, A_LRCLIB, A_FILA_ALEATORIO, A_FILA_REPETIR, A_FILA_LIMPAR,
-  A_FILA_SALVAR, A_NOVA_BUSCA, A_SIMILAR, A_TOCANDO
+  A_FILA_SALVAR, A_NOVA_BUSCA, A_SIMILAR, A_TOCANDO, A_SP_ID, A_SP_SEGREDO, A_SP_IMPORTAR
 };
 typedef struct {
   int tipo, acao;
@@ -367,7 +368,10 @@ static void construirLocal(Pagina *pg) {
       } else acao(pg, A_LFM_CONECTAR, i18n("Conectar o Last.fm (scrobbling)"), i18n("Aprovação pelo celular"));
       titulo(pg, i18n("Outros serviços"));
       acao(pg, A_YTMUSIC, "YouTube Music", i18n("Sem API pública: abre a seção YouTube do QR TIME"));
-      info(pg, i18n("Spotify: só metadados por API oficial; a reprodução não é permitida fora dos apps do Spotify."));
+      acao(pg, A_SP_ID, i18n("Spotify: Client ID"), i18n(mcsp_tem_chave() ? "definido" : "não definido"));
+      acao(pg, A_SP_SEGREDO, i18n("Spotify: Client secret"), NULL);
+      acao(pg, A_SP_IMPORTAR, i18n("Importar uma playlist pública do Spotify"),
+           i18n("Só os nomes: as faixas encontradas tocam do seu servidor. O Spotify não permite tocar fora dos apps dele."));
       break; }
     case P_AJUSTES: {
       McSaidaInfo si;
@@ -527,6 +531,11 @@ static void *fioFav(void *u) {
 }
 static void emFio(const McFaixa *f, int liga, int baixar) {
   pthread_t t;
+  if (!baixar && !strncmp(f->id, "dv", 2)) {   // local favourite: here, not on a worker
+    if (mcv_fav(f->id) != (liga != 0)) mcv_alternar(f);
+    favResultado = liga;
+    return;
+  }
   PedidoFav *p = calloc(1, sizeof *p);
   if (!p) return;
   p->f = *f; p->liga = liga; p->baixar = baixar;
@@ -534,7 +543,7 @@ static void emFio(const McFaixa *f, int liga, int baixar) {
   pthread_detach(t);
 }
 static int tecladoCampo = -1;
-enum { TC_BUSCA = 1, TC_LFM_CHAVE, TC_LFM_SEGREDO, TC_NOVA_LISTA, TC_FILA_LISTA, TC_FORM };
+enum { TC_BUSCA = 1, TC_LFM_CHAVE, TC_LFM_SEGREDO, TC_NOVA_LISTA, TC_FILA_LISTA, TC_FORM, TC_SP_ID, TC_SP_SEGREDO, TC_SP_URL };
 static void executarAcao(int a) {
   Pagina *pg = topo();
   zona = Z_LISTA;
@@ -619,6 +628,34 @@ void mcui_salvar_fila(const char *nome) {
   p->n = mcq_n();
   if (pthread_create(&t, NULL, fioSalvar, p) != 0) { free(p->v); free(p); return; }
   pthread_detach(t);
+}
+
+typedef struct { char url[200]; } PedidoSp;
+static McFaixa *spAchadas; static int spN, spTotal, spPronto, spErro, spFio;
+static char spNome[160];
+static void *fioSpotify(void *u) {
+  PedidoSp p = *(PedidoSp *)u;
+  McFaixa *v = calloc(500, sizeof *v);
+  int a = 0, t = 0, r = MC_ERRO_OUTRO;
+  char nome[160] = "";
+  free(u);
+  if (v) r = mcsp_importar(p.url, v, 500, &a, &t, nome, sizeof nome);
+  pthread_mutex_lock(&trava);
+  free(spAchadas);
+  spAchadas = v; spN = a; spTotal = t; spErro = r; spPronto = 1; spFio = 0;
+  snprintf(spNome, sizeof spNome, "%s", nome);
+  pthread_mutex_unlock(&trava);
+  return NULL;
+}
+static void importarSpotify(const char *url) {
+  pthread_t t;
+  PedidoSp *p;
+  if (spFio || !(p = calloc(1, sizeof *p))) return;
+  snprintf(p->url, sizeof p->url, "%s", url);
+  spFio = 1;
+  if (pthread_create(&t, NULL, fioSpotify, p) != 0) { free(p); spFio = 0; return; }
+  pthread_detach(t);
+  ilha_avisar("mcsp", ILHA_INFO, NULL, i18n("Lendo a playlist do Spotify e procurando na sua biblioteca…"), 4000u, 0);
 }
 
 // ---------------------------------------------------------------- source form
@@ -761,6 +798,24 @@ static void ativar(Pagina *pg, int i) {
           lfmDisparar(1);
           break;
         case A_LFM_SAIR: mclfm_sair(); construirLocal(pg); break;
+        case A_SP_ID: case A_SP_SEGREDO: case A_SP_IMPORTAR:
+          tecladoCampo = l->acao == A_SP_ID ? TC_SP_ID : l->acao == A_SP_SEGREDO ? TC_SP_SEGREDO : TC_SP_URL;
+          if (tecladoCampo == TC_SP_URL && !mcsp_tem_chave()) {
+            tecladoCampo = -1;
+            ilha_avisar("mcsp", ILHA_INFO, NULL, i18n("Preencha o Client ID e o Client secret do Spotify antes."), 4000u, 0);
+            break;
+          }
+          teclado_contexto("Spotify");
+          if (tecladoCampo == TC_SP_URL)
+            teclado_abrir_com(i18n("Link da playlist do Spotify"), i18n("Compartilhar > Copiar link · use \"Digitar pelo celular\""), 120,
+                              "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.-_?=&", NULL);
+          else {
+            teclado_abrir_com(l->acao == A_SP_ID ? "Spotify: Client ID" : "Spotify: Client secret",
+                              "developer.spotify.com/dashboard · use \"Digitar pelo celular\"", 40, "abcdefghijklmnopqrstuvwxyz0123456789", NULL);
+            teclado_permitir_vazio(1);
+            if (l->acao == A_SP_SEGREDO) teclado_mascarar(1);
+          }
+          break;
         case A_YTMUSIC: { extern void app_ir_youtube(void) __attribute__((weak)); if (app_ir_youtube) app_ir_youtube(); break; }
         case A_FESTA: festaLig = !festaLig; mcp_festa(festaLig); dados_gravar("music-settings.txt", festaLig ? "festa=1\n" : "festa=0\n"); construirLocal(pg); break;
         case A_LRCLIB: lrclibLig = !lrclibLig; construirLocal(pg); break;
@@ -970,6 +1025,17 @@ void mcui_atualizar(float dt, Uint32 agora) {
             mcui_salvar_fila(t);
           }
           break; }
+        case TC_SP_ID: case TC_SP_SEGREDO: {
+          int okk = tecladoCampo == TC_SP_ID ? mcsp_definir_chave(t, NULL) : mcsp_definir_chave(NULL, t);
+          teclado_esquecer();
+          ilha_avisar("mcsp", ILHA_INFO, NULL, i18n(okk ? "Salvo neste aparelho." : "Valor inválido: use só letras e números."), 3000u, 0);
+          if (pg) construirLocal(pg);
+          break; }
+        case TC_SP_URL: {
+          char id[64];
+          if (!mcsp_id_playlist(t, id, sizeof id)) { ilha_avisar("mcsp", ILHA_INFO, NULL, i18n("Isso não parece um link de playlist do Spotify."), 4000u, 0); break; }
+          importarSpotify(t);
+          break; }
         case TC_FORM: {
           size_t n;
           char *c = formCampo(formFoco, &n);
@@ -991,6 +1057,30 @@ void mcui_atualizar(float dt, Uint32 agora) {
     if (lotePronto) { lp = 1; lv = lote; nl = nLote; la = loteAcao; lote = NULL; lotePronto = 0; }
     if (!formTestando && formResultado != -99) { ft = formResultado; formResultado = -99; }
     if (lfmResultado != -99) { lr = lfmResultado; lfmResultado = -99; }
+    if (spPronto) {
+      McFaixa *v = spAchadas;
+      int a = spN, tot = spTotal, er = spErro;
+      char nome[160], msg[300];
+      snprintf(nome, sizeof nome, "%s", spNome);
+      spAchadas = NULL; spPronto = 0;
+      pthread_mutex_unlock(&trava);
+      if (er != MC_OK) snprintf(msg, sizeof msg, "%s", i18n(er == MC_ERRO_LOGIN ? "O Spotify recusou o Client ID ou o secret." :
+                                                       er == MC_ERRO_NAO_SUPORTA ? "Playlist não encontrada ou não pública (o Spotify não libera as playlists dele para apps novos)." :
+                                                       "Não foi possível ler a playlist do Spotify."));
+      else {
+        if (a) {
+          char t2[200];
+          int li;
+          snprintf(t2, sizeof t2, "%.150s (Spotify)", nome[0] ? nome : "Playlist");
+          li = mcl_criar(t2);
+          for (int i = 0; li >= 0 && i < a; i++) mcl_adicionar(li, &v[i]);
+        }
+        snprintf(msg, sizeof msg, i18n("%d de %d faixas encontradas na sua biblioteca; salvas em Playlists."), a, tot);
+      }
+      free(v);
+      ilha_avisar("mcsp", ILHA_INFO, NULL, msg, 6000u, 0);
+      pthread_mutex_lock(&trava);
+    }
     if (salvarResultado != -99) {
       int sr = salvarResultado;
       salvarResultado = -99;

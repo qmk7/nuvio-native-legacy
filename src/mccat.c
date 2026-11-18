@@ -161,13 +161,17 @@ int mccat_playlists(McPlaylist *out, int max, int *n) {
     for (int k = *n; k < *n + m; k++) qual(out[k].id, sizeof out[k].id, f.chave, out[k].id);
     *n += m;
   }
-  for (int i = 0; i < mcl_n() && *n < max; i++) {
-    McPlaylist *p = &out[(*n)++];
-    memset(p, 0, sizeof *p);
-    snprintf(p->id, sizeof p->id, "lc:%d", i);
-    snprintf(p->nome, sizeof p->nome, "%s", mcl_nome(i));
-    snprintf(p->dono, sizeof p->dono, "local");
-    p->faixas = mcl_faixas(i, NULL);
+  {
+    static char nomes[MCL_MAX][96];
+    int fx[MCL_MAX], nl = mcl_copiar_nomes(nomes, fx, MCL_MAX);
+    for (int i = 0; i < nl && *n < max; i++) {
+      McPlaylist *p = &out[(*n)++];
+      memset(p, 0, sizeof *p);
+      snprintf(p->id, sizeof p->id, "lc:%d", i);
+      snprintf(p->nome, sizeof p->nome, "%s", nomes[i]);
+      snprintf(p->dono, sizeof p->dono, "local");
+      p->faixas = fx[i];
+    }
   }
   return *n ? MC_OK : e;
 }
@@ -177,9 +181,7 @@ int mccat_playlist(const char *id, McFaixa *out, int max, int *n) {
   int r;
   *n = 0;
   if (!strncmp(id, "lc:", 3)) {
-    const McFaixa *v;
-    int m = mcl_faixas(atoi(id + 3), &v);
-    for (int i = 0; i < m && *n < max; i++) out[(*n)++] = v[i];
+    *n = mcl_copiar(atoi(id + 3), out, max);
     return MC_OK;
   }
   if (!fonteDe(id, &f, &loc) || f.tipo != MCS_SUBSONIC) return MC_ERRO_NAO_SUPORTA;
@@ -204,9 +206,12 @@ int mccat_buscar(const char *q, McArtista *ar, int maxAr, int *nAr, McAlbum *al,
     *nAr += a; *nAl += b; *nFx += c;
   }
   // Local playlists' and favourites' WebDAV tracks match by title too.
-  for (int i = 0; i < mcv_n() && *nFx < maxFx; i++) {
-    const McFaixa *v = mcv_item(i);
-    if (!strncmp(v->id, "dv", 2) && (strcasestr(v->titulo, q) || strcasestr(v->artista, q))) fx[(*nFx)++] = *v;
+  {
+    McFaixa *v = calloc(200, sizeof *v);
+    int nv = v ? mcv_copiar(v, 200) : 0;
+    for (int i = 0; i < nv && *nFx < maxFx; i++)
+      if (!strncmp(v[i].id, "dv", 2) && (strcasestr(v[i].titulo, q) || strcasestr(v[i].artista, q))) fx[(*nFx)++] = v[i];
+    free(v);
   }
   return algum || *nFx ? MC_OK : (mcfontes_n() ? e : MC_OK);
 }
@@ -222,7 +227,7 @@ int mccat_favoritos(McFaixa *out, int max, int *n) {
     for (int k = *n; k < *n + m; k++) qualFaixa(&out[k], f.chave);
     *n += m;
   }
-  for (int i = 0; i < mcv_n() && *n < max; i++) out[(*n)++] = *mcv_item(i);
+  *n += mcv_copiar(out + *n, max - *n);
   return *n ? MC_OK : e;
 }
 int mccat_favoritar(McFaixa *f, int liga) {
