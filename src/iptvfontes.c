@@ -180,6 +180,17 @@ int iptv_conta_ativar(int ativa) {
   }
   pthread_mutex_unlock(&trava); return ok;
 }
+// Phase 8 provider hub: switch an account on/off by id, without changing
+// which account is selected for editing.
+int iptv_conta_ativar_id(unsigned id, int ativa) {
+  pthread_mutex_lock(&trava); carregar(); int ok = 0;
+  for (int i = 0; i < nContas; i++) if (contas[i].id == id) {
+    int anterior = contas[i].ativa; contas[i].ativa = !!ativa;
+    if (!(ok = gravar())) contas[i].ativa = anterior;
+    break;
+  }
+  pthread_mutex_unlock(&trava); return ok;
+}
 int iptv_conta_remover(IptvConta *removida) {
   pthread_mutex_lock(&trava); carregar(); int ok = nContas > 0;
   if (ok) {

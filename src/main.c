@@ -43,6 +43,7 @@
 #include <signal.h>
 #endif
 #include "qrdados.h"
+#include "qrcontas.h"
 #include <unistd.h>   // dup2 (o stderr no mesmo descritor do log)
 #include "gfx.h"
 #include "fundo.h"
@@ -496,6 +497,8 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
 #ifdef NV_LINUX_DESKTOP
     // "colar:<texto>" fills the open keyboard as the phone would, and confirms.
     if (dp && !strncmp(linha, "colar:", 6)) { extern void teclado_porta_colar(const char *); teclado_porta_colar(dp + 1); continue; }
+    // "tela:contas" opens Settings > Accounts, providers and data (as OK on that row does).
+    if (dp && !strcmp(linha, "tela:contas")) { extern void app_ir_contas(void); app_ir_contas(); continue; }
 #endif
     // "ime:abrir", "ime:voz", "ime:fechar": teclado do sistema direto
     // (entrada_texto.h), para medir na TV sem depender da tela que o liga.
@@ -1150,6 +1153,7 @@ int main(int argc, char **argv) {
   // QR TIME phase 8: data schema check. Upgrades only rewrite/add, one
   // version at a time; newer data is left untouched; nothing is deleted.
   qrdados_esquema_iniciar();
+  qrc_tsdb_carregar();   // the person's own TheSportsDB key, if any (Accounts, providers and data)
 #ifdef NV_ANDROID
   nv_android_cache_migrate(dados_dir());
   nv_android_cache_trim(NV_ANDROID_CACHE_BYTES);

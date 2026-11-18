@@ -301,6 +301,7 @@ static const char *ajVisualIcone(int op) {
     case AJ_NAV_RAPIDA: return "aj_zap";
     case AJ_MEDIDOR: return "aj_activity";
     case AJ_DIAGNOSTICO: return "aj_stethoscope";
+    case AJ_QR_CONTAS: return "aj_user-round";
     case AJ_VELOCIDADE: return "aj_gauge";
     case AJ_ESPACO: return "aj_database";
     case AJ_TEX_MB: return "aj_memory-stick";

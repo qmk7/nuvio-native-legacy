@@ -27,7 +27,8 @@ typedef enum {
   TELA_PLUGINS,      // plugins Nuvio (pluginsui.c, F09)
   TELA_ESPORTES,     // QR TIME Sport Center (esporteui.c)
   TELA_YOUTUBE,      // QR TIME YouTube section (ytui.c)
-  TELA_MUSICA        // QR TIME Music Center (mcui.c)
+  TELA_MUSICA,       // QR TIME Music Center (mcui.c)
+  TELA_CONTAS        // QR TIME Accounts, providers and data (qrcontasui.c)
 } Tela;
 
 int  app_iniciar(const char *dirArte);

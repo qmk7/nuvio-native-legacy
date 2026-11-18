@@ -861,6 +861,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "esporteui.h"
 #include "ytui.h"
 #include "mcui.h"
+#include "qrcontasui.h"
 #include "jfid.h"
 #include "partes.h"
 #include "logrede.h"
@@ -1065,6 +1066,7 @@ static void trocarTela(Tela nova) {
     case TELA_ESPORTES:   esporteui_abrir();    break;
     case TELA_YOUTUBE:    ytui_abrir();         break;
     case TELA_MUSICA:     mcui_abrir();         break;
+    case TELA_CONTAS:     qrcui_abrir();        break;
     case TELA_PERFIL:     perfil_abrir(); pedirPerfil(); break;
     case TELA_AJUSTES:    ajustes_iniciar();    break;
     case TELA_DIAGNOSTICO: diagnostico_iniciar(); break;
@@ -1074,6 +1076,8 @@ static void trocarTela(Tela nova) {
 }
 // Music Center -> "YouTube Music": the YouTube section (no public YouTube Music API).
 void app_ir_youtube(void) { trocarTela(TELA_YOUTUBE); menu_definir_destino(MENU_YOUTUBE); }
+// Desktop test port "tela:contas": the same screen Settings opens.
+void app_ir_contas(void) { trocarTela(TELA_CONTAS); menu_definir_destino(MENU_AJUSTES); }
 
 static void alvoPlayer(char *alvo, size_t tam) {
   const CatItem *c = cat_item(player_indice());
@@ -4345,6 +4349,7 @@ static int relogioPedidoPagina(void) {
     case TELA_ESPORTES: return 0;
     case TELA_YOUTUBE: return 0;
     case TELA_MUSICA: return 0;
+    case TELA_CONTAS: return 0;
     case TELA_PERFIL: return perfil_pediu_relogio();
     case TELA_SOCIAL: return amigoperfil_pediu_relogio();
     case TELA_ADDONS: return addonsui_pediu_relogio();
@@ -4802,6 +4807,7 @@ void app_evento(const SDL_Event *e) {
     case TELA_ESPORTES:   esporteui_evento(e);  break;
     case TELA_YOUTUBE:    ytui_evento(e);       break;
     case TELA_MUSICA:     mcui_evento(e);       break;
+    case TELA_CONTAS:     qrcui_evento(e);      break;
     case TELA_PERFIL:     perfil_evento(e);     break;
     case TELA_SOCIAL:     amigoperfil_evento(e); break;
     case TELA_ADDONS:     addonsui_evento(e);   break;
@@ -5718,6 +5724,22 @@ void app_atualizar(float dt, Uint32 agora) {
   if (tela == TELA_AJUSTES && ajustes_pediu_plugins()) {
     pluginsui_abrir();
     trocarTela(TELA_PLUGINS);
+  }
+  // QR TIME phase 8: Accounts, providers and data, opened from Settings. Back
+  // returns to Settings; "Open settings" goes to that provider's own place.
+  if (tela == TELA_AJUSTES && ajustes_pediu_contas()) trocarTela(TELA_CONTAS);
+  if (tela == TELA_CONTAS) {
+    int ir = qrcui_pedido();
+    if (qrcui_quer_sair()) { trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES); }
+    else switch (ir) {
+      case QRCUI_IR_IPTV:    ajustes_abrir_no_iptv(); trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES); break;
+      case QRCUI_IR_TRAKT:   ajustes_abrir_no_trakt(); trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES); break;
+      case QRCUI_IR_AJUSTES: trocarTela(TELA_AJUSTES); menu_definir_destino(MENU_AJUSTES); break;
+      case QRCUI_IR_MUSICA:  trocarTela(TELA_MUSICA); menu_definir_destino(MENU_MUSICA); break;
+      case QRCUI_IR_YOUTUBE: app_ir_youtube(); break;
+      case QRCUI_IR_ADDONS:  addonsDoMenu = 0; addonsui_abrir(); trocarTela(TELA_ADDONS); break;
+      default: break;
+    }
   }
   if (tela == TELA_AJUSTES && ajustes_pediu_diagnostico()) {
     diagDaHome = 0;
@@ -7082,6 +7104,7 @@ void app_atualizar(float dt, Uint32 agora) {
       break; }
     case TELA_YOUTUBE:    ytui_atualizar(dt, agora);       break;
     case TELA_MUSICA:     mcui_atualizar(dt, agora);       break;
+    case TELA_CONTAS:     qrcui_atualizar(dt, agora);      break;
     case TELA_PERFIL:     break;
     case TELA_AJUSTES:    ajustes_atualizar(dt, agora);    break;
     case TELA_DIAGNOSTICO: diagnostico_atualizar(dt, agora); break;
@@ -7199,6 +7222,7 @@ static void desenharAtrasDoPainel(void *ctx) {
       case TELA_ESPORTES:   esporteui_desenhar(agora);  break;
       case TELA_YOUTUBE:    ytui_desenhar(agora);       break;
       case TELA_MUSICA:     mcui_desenhar(agora);       break;
+      case TELA_CONTAS:     qrcui_desenhar(agora);      break;
       case TELA_PERFIL:     perfil_desenhar(agora);     break;
       case TELA_SOCIAL:     amigoperfil_desenhar(agora);     break;
       case TELA_ADDONS:     addonsui_desenhar(agora);   break;

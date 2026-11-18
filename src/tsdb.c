@@ -13,6 +13,7 @@ static char base[160] = "https://www.thesportsdb.com/api/v1/json";
 static char chave[64] = "123";
 void tsdb_definir_base(const char *b) { snprintf(base, sizeof base, "%s", b ? b : ""); }
 void tsdb_definir_chave(const char *k) { snprintf(chave, sizeof chave, "%s", k && k[0] ? k : "123"); }
+int tsdb_chave_pessoal(void) { return strcmp(chave, "123") != 0; }
 
 static int regiao(const char *pais) {
   static const char *const me[] = { "saudi", "arab", "middle east", "mena", "qatar", "emirates", "uae", "kuwait",

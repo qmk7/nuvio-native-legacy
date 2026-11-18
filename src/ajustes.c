@@ -728,6 +728,7 @@ typedef enum {
   AJ_HERO_TAMANHO,
   AJ_HERO_PASTA_DETALHES, // Device-local folder hero details, append-only; on by default.
   AJ_IPTV_TESTAR,      // QR TIME: action, test the selected IPTV account now (iptvteste.h).
+  AJ_QR_CONTAS,        // QR TIME phase 8: action, opens Accounts, providers and data (qrcontasui.c).
   AJ_N
 } OpcaoId;
 _Static_assert(DEBRID_RD == 0 && DEBRID_TB == 1 && DEBRID_PM == 2 && DEBRID_AD == 3,
@@ -1867,6 +1868,7 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Tamanho do destaque", V_HERO_TAMANHO, 3),       // local: heroSizeLocal
   ESC("Mostrar detalhes da pasta no destaque", V_LIGA, 2),
   ACAO("Testar conexão"),
+  ACAO("Contas, provedores e dados"),
 };
 
 // Nome de cada opcao no arquivo. O formato era POSICIONAL — uma linha por
@@ -2201,6 +2203,7 @@ static const char *CHAVE[] = {
   "heroSizeLocal",
   "heroFolderDetailsLocal",
   "-iptvTestar",
+  "-qrContas",
 };
 // QUATRO VETORES PARALELOS indexados pelo mesmo enum AJ_*: OPCOES, CHAVE,
 // valor e as secoes. OPCOES ja e declarado [AJ_N], e `valor` aceita inicializacao
@@ -2622,7 +2625,8 @@ static int pediuDicasControle;
 int ajustes_pediu_dicascontrole(void) { int v = pediuDicasControle; pediuDicasControle = 0; return v; }
 static int pediuNovidades20;
 int ajustes_pediu_novidades20(void) { int v = pediuNovidades20; pediuNovidades20 = 0; return v; }
-static int pediuDiagnostico;
+static int pediuDiagnostico, pediuContas;
+int ajustes_pediu_contas(void) { int v = pediuContas; pediuContas = 0; return v; }
 int ajustes_pediu_diagnostico(void) { int v = pediuDiagnostico; pediuDiagnostico = 0; return v; }
 static int pediuVelocidade;
 int ajustes_pediu_velocidade(void) { int v = pediuVelocidade; pediuVelocidade = 0; return v; }
@@ -7766,6 +7770,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_IPTV_NOME: return "Nome da conta";
     case AJ_IPTV_REMOVER: return "Apaga apenas a conta selecionada e seus canais.";
     case AJ_IPTV_TESTAR: return "Confere agora se o servidor responde e aceita esta conta, sem mudar nada.";
+    case AJ_QR_CONTAS: return "Todos os provedores num lugar: estado, teste de conexão, ligar ou desligar e atualizar. Também o cache e as operações de limpeza, sempre com confirmação.";
     case AJ_GUIA_FONTE: return "Fontes exibidas no Guia de TV.";
     case AJ_GUIA_RECARREGAR: return "Mantém os canais disponíveis durante a atualização.";
     case AJ_M3U_URL: return "Lista de canais M3U por URL, salva neste perfil.";
@@ -9879,6 +9884,7 @@ static void eventoTela(const SDL_Event *e) {
     }
     if (focoOp == AJ_FONTE_REGEX_PADRAO) { frRegexAbrir(); return; }
     if (focoOp == AJ_DIAGNOSTICO) { pediuDiagnostico = 1; return; }
+    if (focoOp == AJ_QR_CONTAS) { pediuContas = 1; return; }
     if (focoOp == AJ_LEG1_RESTAURAR || focoOp == AJ_LEG2_RESTAURAR) {
       int ok;
       if (focoOp == AJ_LEG1_RESTAURAR) {
@@ -10882,7 +10888,7 @@ static AjPreview familiaPreviaOpcao(int op) {
     case AJ_SELOS_PACOTE_ADD: case AJ_SELOS_PACOTE_REM:
     case AJ_URL_LISTA: case AJ_URL_M3U_ADD: case AJ_URL_XMLTV_ADD: case AJ_URL_REM:
     case AJ_XTREAM_CONEXOES: case AJ_XTREAM_CONTA: case AJ_GUIA_RECARREGAR: case AJ_M3U_URL: case AJ_M3U_EPG: case AJ_M3U_LIMPAR:
-    case AJ_DIAGNOSTICO: case AJ_VELOCIDADE: case AJ_LIVETV_DIAG:
+    case AJ_DIAGNOSTICO: case AJ_VELOCIDADE: case AJ_LIVETV_DIAG: case AJ_QR_CONTAS:
     case AJ_P2P_URL: case AJ_P2P_TESTAR:
     case AJ_JF_SERVIDOR: case AJ_JF_ENTRAR: case AJ_JF_SAIR:
     case AJ_EM_SERVIDOR: case AJ_EM_ENTRAR: case AJ_EM_SAIR:

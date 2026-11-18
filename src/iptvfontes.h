@@ -13,6 +13,7 @@ int iptv_conta_mover(int indice,int delta);
 int iptv_conta_adicionar(int tipo);
 int iptv_conta_renomear(const char *nome);
 int iptv_conta_ativar(int ativa);
+int iptv_conta_ativar_id(unsigned id, int ativa);   // by id; the selection is kept
 int iptv_conta_remover(IptvConta *removida);
 // Remove per-profile account registries and all native credentials/caches.
 void iptv_contas_esquecer_todas(void);

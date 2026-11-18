@@ -303,6 +303,8 @@ static const char *uxSinonimos(int op) {
     case AJ_TEX_MB: case AJ_ESPACO: return "lento lenta lentidao travando memoria ram textura cache imagens";
     case AJ_DIAGNOSTICO: case AJ_VELOCIDADE:
       return "lento lenta lentidao travando trava falha erro desempenho diagnostico rede internet";
+    case AJ_QR_CONTAS:
+      return "conta contas provedor provedores iptv musica navidrome webdav trakt youtube lastfm spotify cache limpar dados apagar redefinir";
     case AJ_SEEKR_LIGADO: case AJ_SEEKR_FITA: case AJ_SEEKR_AJUSTE:
       return "seekr miniatura barra tempo previa avanco retrocesso";
     default: return "";

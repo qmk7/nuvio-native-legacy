@@ -244,6 +244,7 @@ static const Item TELA[] = {
 
   // ---- CONTA E SISTEMA -----------------------------------------------------------
   SEC("Conta e serviços", "Perfil, sincronização, Trakt, Simkl e avisos", "aj_user-round"),
+    ROT("Contas e provedores"), OPC(AJ_QR_CONTAS),
     ROT("Perfil"),
       OPC(AJ_PERFIL_ATIVO), OPC(AJ_SYNC),
       OPC(AJ_PERFIL_PESQ), OPC(AJ_PERFIL_EDITAR), OPC(AJ_PERFIL_INFANTIL), OPC(AJ_SAIR),

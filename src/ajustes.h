@@ -37,6 +37,7 @@ int  ajustes_pediu_dicascontrole(void); // Settings > About and help
 int  ajustes_pediu_novidades20(void);   // OK em Sobre e ajuda › Novidades 2.0: o app.c abre o guia
 int  ajustes_pediu_plugins(void);   // OK em Plugins (F09): o app.c abre a tela   // 1 quando o Back deve fechar a tela
 int  ajustes_pediu_diagnostico(void);
+int  ajustes_pediu_contas(void);   // QR TIME phase 8: OK on Accounts, providers and data
 // OK em "Teste de velocidade" (Ajustes › Diagnóstico). Lido e zerado pelo app.c.
 int  ajustes_pediu_velocidade(void);
 // Itens da barra lateral que a pessoa pode esconder (#162). 1 = aparece.

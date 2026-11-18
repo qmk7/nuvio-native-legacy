@@ -27,6 +27,7 @@ int tsdb_parse_tv(const char *json, TsdbTv *out, int max);
 
 void tsdb_definir_base(const char *base);   // tests: a local fixture
 void tsdb_definir_chave(const char *chave); // the user's key ("" = free "123")
+int  tsdb_chave_pessoal(void);              // 1 = a personal key is in use
 // Channels of match `e` (BLOCKS; worker thread). Cached per event for the
 // session. Returns how many, 0 none, -1 no answer.
 int tsdb_canais(const EspEvento *e, TsdbTv *out, int max);
