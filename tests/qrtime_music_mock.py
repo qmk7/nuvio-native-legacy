@@ -99,6 +99,54 @@ def auth(q):
         return None if p == pw else fail(40, "Wrong username or password")
     return fail(10, "Required parameter is missing")
 
+# ---- Last.fm API 2.0 (signature checked like the real service) ----
+LFM_KEY, LFM_SECRET = "qrtlfmkey", "qrtsecret"
+LFM = {"polls": 0, "scrobbles": []}
+
+
+def lfm_sig(params):
+    s = "".join(k + params[k] for k in sorted(params) if k not in ("format", "callback", "api_sig"))
+    return hashlib.md5((s + LFM_SECRET).encode()).hexdigest()
+
+
+def lastfm(params):
+    if params.get("api_key") != LFM_KEY:
+        return {"error": 10, "message": "Invalid API key"}
+    m = params.get("method", "")
+    signed = m.startswith("auth.") or m.startswith("track.")
+    if signed and params.get("api_sig") != lfm_sig(params):
+        return {"error": 13, "message": "Invalid method signature supplied"}
+    if m == "auth.getToken":
+        LFM["polls"] = 0
+        return {"token": "TOK1"}
+    if m == "auth.getSession":
+        LFM["polls"] += 1
+        if LFM["polls"] < 2:
+            return {"error": 14, "message": "This token has not been authorized"}
+        return {"session": {"name": "qrtlistener", "key": "SK1", "subscriber": 0}}
+    if m in ("track.updateNowPlaying", "track.scrobble"):
+        if params.get("sk") != "SK1":
+            return {"error": 9, "message": "Invalid session key"}
+        if m == "track.scrobble" and os.path.exists(os.path.join(WORK, "lfm_down")):
+            return {"error": 16, "message": "Temporarily unavailable"}
+        with LOCK, open(os.path.join(WORK, "lastfm.log"), "a") as f:
+            f.write("%s|%s|%s|%s\n" % (m, params.get("artist"), params.get("track"), params.get("timestamp", "")))
+        return {"scrobbles": {"@attr": {"accepted": 1, "ignored": 0}}} if m == "track.scrobble" else {"nowplaying": {}}
+    if m == "artist.getInfo":
+        return {"artist": {"name": params.get("artist"), "bio": {"summary": "A test band from the fixture. <a href=\"https://www.last.fm/music/x\">Read more on Last.fm</a>"}}}
+    if m == "artist.getSimilar":
+        return {"similarartists": {"artist": [{"name": "Sun Trio", "match": "1"}, {"name": "Many Songs", "match": "0.5"}]}}
+    return {"error": 3, "message": "Invalid Method"}
+
+
+def lrclib(q):
+    if q.get("artist_name") == "Sun Trio" and q.get("track_name") == "Surround Test":
+        return 200, {"id": 1, "trackName": "Surround Test", "artistName": "Sun Trio", "instrumental": False,
+                     "plainLyrics": "Round we go\nAnd back", "syncedLyrics": "[00:00.50] Round we go\n[00:01.75] And back"}
+    if q.get("track_name") == "Blue Hour":
+        return 200, {"id": 2, "instrumental": True, "plainLyrics": None, "syncedLyrics": None}
+    return 404, {"code": 404, "name": "TrackNotFound", "message": "Failed to find specified track"}
+
 
 class H(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
@@ -327,11 +375,27 @@ class H(BaseHTTPRequestHandler):
         if u.path.startswith("/dav/"):
             return self.dav_get()
         self.log("GET " + redact(self.path) + (" RANGE " + self.headers["Range"] if self.headers.get("Range") else ""))
+        if u.path.startswith("/lfm/"):
+            return self.send(lastfm(dict(urllib.parse.parse_qsl(u.query))))
+        if u.path == "/lrclib/api/get":
+            if self.headers.get("User-Agent", "") != "QRTIME/1.0":
+                self.log("LRCLIB-UA " + self.headers.get("User-Agent", ""))
+            code, body = lrclib(dict(urllib.parse.parse_qsl(u.query)))
+            return self.send(body, code=code)
         if u.path.startswith("/rest/"):
             m = u.path[6:]
             if m.endswith(".view"):
                 m = m[:-5]
             return self.rest(m, urllib.parse.parse_qs(u.query, keep_blank_values=True))
+        return self.send(b"not found", "text/plain", 404)
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", "0") or 0)
+        body = self.rfile.read(n).decode()
+        params = dict(urllib.parse.parse_qsl(body))
+        self.log("POST %s %s method=%s" % (self.path, self.headers.get("Content-Type", ""), params.get("method", "")))
+        if self.path.startswith("/lfm/"):
+            return self.send(lastfm(params))
         return self.send(b"not found", "text/plain", 404)
 
     def do_HEAD(self):
