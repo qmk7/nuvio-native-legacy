@@ -44,6 +44,13 @@ const char *traktauth_erro(void);
 int traktauth_aguardando(void);
 
 void traktauth_cancelar(void);
+// QR TIME PKCE (no client secret in the package): traktauth_comecar opens an
+// authorization whose QR is traktauth_url(); the person approves on the phone
+// and pastes the code Trakt shows with traktauth_pkce_codigo.
+int  traktauth_pkce(void);                       // 1 = waiting for the pasted code
+int  traktauth_pkce_codigo(const char *codigo);  // 1 = accepted for exchange
+#include <stddef.h>
+int  traktauth_pkce_desafio(char *verifier, size_t nv, char *challenge, size_t nc);   // tests
 
 // O VINCULO E POR PERFIL (trakt-p<N>.txt). O trakt.txt antigo, de antes dos
 // perfis, e do perfil 1 e so dele: vira trakt-p1.txt na primeira leitura e

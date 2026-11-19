@@ -9467,6 +9467,16 @@ static void hcEvento(SDL_Keycode k) {
   }
   if (k == SDLK_RETURN || k == SDLK_KP_ENTER) hcEscolher(hcFoco);
 }
+// The Trakt PKCE code typed (or pasted from the phone): exchanged on the next step.
+static int traTeclado;
+static void traTecladoLer(void) {
+  int r;
+  if (!traTeclado) return;
+  r = teclado_resultado();
+  if (r == TECLADO_PRONTO && !traktauth_pkce_codigo(teclado_texto()))
+    uxNotificar("Código inválido: use só letras e números.");
+  if (r != TECLADO_NADA) { teclado_esquecer(); traTeclado = 0; }
+}
 // Teclado da busca pronto: o texto vira o filtro (cancelar nao muda nada).
 static void hcTecladoLer(void) {
   int r;
@@ -9800,6 +9810,15 @@ static void eventoTela(const SDL_Event *e) {
         // faz nada de proposito, para nao trocar o codigo que a pessoa acabou
         // de digitar no celular.
         if (traAtivo && ta == TRA_ERRO) traktauth_comecar();
+        // PKCE: OK opens the keyboard (with "type on the phone") for the code
+        // Trakt showed after the approval.
+        else if (traAtivo && traktauth_pkce()) {
+          traTeclado = 1;
+          teclado_contexto("Trakt");
+          teclado_abrir_com("Código do Trakt", "O código que o Trakt mostrou depois de autorizar. Use \"Digitar pelo celular\" para colar.",
+                            150, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_", NULL);
+          teclado_permitir_vazio(0);
+        }
         else if (smkAtivo && sa == SMK_ERRO) simklauth_comecar();
       }
       return;
@@ -10118,7 +10137,7 @@ void ajustes_atualizar(float dt, Uint32 agora) {
   // TECLADO_NADA na segunda, e por isso a gravacao acontece aqui, uma vez.
   // COM A MODAL DE PESSOAS ABERTA O TECLADO E DELA: ler aqui consumiria o
   // resultado antes de ela ver (e o apelido digitado se perderia em silencio).
-  if (!pessoas_aberto()) hcTecladoLer();
+  if (!pessoas_aberto()) { hcTecladoLer(); traTecladoLer(); }
   { int r = pessoas_aberto() ? TECLADO_NADA : teclado_resultado();
     if (r == TECLADO_PRONTO && stCampo) {
       size_t cap;char *rascunho=ajIptvRascunho(stCampo,&cap);

@@ -828,6 +828,26 @@ static void desenhaVinculo(const char *servico, const char *codigo,
       gfx_rect((GfxRect){ tile.x + 14, tile.y + 14, 328, 328 }, texQrVin, GFX_SNAP, 0, 0, 0, 0, 0, 0, 0, 1);
     } }
   y += 30;
+  if (!strcmp(servico, "Trakt") && traktauth_pkce()) {
+    // PKCE: the QR is Trakt's own authorization page; the code comes back on
+    // the phone and is pasted here (OK opens the keyboard, "type on the phone").
+    static const char *const passos[3] = {
+      "1. Aponte a câmera do celular e autorize no Trakt.",
+      "2. O Trakt mostra um código: copie-o.",
+      "3. Aperte OK e cole o código pelo celular." };
+    for (int i = 0; i < 3; i++) {
+      TxtLinha l = ajTxtC(TXT_AJ_TEXTO, passos[i], m.x + m.w - 56 - x);
+      txt_desenhar_alpha(l, x, y, i == 2 ? 1.0f : 0.8f);
+      y += l.h + 18;
+    }
+    if (traktauth_erro()[0]) {
+      TxtLinha l = txt_linha_corta(TXT_AJ_SUB, traktauth_erro(), 236, 108, 108, 255, m.x + m.w - 56 - x);
+      txt_desenhar(l, x, y + 6);
+    }
+    { AjDica d[2] = { { "OK", "Colar o código" }, { "Voltar", "Fechar" } };
+      ajDicasLinha(d, 2, x, m.y + m.h - 50 - 30, 1); }
+    return;
+  }
   { TxtLinha l = ajTxt(TXT_AJ_TEXTO, "Aponte a câmera do celular, ou abra:"); txt_desenhar_alpha(l, x, y, 0.6f); y += l.h + 6; }
   { char e[200]; const char *p = endereco ? strstr(endereco, "://") : NULL;
     snprintf(e, sizeof e, "%s", p ? p + 3 : endereco ? endereco : "-");

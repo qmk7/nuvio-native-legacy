@@ -18,6 +18,10 @@
 #include <pthread.h>
 #include "credfio.h"
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "admin.h"
+#pragma weak admin_sha256_hex
 
 // O VINCULO E POR PERFIL: trakt-p<N>.txt e trakt-fluxo-p<N>.txt.
 //
@@ -51,6 +55,14 @@ static TraEstado estado = TRA_PARADO;
 static char deviceCode[128];
 static char userCode[32];
 static char url[160];
+// QR TIME: PKCE (RFC 7636) when the package has a client id but no secret.
+// Trakt's device-code exchange needs the secret; the authorization-code grant
+// with a code_verifier does not. The person opens pkceUrl (QR), approves, and
+// pastes the code Trakt shows (redirect urn:ietf:wg:oauth:2.0:oob) into the TV.
+#define TRA_OOB "urn:ietf:wg:oauth:2.0:oob"
+static int pkce;                     // 1 = this link attempt is PKCE
+static char pkceVerifier[80], pkceUrl[700], pkceCodigo[160], pkceCodigoFio[160];
+static int pkceCodigoPend;
 static char erro[200];
 static char token[300], refresh[300];
 // 1 quando o carregar achou o access token vencido no papel mas com refresh
@@ -380,6 +392,43 @@ static void *fioPedir(void *u) {
   unsigned novoPoll = 0, novoLimite = 600000u;
   (void)u;
 
+  if (nuvem_trakt_cliente()[0] && !nuvem_trakt_segredo()[0]) {
+    // No secret: PKCE. Nothing goes on the network here; the QR is the
+    // authorize page and the token request happens when the code is pasted.
+    char ch[64];
+    int ok = traktauth_pkce_desafio(pkceVerifier, sizeof pkceVerifier, ch, sizeof ch);
+    pthread_mutex_lock(&trava);
+    if (fioAtual() && mesmaConta(usuarioFio)) {
+      if (ok) {
+        char cid[200];
+        size_t k = 0;
+        // Percent-encode anything outside the unreserved set (a Trakt client id is hex).
+        for (const char *q = nuvem_trakt_cliente(); *q && k + 4 < sizeof cid; q++) {
+          unsigned char c = (unsigned char)*q;
+          if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') cid[k++] = (char)c;
+          else k += (size_t)snprintf(cid + k, sizeof cid - k, "%%%02X", c);
+        }
+        cid[k] = 0;
+        snprintf(pkceUrl, sizeof pkceUrl,
+                 "https://trakt.tv/oauth/authorize?response_type=code&client_id=%s&redirect_uri=%s"
+                 "&code_challenge=%s&code_challenge_method=S256", cid, "urn%3Aietf%3Awg%3Aoauth%3A2.0%3Aoob", ch);
+        pkce = 1;
+        userCode[0] = 'P'; userCode[1] = 0;   // non-empty: the card shows the QR
+        deviceCode[0] = 0;
+        expiraEm = (long)time(NULL) + 600;
+        erro[0] = 0;
+        estado = TRA_AGUARDANDO;
+        printf("[trakt] PKCE: autorizacao aberta (sem segredo no pacote)\n");
+      } else {
+        snprintf(erro, sizeof erro, "%s", i18n("não consegui preparar a autorização do Trakt"));
+        estado = TRA_ERRO;
+      }
+      fflush(stdout);
+    }
+    pthread_mutex_unlock(&trava);
+    fioPronto = 1;
+    return NULL;
+  }
   if (!nuvem_trakt_cliente()[0] || !nuvem_trakt_segredo()[0]) {
     // Caso de COMPILACAO, nao do usuario: o pacote saiu sem as chaves do
     // aplicativo. Dizer isso evita a pessoa tentar de novo para sempre.
@@ -575,6 +624,51 @@ static void empurrarParaConta(void) {
 // trakt.txt) mas nunca usado — um access token vencido ficava para sempre,
 // e a tela dizia "conectado" com tudo voltando 401. grant_type padrao OAuth;
 // o Trakt responde com um refresh NOVO (rotacao), que vai junto para a conta.
+// The pasted code -> token (no client_secret: the verifier proves the request).
+static void *fioPkce(void *u) {
+  Jsw w;
+  char *r;
+  int st = 0, retry = 0;
+  (void)u;
+  jsw_iniciar(&w);
+  jsw_obj_ini(&w);
+  jsw_cs(&w, "code", pkceCodigoFio);
+  jsw_cs(&w, "client_id", nuvem_trakt_cliente());
+  jsw_cs(&w, "redirect_uri", TRA_OOB);
+  jsw_cs(&w, "grant_type", "authorization_code");
+  jsw_cs(&w, "code_verifier", pkceVerifier);
+  jsw_obj_fim(&w);
+  r = postar("/oauth/token", jsw_texto_final(&w), &st, &retry);
+  jsw_livre(&w);
+  memset(pkceCodigoFio, 0, sizeof pkceCodigoFio);
+  pthread_mutex_lock(&trava);
+  if (!mesmaConta(usuarioFio) || !fioAtual() || fioDesconectado()) {
+    pthread_mutex_unlock(&trava); free(r); fioPronto = 1; return NULL;
+  }
+  printf("[trakt] PKCE: troca do codigo HTTP %d\n", st); fflush(stdout);
+  if (r && st >= 200 && st < 300 && js_texto(r, r + strlen(r), "access_token", token, sizeof token)) {
+    if (!js_texto(r, r + strlen(r), "refresh_token", refresh, sizeof refresh)) refresh[0] = 0;
+    criadoEm  = (long)js_num(r, r + strlen(r), "created_at", (double)time(NULL));
+    expiraSeg = (long)js_num(r, r + strlen(r), "expires_in", 86400);
+    tokenNovo = 1;
+    pkce = 0; memset(pkceVerifier, 0, sizeof pkceVerifier);
+    printf("[trakt] autorizado (PKCE)\n"); fflush(stdout);
+    estado = TRA_LIGADO;
+  } else if (st == 429) {
+    esperar429(retry);
+    pkceCodigoPend = 1;   // the same code goes again after the wait
+  } else {
+    // 400/401: wrong, used or expired code. The authorization stays open: the
+    // person can paste again (or Back and start over).
+    snprintf(erro, sizeof erro, "%s", st ? i18n("o Trakt recusou o código — confira e cole de novo")
+                                         : i18n("sem resposta do Trakt — tente de novo"));
+  }
+  pthread_mutex_unlock(&trava);
+  free(r);
+  fioPronto = 1;
+  return NULL;
+}
+
 static void *fioRenovar(void *u) {
   Jsw w;
   char *r;
@@ -584,7 +678,8 @@ static void *fioRenovar(void *u) {
   jsw_obj_ini(&w);
   jsw_cs(&w, "refresh_token", refreshFio);
   jsw_cs(&w, "client_id", nuvem_trakt_cliente());
-  jsw_cs(&w, "client_secret", nuvem_trakt_segredo());
+  // PKCE links have no secret; Trakt then refreshes with the client id alone.
+  if (nuvem_trakt_segredo()[0]) jsw_cs(&w, "client_secret", nuvem_trakt_segredo());
   jsw_cs(&w, "redirect_uri", "urn:ietf:wg:oauth:2.0:oob");
   jsw_cs(&w, "grant_type", "refresh_token");
   jsw_obj_fim(&w);
@@ -775,6 +870,16 @@ void traktauth_passo(unsigned agoraMs) {
   }
 
   if (estado != TRA_AGUARDANDO) return;
+  if (pkce) {
+    if (pkceCodigoPend && !esperaMs && !esperaArmada) {
+      pkceCodigoPend = 0;
+      snprintf(pkceCodigoFio, sizeof pkceCodigoFio, "%s", pkceCodigo);
+      memset(pkceCodigo, 0, sizeof pkceCodigo);
+      erro[0] = 0;
+      soltar(fioPkce);
+    }
+    return;
+  }
   if (!comecouMs) comecouMs = agoraMs;
   if (agoraMs >= proximoPoll) {
     proximoPoll = agoraMs + pollMs;
@@ -783,12 +888,59 @@ void traktauth_passo(unsigned agoraMs) {
 }
 
 void traktauth_cancelar(void) {
+  pkce = 0; pkceCodigoPend = 0;
+  memset(pkceVerifier, 0, sizeof pkceVerifier); memset(pkceCodigo, 0, sizeof pkceCodigo);
   if (estado == TRA_PEDINDO || estado == TRA_AGUARDANDO || estado == TRA_ERRO)
     estado = token[0] ? TRA_LIGADO : TRA_PARADO;
 }
 
 TraEstado   traktauth_estado(void) { return estado; }
 const char *traktauth_codigo(void) { return userCode; }
-const char *traktauth_url(void)    { return url; }
+const char *traktauth_url(void)    { return pkce ? pkceUrl : url; }
+int traktauth_pkce(void) { return pkce && estado == TRA_AGUARDANDO; }
+// Letters, digits, - and _ only (what Trakt's codes use); 1 = queued.
+int traktauth_pkce_codigo(const char *codigo) {
+  size_t n = 0;
+  char limpo[160];
+  if (!traktauth_pkce() || !codigo) return 0;
+  for (const char *p = codigo; *p && n + 1 < sizeof limpo; p++) {
+    char c = *p;
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') limpo[n++] = c;
+    else if (c != ' ' && c != '\n' && c != '\r' && c != '\t') return 0;
+  }
+  limpo[n] = 0;
+  if (n < 4) return 0;
+  snprintf(pkceCodigo, sizeof pkceCodigo, "%s", limpo);
+  pkceCodigoPend = 1;
+  return 1;
+}
+// RFC 7636: a 64-character verifier from [A-Za-z0-9-._~] and its S256
+// challenge, base64url without padding. 1 ok.
+int traktauth_pkce_desafio(char *verifier, size_t nv, char *challenge, size_t nc) {
+  static const char ALFA[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  static const char B64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  unsigned char rnd[64], dig[32];
+  char hex[65];
+  int fd, i, o = 0;
+  if (nv < 65 || nc < 44 || !admin_sha256_hex) return 0;
+  fd = open("/dev/urandom", O_RDONLY);
+  if (fd < 0) return 0;
+  if (read(fd, rnd, sizeof rnd) != (ssize_t)sizeof rnd) { close(fd); return 0; }
+  close(fd);
+  for (i = 0; i < 64; i++) verifier[i] = ALFA[rnd[i] % 66u];
+  verifier[64] = 0;
+  admin_sha256_hex((const unsigned char *)verifier, 64, hex);
+  for (i = 0; i < 32; i++) { unsigned v; sscanf(hex + 2 * i, "%2x", &v); dig[i] = (unsigned char)v; }
+  for (i = 0; i + 2 < 32; i += 3) {
+    unsigned v = (unsigned)dig[i] << 16 | (unsigned)dig[i + 1] << 8 | dig[i + 2];
+    challenge[o++] = B64[v >> 18 & 63]; challenge[o++] = B64[v >> 12 & 63];
+    challenge[o++] = B64[v >> 6 & 63];  challenge[o++] = B64[v & 63];
+  }
+  { unsigned v = (unsigned)dig[30] << 16 | (unsigned)dig[31] << 8;   // 32 = 30 + 2 left
+    challenge[o++] = B64[v >> 18 & 63]; challenge[o++] = B64[v >> 12 & 63]; challenge[o++] = B64[v >> 6 & 63]; }
+  challenge[o] = 0;   // 43 characters
+  memset(rnd, 0, sizeof rnd);
+  return 1;
+}
 int traktauth_aguardando(void) { return esperaMs || esperaArmada; }
 const char *traktauth_erro(void)   { return traktauth_aguardando() ? i18n("Trakt limitou os pedidos; tentando de novo…") : erro; }
