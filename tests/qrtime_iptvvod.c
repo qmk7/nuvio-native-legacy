@@ -57,6 +57,14 @@ static void carregar(void) {
   nf = iptvvod_fileiras_copiar(itens, 64, fils, 4, &ni);
 }
 
+// Catalogue titles for the no-key fallback (what the app shows for an addon id).
+static int tituloFalso(const char *id, const char *tipo, char *t, size_t n, int *ano) {
+  (void)tipo;
+  if (!strcmp(id, "tt0133093")) { snprintf(t, n, "The Matrix"); *ano = 1999; return 1; }
+  if (!strcmp(id, "tt0903747")) { snprintf(t, n, "Breaking Bad"); *ano = 2008; return 1; }
+  if (!strcmp(id, "tt0000777")) { snprintf(t, n, "The Matrix"); *ano = 2009; return 1; }
+  return 0;
+}
 int main(int argc, char **argv) {
   if (argc < 3) { fprintf(stderr, "usage: %s <data dir> online|offline [base url]\n", argv[0]); return 2; }
   setenv("NUVIO_DADOS", argv[1], 1);
@@ -182,6 +190,22 @@ int main(int argc, char **argv) {
     iptvvod_teste_tmdb_base(base);
     CONFERE(iptvvod_origem("tt0133093", "movie", NULL, NULL, NULL, NULL, &l) < 0 ||
             (free(l), l = NULL, 1), "no TMDB key: nothing is asked");
+    // ---- QR TIME: no TMDB key, the catalogue's title + year (as Nuvio One) ----
+    iptvvod_definir_titulo(tituloFalso);
+    CONFERE(iptvvod_origem_ativa(), "IPTV source active without a TMDB key (catalogue-title fallback)");
+    n = iptvvod_origem("tt0133093", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n >= 3 && temUrl(l, n, "/movie/qrtuser/") && temUrl(l, n, "/m3uvod/matrix.mp4"),
+            "no key: The Matrix (1999) found by title + year in the providers' libraries");
+    free(l); l = NULL;
+    n = iptvvod_origem("tt0903747:2:1", "series", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n >= 1 && (temUrl(l, n, "/40011.mp4") || temUrl(l, n, "/50011.mp4")), "no key: Breaking Bad S2E1 by title");
+    free(l); l = NULL;
+    n = iptvvod_origem("tt0000777", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 0, "no key: same title, year 10 years off -> refused (no wrong film)");
+    free(l); l = NULL;
+    n = iptvvod_origem("tt0000404", "movie", NULL, NULL, NULL, NULL, &l);
+    CONFERE(n == 0, "no key: a title not in the catalogue -> nothing guessed");
+    iptvvod_definir_titulo(NULL);
     iptvvod_definir_chave_tmdb(chaveTeste);
     n = iptvvod_origem("tt0133093", "movie", NULL, NULL, NULL, NULL, &l);
     CONFERE(n == 4 && temUrl(l, n, "/movie/qrtuser/") && temUrl(l, n, "/movie/qrtuser2/") &&

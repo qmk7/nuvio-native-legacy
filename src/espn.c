@@ -267,7 +267,11 @@ int espn_buscar(const char *liga, time_t agora, int (*cb)(const EspEvento *, voi
   if (!espn_liga(liga)) return -1;
   espn_janela(agora, janela, sizeof janela);
   snprintf(url, sizeof url, "%s/%s/scoreboard?dates=%s&limit=1000", base, liga, janela);
-  corpo = rede_baixar(url, 15);
+  // The same browser identity Nuvio One sends (SportsFeeds.kt): ESPN's public
+  // API is built for its web pages and may refuse an unknown client name.
+  { static const char *const cab[] = {
+      "User-Agent: Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", NULL };
+    corpo = rede_baixar_com(url, 15, cab); }
   arquivo(liga, nome, sizeof nome);
   if (corpo && (n = espn_parse(corpo, liga, NULL, NULL)) >= 0) {
     // A good answer replaces the cache: "<epoch>\n<body>".

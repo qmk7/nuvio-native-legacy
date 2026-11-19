@@ -99,6 +99,8 @@ int  iptvvod_origem_ativa(void);        // library loaded and a TMDB key
 void iptvvod_ligar_aos_addons(void);   // iptvvodaddons.c
 // The TMDB key in use (descoberta.c). Tests point the base URL at a fixture.
 void iptvvod_definir_chave_tmdb(const char *(*chave)(void));
+// Title + year of an addon id from the app's catalogue (no-TMDB fallback).
+void iptvvod_definir_titulo(int (*fn)(const char *id, const char *tipo, char *titulo, size_t n, int *ano));
 void iptvvod_teste_tmdb_base(const char *base);
 
 // Posters (posterprov.c): the real IMDb/TMDB ids TMDB confirmed for a movie

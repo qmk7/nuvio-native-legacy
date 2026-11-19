@@ -95,7 +95,9 @@ static char *pedir(const char *caminho) {
   pthread_mutex_unlock(&trava);
   if (espera > 0 && espera < 60000) usleep((useconds_t)espera * 1000);
   snprintf(url, sizeof url, "%s/%s/%s", base, chave, caminho);
-  return rede_baixar(url, 15);
+  { static const char *const cab[] = {   // a browser identity, as for ESPN (espn.c)
+      "User-Agent: Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", NULL };
+    return rede_baixar_com(url, 15, cab); }
 }
 int tsdb_canais(const EspEvento *e, TsdbTv *out, int max) {
   const EspLiga *l = espn_liga(e->liga);

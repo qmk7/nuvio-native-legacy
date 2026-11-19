@@ -1296,6 +1296,11 @@ int iptvvod_fontes_colher(const char *alvo, Stream **lista, int *n) {
 static const char *(*chaveTmdbFn)(void);
 static char tmdbBase[160] = "https://api.themoviedb.org/3";
 void iptvvod_definir_chave_tmdb(const char *(*chave)(void)) { chaveTmdbFn = chave; }
+// QR TIME: the title and year the app already shows for an addon id (its
+// catalogue), so a provider copy is found without TMDB, the way Nuvio One
+// matches On Demand copies (title + year within one). Set by iptvvodaddons.c.
+static int (*tituloFn)(const char *id, const char *tipo, char *titulo, size_t n, int *ano);
+void iptvvod_definir_titulo(int (*fn)(const char *id, const char *tipo, char *titulo, size_t n, int *ano)) { tituloFn = fn; }
 void iptvvod_teste_tmdb_base(const char *base) { snprintf(tmdbBase, sizeof tmdbBase, "%s", base ? base : ""); }
 
 typedef struct { long tmdb; char kind; char titulo[128], original[128]; int ano; } Resolvido;
@@ -1425,14 +1430,29 @@ int iptvvod_origem(const char *id, const char *tipo, int (*cancelado)(void *), v
   if (i == nResolv) {
     if (cancelado && cancelado(ctx)) return -1;
     ok = resolver(imdb, tmdb, kind, &r);
-    if (ok < 0) return 0;
+    // -1 = no key / no answer: not cached (a key or the network may come
+    // back); the catalogue-title fallback below still runs.
+    if (ok < 0) ok = 0;
+    else {
     pthread_mutex_lock(&travaResolv);
     i = nResolv < RESOLV_CACHE ? nResolv++ : (int)((unsigned long)fnv(chaveId, 1469598103934665603ULL) % RESOLV_CACHE);
     snprintf(resolvCache[i].id, sizeof resolvCache[i].id, "%s", chaveId);
     resolvCache[i].kind = kind; resolvCache[i].r = r; resolvCache[i].ok = ok;
     pthread_mutex_unlock(&travaResolv);
+    }
   }
-  if (ok <= 0) return 0;
+  if (ok <= 0) {
+    // No TMDB answer (no key, offline, or not found): the catalogue's own
+    // title and year. The same gate as always decides: the copy's title must
+    // agree, and with a year, within one year (gruposDe / copiaConfere).
+    char base[24];
+    memset(&r, 0, sizeof r);
+    r.kind = kind;
+    r.tmdb = imdb[0] ? 0 : tmdb;
+    snprintf(base, sizeof base, "%s", imdb[0] ? imdb : chaveId);
+    if (!tituloFn || !tituloFn(base, kind == 's' ? "series" : "movie", r.titulo, sizeof r.titulo, &r.ano) || !r.titulo[0]) return 0;
+    printf("[iptvvod] sem TMDB: casando pelo titulo do catalogo (ano %d)\n", r.ano);
+  }
   nr = gruposDe(&r, refs, IPTVVOD_CONTAS_MAX * 2, grupos, 4, &nG);
   if (!nr) return 0;
   if (cancelado && cancelado(ctx)) return -1;
@@ -1465,7 +1485,9 @@ int iptvvod_origem(const char *id, const char *tipo, int (*cancelado)(void *), v
   if (lista) *lista = l; else free(l);
   return n;
 }
-int iptvvod_origem_ativa(void) { return iptvvod_ativo() && chaveTmdbFn && chaveTmdbFn() && chaveTmdbFn()[0]; }
+// Active with a TMDB key (ids resolved exactly) or with the catalogue title
+// fallback (QR TIME: no key needed, as in Nuvio One).
+int iptvvod_origem_ativa(void) { return iptvvod_ativo() && ((chaveTmdbFn && chaveTmdbFn() && chaveTmdbFn()[0]) || tituloFn); }
 
 // ------------------------------------------------------------- verified ids
 // A library item gets real IMDb/TMDB ids only after TMDB confirms them:
