@@ -4504,8 +4504,11 @@ void guia_evento(const SDL_Event *e) {
     int fresco = !e->key.repeat && !(dirSeg == k && agora - dirTick < G_REP_MS);
     // Only a fresh Up at the first channel may leave the channel list.
     if (dir < 0 && fresco && focoLin == 0 && (!modoLista || focoCol == 0)) {
-      focoTopo = 1; focoFontes = 0;
-      topoCol = modoLista ? G_TOPO_LISTA : G_TOPO_CARTOES;
+      // QR TIME: the sources bar first (as the footer hint says, "↑ sources"):
+      // each IPTV account and add-on by name; OK shows only its lists. Up
+      // again reaches the header buttons.
+      if (barraVisivel()) fontesEntrar();
+      else { focoTopo = 1; focoFontes = 0; topoCol = modoLista ? G_TOPO_LISTA : G_TOPO_CARTOES; }
       dirSeg = 0;
       return;
     }
