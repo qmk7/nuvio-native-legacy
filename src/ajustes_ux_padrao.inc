@@ -357,3 +357,4 @@
   0, /* accounts, providers and data: action, no stored value */
   0, /* sleep timer: Off */
   1, /* cinema mode: Off (V_LIGA 1) */
+  2, /* followed teams: match reminders and goals */

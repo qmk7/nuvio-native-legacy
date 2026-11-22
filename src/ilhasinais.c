@@ -1,5 +1,6 @@
 // Sinais da ilha do relogio — ver ilhasinais.h.
 #include "mcfesta.h"
+#include "esportealerta.h"
 #include "ilhasinais.h"
 #include "ilha.h"
 #include "ilhasalvar.h"
@@ -58,6 +59,7 @@ static void acoes(void) {
 #endif
   if (!strncmp(chave, "enquete:", 8)) { enquete_acao(chave, b); return; }
   if (!strncmp(chave, "festa:", 6)) { mcfesta_acao(chave, b); return; }   // QR TIME party requests
+  if (!strncmp(chave, "esportehl:", 10)) { esportealerta_acao(chave, b); return; }   // QR TIME match highlights
   if (!strncmp(chave, "pedido:", 7)) {
     // O fio social pode estar ocupado (uma releitura em voo): a resposta fica
     // guardada e sai na proxima volta, em vez de se perder em silencio.

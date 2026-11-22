@@ -736,6 +736,32 @@ int ondever_youtube_lista(const char *v, const char *lista) {
 // the LG store opens instead. The contentTarget form is the one public webOS
 // remote-control projects use; it is UNVERIFIED on the B5 until tested there.
 int ondever_youtube_video(const char *v) { return ondever_youtube_lista(v, NULL); }
+// QR TIME: a SEARCH in the official YouTube app (match highlights, a song
+// from the player). Same launcher and same caveat: the "#/search?q=" target
+// is the form public webOS remote projects use, UNVERIFIED on the B5.
+int ondever_youtube_busca(const char *q) {
+  char enc[400];
+  size_t k = 0;
+  if (!q || !q[0]) return ONDE_PROCURAR;
+  for (const unsigned char *s = (const unsigned char *)q; *s && k + 4 < sizeof enc; s++) {
+    if (isalnum(*s) || *s == '-' || *s == '_' || *s == '.') enc[k++] = (char)*s;
+    else k += (size_t)snprintf(enc + k, sizeof enc - k, "%%%02X", *s);
+  }
+  enc[k] = 0;
+  printf("[youtube] busca no app oficial (%zu bytes)\n", strlen(q));
+  fflush(stdout);
+#if defined(ONDE_WEBOS) && !defined(NV_TPK)
+  {
+    char carga[600];
+    static const char lojaYt[] = "111299001912";
+    snprintf(carga, sizeof carga, "{\"id\":\"youtube.leanback.v4\",\"params\":{\"contentTarget\":\"https://www.youtube.com/tv#/search?q=%s\"}}", enc);
+    video_luna("luna://com.webos.applicationManager/launch", carga, respostaLaunch, (void *)lojaYt);
+    return ONDE_ABRIR;
+  }
+#else
+  return ONDE_INFO;
+#endif
+}
 
 void ondever_iniciar(void) {
   pthread_t t;

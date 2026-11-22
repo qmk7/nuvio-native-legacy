@@ -641,7 +641,9 @@ def varrer():
                                 "registro_ilha.inc", "registro_envio.inc") if (src / nome).exists()
     ]
     for arq in sorted(arquivos):
-        if arq.name == "idioma.c":
+        # esportenomes.c: an English->Arabic DICTIONARY of team names (data
+        # compared against ESPN and guide titles), not interface text.
+        if arq.name in ("idioma.c", "esportenomes.c"):
             continue
         txt = arq.read_text(encoding="utf-8")
         txt = sem_corpo_em_js(txt)

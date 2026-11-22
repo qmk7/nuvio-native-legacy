@@ -226,6 +226,7 @@ static const char *ajVisualIcone(int op) {
     case AJ_BUSCA_ORIGEM: return "aj_tag";
     case AJ_ESMAECER: return "aj_moon";
     case AJ_SONO: return "aj_alarm-clock";
+    case AJ_ESPORTE_ALERTAS: return "aj_trophy";
     case AJ_CINEMA: return "aj_clapperboard";
     case AJ_DESCANSO_ESTILO: return "aj_image";
     case AJ_DESCANSO_FONTE: return "aj_film";

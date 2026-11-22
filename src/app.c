@@ -859,6 +859,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "iptvvod.h"
 #include "addonslocal.h"
 #include "esporteui.h"
+#include "esportealerta.h"
 #include "ytui.h"
 #include "mcui.h"
 #include "qrcontasui.h"
@@ -3717,7 +3718,7 @@ static void perfilAbrirSessao(int antes) {
   // All hooks reset live state or reload profile-owned files. They neither
   // reload artwork nor wait for the old profile's network requests.
   addons_abrir_sessao();
-  esporteui_perfil_trocou();   // Sport Center: this profile's follows and links
+  esporteui_perfil_trocou(); esportealerta_perfil_trocou();   // Sport Center: this profile's follows and links
   ytui_perfil_trocou();        // YouTube: this profile's account
   mcui_perfil_trocou();        // Music Center: this profile's sources, queue, Last.fm
   // QR TIME guest: this profile's add-ons are the ones saved on this TV.
@@ -7156,6 +7157,7 @@ void app_atualizar(float dt, Uint32 agora) {
     char lid[80], lnome[120], lbase[600];
     CatItem it;
     glem_passo(dt, agora);
+    esportealerta_passo(agora);   // QR TIME: followed teams' reminders and goals
     // "Assistir" no cartao: o canal em tela cheia, de onde a pessoa estiver.
     if (aguardandoFonte != 2 && glem_pediu_assistir(lid, sizeof lid, lnome, sizeof lnome,
                                                      lbase, sizeof lbase)) {

@@ -1,4 +1,5 @@
 #include "esporte.h"
+#include "esportenomes.h"
 #include "dados.h"
 #include "perfis.h"
 #include "perfisessao.h"
@@ -271,6 +272,11 @@ int esporte_time_em(const EspTime *t, const char *texto) {
   if (!d[0]) return 0;
   if (t->curto[0] && nomeEm(t->curto, d)) return 1;
   if (t->nome[0] && nomeEm(t->nome, d)) return 1;
+  // QR TIME: an Arabic guide names the team in Arabic. A substring, not a
+  // whole word: Arabic glues "and" to the next name ("الهلال والنصر").
+  { const char *ar = esporte_nome_ar(t->nome);
+    if (!ar && t->curto[0]) ar = esporte_nome_ar(t->curto);
+    if (ar) { char a[128]; dobrar(ar, a, sizeof a); if (a[0] && strstr(d, a)) return 1; } }
   if (strlen(t->abrev) >= 3) { char a[16]; dobrar(t->abrev, a, sizeof a); if (palavraEm(a, d)) return 1; }
   return 0;
 }

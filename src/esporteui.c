@@ -1,4 +1,5 @@
 #include "esporteui.h"
+#include "esportenomes.h"
 #include "espn.h"
 #include "esporte.h"
 #include "tsdb.h"
@@ -128,7 +129,7 @@ static CatItem pedido; static int temPedido;
 static char abrirPend[24];
 
 static const char *esporteDe(const char *liga) { const EspLiga *l = espn_liga(liga); return l ? l->esporte : ""; }
-static const char *nomeLiga(const char *liga) { const EspLiga *l = espn_liga(liga); return l ? l->nome : liga; }
+static const char *nomeLiga(const char *liga) { const EspLiga *l = espn_liga(liga); return l ? esporte_liga_tela(l->nome) : liga; }
 static int diaDe(time_t t) {
   // Local day offset from today.
   time_t agora = time(NULL);
@@ -222,7 +223,7 @@ static int progsGuia(const char *canal, time_t de, time_t ate, char (*t)[128], t
   }
   return n;
 }
-static void titulo(const EspEvento *e, char *d, size_t n) { snprintf(d, n, "%s × %s", e->casa.nome, e->fora.nome); }
+static void titulo(const EspEvento *e, char *d, size_t n) { snprintf(d, n, "%s × %s", esporte_nome_tela(e->casa.nome), esporte_nome_tela(e->fora.nome)); }
 static void canalReminder(const EspEvento *e, char *canal, size_t n, char *nome, size_t nn) {
   EspCanal c[1];
   if (esporte_canais(e->id, c, 1) == 1) { snprintf(canal, n, "%s", c[0].canal); snprintf(nome, nn, "%s", c[0].nome); }
@@ -293,12 +294,12 @@ static void montarAcoes(void) {
   if (atual.casa.id[0] && nAcoes < 40) {
     Acao *a = &acoes[nAcoes++];
     a->tipo = AC_SEGUIR_CASA;
-    snprintf(a->texto, sizeof a->texto, "%s %s", i18n(esporte_segue_time(atual.liga, atual.casa.id) ? "Deixar de seguir" : "Seguir"), atual.casa.nome);
+    snprintf(a->texto, sizeof a->texto, "%s %s", i18n(esporte_segue_time(atual.liga, atual.casa.id) ? "Deixar de seguir" : "Seguir"), esporte_nome_tela(atual.casa.nome));
   }
   if (atual.fora.id[0] && nAcoes < 40) {
     Acao *a = &acoes[nAcoes++];
     a->tipo = AC_SEGUIR_FORA;
-    snprintf(a->texto, sizeof a->texto, "%s %s", i18n(esporte_segue_time(atual.liga, atual.fora.id) ? "Deixar de seguir" : "Seguir"), atual.fora.nome);
+    snprintf(a->texto, sizeof a->texto, "%s %s", i18n(esporte_segue_time(atual.liga, atual.fora.id) ? "Deixar de seguir" : "Seguir"), esporte_nome_tela(atual.fora.nome));
   }
   if (focoAcao >= nAcoes) focoAcao = nAcoes ? nAcoes - 1 : 0;
 }
@@ -618,8 +619,8 @@ void esporteui_desenhar(Uint32 agora) {
     y += 50;
     logo(e->casa.logo, x, y, 120);
     logo(e->fora.logo, x + w - 120, y, 120);
-    texto(TXT_TITULO2, e->casa.nome, x + 140, y + 20, 1, 240, 242, 248);
-    { TxtLinha l = txt_linha(TXT_TITULO2, e->fora.nome, 240, 242, 248, 255); txt_desenhar_alpha(l, x + w - 140 - (float)l.w, y + 20, 1); }
+    texto(TXT_TITULO2, esporte_nome_tela(e->casa.nome), x + 140, y + 20, 1, 240, 242, 248);
+    { TxtLinha l = txt_linha(TXT_TITULO2, esporte_nome_tela(e->fora.nome), 240, 242, 248, 255); txt_desenhar_alpha(l, x + w - 140 - (float)l.w, y + 20, 1); }
     placarTexto(e, b, sizeof b);
     { TxtLinha l = txt_linha(TXT_TITULO1, b, 255, 255, 255, 255); txt_desenhar_alpha(l, x + (w - (float)l.w) * 0.5f, y + 10, 1); }
     estadoTexto(e, b, sizeof b);
@@ -740,7 +741,7 @@ void esporteui_desenhar(Uint32 agora) {
       if (aba == ABA_LIGAS) {
         const EspLiga *ls;
         espn_ligas(&ls);
-        snprintf(b, sizeof b, "%s %s", esporte_segue_liga(ls[i].chave) ? "★" : "☆", ls[i].nome);
+        snprintf(b, sizeof b, "%s %s", esporte_segue_liga(ls[i].chave) ? "★" : "☆", esporte_liga_tela(ls[i].nome));
         texto(TXT_BODY, b, x + 8, ry + 16, f ? 1 : 0.8f, 240, 242, 248);
         continue;
       }
@@ -758,11 +759,11 @@ void esporteui_desenhar(Uint32 agora) {
         texto(TXT_CAPTION, b, x, ry + 22, 0.85f, e->estado == ESP_AO_VIVO ? 255 : 200, e->estado == ESP_AO_VIVO ? 120 : 202,
               e->estado == ESP_AO_VIVO ? 110 : 210);
         logo(e->casa.logo, x + 230, ry + 10, 52);
-        textoCorta(TXT_BODY, e->casa.curto, x + 296, ry + 18, 420, f ? 1 : 0.85f);
+        textoCorta(TXT_BODY, esporte_nome_tela(e->casa.curto), x + 296, ry + 18, 420, f ? 1 : 0.85f);
         placarTexto(e, b, sizeof b);
         texto(TXT_CALLOUT, b, x + 740, ry + 16, 1, 255, 255, 255);
         logo(e->fora.logo, x + 860, ry + 10, 52);
-        textoCorta(TXT_BODY, e->fora.curto, x + 926, ry + 18, 420, f ? 1 : 0.85f);
+        textoCorta(TXT_BODY, esporte_nome_tela(e->fora.curto), x + 926, ry + 18, 420, f ? 1 : 0.85f);
         snprintf(b, sizeof b, "%s", nomeLiga(e->liga));
         if (esporte_canais(e->id, c, 1) == 1) snprintf(b, sizeof b, "%s  ·  📺 %s", nomeLiga(e->liga), c[0].nome);
         textoCorta(TXT_CAPTION, b, x + 1370, ry + 22, w - 1370, 0.6f);

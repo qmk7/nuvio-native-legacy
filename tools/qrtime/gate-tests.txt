@@ -98,3 +98,5 @@ qrtime_trakt_pkce
 qrtime_sono
 qrtime_lanweb
 qrtime_backup:900
+qrtime_festa:900
+qrtime_esportealerta:900

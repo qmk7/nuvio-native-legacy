@@ -81,4 +81,6 @@ int ondever_status(const char *id);
 #ifdef NV_SHOT_HOOKS
 void ondever_shot(const char *imdb, const OndeVer *l, int n);
 #endif
+// QR TIME: search in the official YouTube app (ONDE_ABRIR on webOS).
+int ondever_youtube_busca(const char *q);
 #endif
