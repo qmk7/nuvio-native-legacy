@@ -57,7 +57,7 @@ sport() {   # Home -> main menu -> Sport Center
 abrir "$W/1.log"
 sport || erro "Sport Center did not load"
 grep -qE "\[esporte\] 5 evento\(s\) de 6 liga\(s\)" "$LOG" && ok "followed leagues loaded (5 events, 6 leagues)" || erro "events: $(grep '\[esporte\] [0-9]' "$LOG" | tail -1)"
-grep -q "soccer/esp.1: o provedor nao respondeu" "$LOG" && ok "a failing league is reported, the others still load" || erro "provider failure not reported"
+grep -qE "soccer/esp.1( [0-9]{6})?: o provedor nao respondeu" "$LOG" && ok "a failing league is reported, the others still load" || erro "provider failure not reported"
 # Tabs -> filters -> first row (the live match) -> match page; the guide's EPG
 # must load before the suggestion can appear.
 tecla down 0.6; tecla down 0.6; tecla ok 3

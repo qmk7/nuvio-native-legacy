@@ -58,6 +58,8 @@ int espn_parse(const char *json, const char *liga,
 time_t espn_instante(const char *iso);
 // "YYYYMMDD-YYYYMMDD" for agora-7 .. agora+7 days (UTC dates).
 void espn_janela(time_t agora, char *dst, size_t tam);
+// The month(s) the window covers ("YYYYMM"); ESPN accepts a month, not a day range. 1 or 2.
+int espn_meses(time_t agora, char m[2][8]);
 
 // ---- fetching with a disk cache (BLOCKS; worker thread) ----
 // Base URL (tests point it at a fixture). Default: ESPN.

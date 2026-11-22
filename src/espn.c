@@ -90,9 +90,15 @@ static const char *chaveRaiz(const char *obj, const char *fim, const char *chave
       while (q < fim && *q && *q != '"') { if (*q == '\\') q++; q++; }
       if (q >= fim) return NULL;
       if (prof == 1 && (size_t)(q - a) == n && !strncmp(a, chave, n)) {
+        // Only a KEY counts: a string followed by ':'. A value equal to the
+        // name ("type":"team" before "team":{...}, ESPN 2026-11) is skipped.
         const char *v = q + 1;
-        while (*v == ' ' || *v == ':' || *v == '\n' || *v == '\t' || *v == '\r') v++;
-        return v;
+        while (v < fim && (*v == ' ' || *v == '\n' || *v == '\t' || *v == '\r')) v++;
+        if (v < fim && *v == ':') {
+          v++;
+          while (v < fim && (*v == ' ' || *v == '\n' || *v == '\t' || *v == '\r')) v++;
+          return v;
+        }
       }
       p = q;
     } else if (*p == '{' || *p == '[') prof++;
@@ -253,53 +259,75 @@ int espn_parse(const char *json, const char *liga, int (*cb)(const EspEvento *, 
 static char base[200] = "https://site.api.espn.com/apis/site/v2/sports";
 void espn_definir_base(const char *b) { snprintf(base, sizeof base, "%s", b ? b : ""); }
 
-static void arquivo(const char *liga, char *dst, size_t tam) {
-  snprintf(dst, tam, "esporte-%s.json", liga);
+static void arquivo(const char *liga, const char *mes, char *dst, size_t tam) {
+  snprintf(dst, tam, "esporte-%s-%s.json", liga, mes);
   for (char *c = dst; *c; c++) if (*c == '/') *c = '-';
+}
+// ESPN's scoreboard stopped accepting a day range ("dates=YYYYMMDD-YYYYMMDD"
+// answers 400 "Failed to get events endpoint", measured 2026-11-22); a single
+// day or a whole month ("dates=YYYYMM") still works. The ±7-day window spans
+// one or two months: those are fetched and only the window's events are kept.
+int espn_meses(time_t agora, char m[2][8]) {
+  time_t de = agora - 7 * 86400, ate = agora + 7 * 86400;
+  struct tm a, b;
+  gmtime_r(&de, &a);
+  gmtime_r(&ate, &b);
+  snprintf(m[0], 8, "%04d%02d", a.tm_year + 1900, a.tm_mon + 1);
+  snprintf(m[1], 8, "%04d%02d", b.tm_year + 1900, b.tm_mon + 1);
+  return strcmp(m[0], m[1]) ? 2 : 1;
+}
+typedef struct { int (*cb)(const EspEvento *, void *); void *u; time_t de, ate; int n; } Janela;
+static int naJanela(const EspEvento *e, void *u) {
+  Janela *j = u;
+  if (e->ini && (e->ini < j->de || e->ini > j->ate)) return 1;   // outside the window: skip
+  j->n++;
+  return j->cb ? j->cb(e, j->u) : 1;
 }
 int espn_buscar(const char *liga, time_t agora, int (*cb)(const EspEvento *, void *), void *u,
                 time_t *quando, int *falhou) {
-  char url[400], janela[32], nome[96];
-  char *corpo;
-  int n = -1;
+  char url[400], meses[2][8], nome[112];
+  int nm, algum = 0, total = 0;
+  Janela jan = { cb, u, agora - 7 * 86400, agora + 8 * 86400, 0 };
   if (quando) *quando = 0;
   if (falhou) *falhou = 0;
   if (!espn_liga(liga)) return -1;
-  espn_janela(agora, janela, sizeof janela);
-  snprintf(url, sizeof url, "%s/%s/scoreboard?dates=%s&limit=1000", base, liga, janela);
-  // The same browser identity Nuvio One sends (SportsFeeds.kt): ESPN's public
-  // API is built for its web pages and may refuse an unknown client name.
-  { static const char *const cab[] = {
-      "User-Agent: Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", NULL };
-    corpo = rede_baixar_com(url, 15, cab); }
-  arquivo(liga, nome, sizeof nome);
-  if (corpo && (n = espn_parse(corpo, liga, NULL, NULL)) >= 0) {
-    // A good answer replaces the cache: "<epoch>\n<body>".
-    size_t len = strlen(corpo);
-    char *t = malloc(len + 32);
-    if (t) {
-      snprintf(t, len + 32, "%lld\n%s", (long long)agora, corpo);
-      dados_gravar_leve(nome, t);
-      free(t);
+  nm = espn_meses(agora, meses);
+  for (int k = 0; k < nm; k++) {
+    char *corpo;
+    snprintf(url, sizeof url, "%s/%s/scoreboard?dates=%s&limit=1000", base, liga, meses[k]);
+    // The same browser identity Nuvio One sends (SportsFeeds.kt).
+    { static const char *const cab[] = {
+        "User-Agent: Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", NULL };
+      corpo = rede_baixar_com(url, 15, cab); }
+    arquivo(liga, meses[k], nome, sizeof nome);
+    if (corpo && espn_parse(corpo, liga, NULL, NULL) >= 0) {
+      // A good answer replaces this month's cache: "<epoch>\n<body>".
+      size_t len = strlen(corpo);
+      char *t = malloc(len + 32);
+      if (t) { snprintf(t, len + 32, "%lld\n%s", (long long)agora, corpo); dados_gravar_leve(nome, t); free(t); }
+      if (quando && (!*quando || agora < *quando)) *quando = agora;
+      espn_parse(corpo, liga, naJanela, &jan);
+      algum = 1;
+      free(corpo);
+      continue;
     }
-    if (quando) *quando = agora;
-    n = espn_parse(corpo, liga, cb, u);
     free(corpo);
-    return n;
-  }
-  free(corpo);
-  if (falhou) *falhou = 1;
-  printf("[esporte] %s: o provedor nao respondeu um placar valido; usando a copia salva\n", liga);
-  fflush(stdout);
-  {
-    char *c = dados_ler(nome), *body;
-    if (!c) return -1;
-    body = strchr(c, '\n');
-    if (body) {
-      if (quando) *quando = (time_t)atoll(c);
-      n = espn_parse(body + 1, liga, cb, u);
+    if (falhou) *falhou = 1;
+    printf("[esporte] %s %s: o provedor nao respondeu um placar valido; usando a copia salva\n", liga, meses[k]);
+    fflush(stdout);
+    {
+      char *c = dados_ler(nome), *body;
+      if (!c) continue;
+      body = strchr(c, '\n');
+      if (body && espn_parse(body + 1, liga, NULL, NULL) >= 0) {
+        time_t q = (time_t)atoll(c);
+        if (quando && (!*quando || q < *quando)) *quando = q;   // the oldest data shown
+        espn_parse(body + 1, liga, naJanela, &jan);
+        algum = 1;
+      }
+      free(c);
     }
-    free(c);
-    return n;
   }
+  total = jan.n;
+  return algum ? total : -1;
 }

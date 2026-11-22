@@ -66,6 +66,22 @@ int main(int argc, char **argv) {
   CONFERE(espn_instante("tomorrow") == 0 && espn_instante("2026-11-17T20:00X") == 0, "invalid dates refused");
   espn_janela((time_t)1794945600, j, sizeof j);
   CONFERE(!strcmp(j, "20261110-20261124"), "window: a week before to a week after");
+  {
+    char m[2][8];
+    CONFERE(espn_meses((time_t)1794945600, m) == 1 && !strcmp(m[0], "202611"), "ESPN query by month (it refuses day ranges): one month");
+    CONFERE(espn_meses((time_t)1796587200, m) == 2 && !strcmp(m[0], "202611") && !strcmp(m[1], "202612"), "window across two months: both");
+  }
+  {
+    // ESPN 2026-11: each competitor has "type":"team" BEFORE "team":{...}. The
+    // value "team" must not be taken for the key (the empty Sport Center bug).
+    static const char J[] = "{\"events\":[{\"id\":\"1\",\"date\":\"2026-11-22T16:30Z\",\"status\":{\"type\":{\"state\":\"pre\"}},"
+      "\"competitions\":[{\"id\":\"1\",\"competitors\":["
+      "{\"id\":\"364\",\"type\":\"team\",\"homeAway\":\"home\",\"score\":\"0\",\"team\":{\"id\":\"364\",\"displayName\":\"Liverpool\"}},"
+      "{\"id\":\"359\",\"type\":\"team\",\"homeAway\":\"away\",\"score\":\"0\",\"team\":{\"id\":\"359\",\"displayName\":\"Arsenal\"}}]}]}]}";
+    Lista l = {0};
+    CONFERE(espn_parse(J, "soccer/eng.1", juntar, &l) == 1 && l.n == 1 && !strcmp(l.v[0].casa.nome, "Liverpool") && !strcmp(l.v[0].fora.nome, "Arsenal"),
+            "competitor with \"type\":\"team\" before the team object: names read");
+  }
   CONFERE(espn_parse("<html>", "soccer/ksa.1", NULL, NULL) < 0 && espn_parse("{\"x\":1}", "soccer/ksa.1", NULL, NULL) < 0,
           "a body that is not a scoreboard is a failure");
 
