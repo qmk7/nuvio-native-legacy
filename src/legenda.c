@@ -1140,3 +1140,16 @@ int legenda_documento_cues(const LegendaDocumento *d,double posSeg,
   for(i=0;i<n/2;i++){LegendaCue tmp=dst[i];dst[i]=dst[n-1-i];dst[n-1-i]=tmp;}
   return n;
 }
+
+// QR TIME (legtrad.c): a copy of the cues on screen now, for translation.
+// The caller frees *saida. Returns the count (0 = no subtitle on).
+int legenda_copiar_cues(LegendaCue **saida) {
+  int n;
+  *saida = NULL;
+  pthread_mutex_lock(&trava);
+  n = ligada && nCues > 0 ? nCues : 0;
+  if (n && (*saida = malloc(sizeof **saida * (size_t)n)) != NULL) memcpy(*saida, cues, sizeof **saida * (size_t)n);
+  else n = 0;
+  pthread_mutex_unlock(&trava);
+  return n;
+}

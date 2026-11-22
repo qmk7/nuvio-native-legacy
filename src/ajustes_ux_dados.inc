@@ -307,6 +307,10 @@ static const char *uxSinonimos(int op) {
     case AJ_ESPORTE_ALERTAS: return "esporte esportes futebol jogo partida time gol aviso lembrete sport match goal";
     case AJ_SALAT_CIDADE: return "oracao salat adhan reza horario prayer namaz cidade";
     case AJ_SALAT_MODO: return "oracao pausar pausa salat prayer pause";
+    case AJ_BOM_DIA: return "bom dia manha clima tempo previsao saudacao morning weather greeting";
+    case AJ_VISITANTE: return "visitante convidado visita historico privado guest incognito sem registro";
+    case AJ_ATALHOS_LG: return "atalho atalhos menu lg launcher inicio esportes musica tv ao vivo shortcut";
+    case AJ_QUALI_ALERTA: return "versao melhor 4k dolby vision aviso lista qualidade upgrade";
     case AJ_SONO: return "sono dormir temporizador desligar timer sleep apagar tela minutos";
     case AJ_QR_CONTAS:
       return "conta contas provedor provedores iptv musica navidrome webdav trakt youtube lastfm spotify cache limpar dados apagar redefinir";

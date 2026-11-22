@@ -231,6 +231,7 @@ static void aoSinalTerminar(int sig) {
 #include "esmaecer.h"
 #include "sono.h"
 #include "celapps.h"
+#include "atalhoslg.h"
 #include "descanso.h"
 
 // RSS DO PROCESSO, em MB, lido de /proc/self/statm. E o numero que responde
@@ -1055,6 +1056,7 @@ int main(int argc, char **argv) {
   char dirBuf[512];
   const char *dirArte = NULL;
   if (argc > 1 && argv[1][0] != '{') dirArte = argv[1];
+  if (argc > 1 && argv[1][0] == '{') atalhoslg_lancamento(argv[1]);   // QR TIME: launched from an LG launcher shortcut
 #ifdef NV_ANDROID
   // Sem argv util no Android: o NuvioActivity exporta NUVIO_ARTE antes do SDL.
   if (!dirArte && getenv("NUVIO_ARTE") && getenv("NUVIO_ARTE")[0]) dirArte = getenv("NUVIO_ARTE");
@@ -1838,6 +1840,8 @@ int main(int argc, char **argv) {
   ajustes_dir(dirDados);
   ajustes_migrar_escopo();   // 2.1: cada perfil parte do que esta TV usa hoje (uma vez, com backup)
   qrdados_qualidade_aplicar();   // QR TIME: max-quality defaults, once (schema v2)
+  ajustes_visitante_zerar();     // QR TIME: a guest session never survives a restart
+  atalhoslg_dir(dirArte);
   // Icone do app (apoiadores): a arte vem do pacote; o alias do launcher do
   // Android e a abertura do .wgt seguem o que ficou gravado (idempotente).
   iconeapp_iniciar(dirArte);

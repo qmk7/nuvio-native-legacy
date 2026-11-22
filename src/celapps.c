@@ -9,27 +9,30 @@
 #include "mclfm.h"
 #include "mcspotify.h"
 #include "mcui.h"
+#include "songid.h"
 #include "player.h"
 #include "mcfesta.h"
 #include "qrbackup.h"
 #include "perfilfoto.h"
+#include "ezviz.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 int ajustes_idioma(void);
 
-static const char *const APP[CA_N] = { "controle", "musica", "festa", "backup", "foto" };
+static const char *const APP[CA_N] = { "controle", "musica", "festa", "backup", "foto", "casa" };
 static const char *const NOME[CA_N] = { "Controle pelo celular", "Configurar música pelo celular", "Modo festa",
-                                        "Backup e restauração", "Foto do perfil" };
+                                        "Backup e restauração", "Foto do perfil", "Campainha EZVIZ" };
 static const char *const DESC[CA_N] = {
   "Setas, OK, voltar e play no celular. Digite no celular para buscar na TV ou preencher o campo aberto.",
   "Navidrome, WebDAV, Last.fm e playlists do Spotify, digitados no celular.",
   "Os convidados pedem músicas pelo celular; você aprova na TV. Votos para pular.",
   "Guarda num arquivo protegido por senha o que a conta não sincroniza, e restaura.",
   "Escolha uma foto no celular para o perfil atual.",
+  "AppKey e Secret do EZVIZ: a TV avisa quando tocam a campainha.",
 };
-static const char *const ICONE[CA_N] = { "aj_gamepad-2", "aj_music", "aj_party-popper", "aj_hard-drive", "aj_image" };
+static const char *const ICONE[CA_N] = { "aj_gamepad-2", "aj_music", "aj_party-popper", "aj_hard-drive", "aj_image", "aj_door-open" };
 static CelAppDef defs[CA_N];
 
 const char *celapps_nome(int a) { return a >= 0 && a < CA_N ? NOME[a] : ""; }
@@ -126,7 +129,7 @@ static void pedidoControle(const LwPedido *p) {
 
 // ---------------------------------------------------------------- music setup
 static char *paginaMusica(void) {
-  char corpo[4000], a[12][200];
+  char corpo[7000], a[12][200];
   const char *k[12] = { "Servidor de música", "Tipo", "Nome", "Endereço", "Usuário", "Senha", "Salvar na TV",
                         "Chave de API", "Segredo compartilhado", "Playlist do Spotify", "Link público da playlist", "Importar" };
   for (int i = 0; i < 12; i++) lanweb_escapar(a[i], sizeof a[i], i18n(k[i]));
@@ -140,8 +143,10 @@ static char *paginaMusica(void) {
     "<input id=\"ls\" type=\"password\" autocomplete=\"off\"><button id=\"lfm\">%s</button>"
     "<h2>%s</h2><label>Client ID</label><input id=\"sci\" autocomplete=\"off\"><label>Client secret</label>"
     "<input id=\"scs\" type=\"password\" autocomplete=\"off\"><label>%s</label><input id=\"sp\" inputmode=\"url\" placeholder=\"https://open.spotify.com/playlist/...\">"
-    "<button id=\"spb\">%s</button><div id=\"msg\" class=\"msg\"></div>",
-    a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[6], a[9], a[10], a[11]);
+    "<button id=\"spb\">%s</button>"
+    "<h2>AudD</h2><label>API token</label><input id=\"aud\" type=\"password\" autocomplete=\"off\"><button class=\"s\" id=\"audb\">%s</button>"
+    "<div id=\"msg\" class=\"msg\"></div>",
+    a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[6], a[9], a[10], a[11], a[6]);
   return celapps_pagina("Configurar música pelo celular", corpo,
     "function v(i){return document.getElementById(i).value.trim()}"
     "document.getElementById('fonte').onclick=function(){post('fonte',{tipo:v('tipo'),nome:v('nome'),url:v('url'),usuario:v('usr'),senha:v('pw')})"
@@ -150,6 +155,7 @@ static char *paginaMusica(void) {
     "document.getElementById('ls').value=''})};"
     "document.getElementById('spb').onclick=function(){post('spotify',{url:v('sp'),id:v('sci'),segredo:v('scs')}).then(function(){msg('\\u2713');"
     "document.getElementById('scs').value=''})};"
+    "document.getElementById('audb').onclick=function(){post('audd',{token:v('aud')}).then(function(){msg('\\u2713');document.getElementById('aud').value=''})};"
     "setInterval(function(){estado(function(e){if(e.msg)msg(e.msg)})},2000);");
 }
 static void pedidoMusica(const LwPedido *p) {
@@ -196,6 +202,13 @@ static void pedidoMusica(const LwPedido *p) {
     memset(k, 0, sizeof k); memset(s, 0, sizeof s);
     return;
   }
+  if (!strcmp(p->rota, "audd")) {
+    char t[128];
+    lanweb_campo(p->corpo, "token", t, sizeof t);
+    if (songid_definir_chave(t)) ilha_avisar("celmusica", ILHA_OK, "aj_music", i18n(t[0] ? "Chave do AudD salva" : "Chave do AudD removida"), 3000, 0);
+    memset(t, 0, sizeof t);
+    return;
+  }
   if (!strcmp(p->rota, "spotify")) {
     // Spotify's official Web API with the person's own developer app (client
     // id + secret, kept on this TV). Reading a playlist without a key would
@@ -227,6 +240,7 @@ static void iniciarDefs(void) {
   if (!defs[CA_FESTA].montar) mcfesta_iniciar();
   if (!defs[CA_BACKUP].montar) qrbackup_iniciar();
   if (!defs[CA_FOTO].montar) perfilfoto_iniciar();
+  if (!defs[CA_CASA].montar) ezviz_iniciar();
 }
 int celapps_abrir(int a) {
   char *h;

@@ -142,4 +142,6 @@ uint64_t legenda_documento_hash(const LegendaDocumento *doc);
 int legenda_documento_cues(const LegendaDocumento *doc, double posSeg,
                           int atrasoMs, LegendaCue *dst, int max);
 
+// QR TIME: copy of the active cues (legtrad.c). Caller frees. 0 = none.
+int legenda_copiar_cues(LegendaCue **saida);
 #endif

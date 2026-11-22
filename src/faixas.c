@@ -1,3 +1,4 @@
+#include "velmem.h"
 #include "faixas.h"
 #include "legfontes.h"
 #include "ponteiro.h"
@@ -1166,7 +1167,7 @@ static void passoVolume(int d) {
 }
 static void passoVelocidade(int d) {
   int antes = video_velocidade_atual(), v = vel_passo(antes, d);
-  if (v != antes) { video_velocidade(v); velPedidaUi = v; }
+  if (v != antes) { video_velocidade(v); velPedidaUi = v; velmem_gravar(player_serie_imdb(), v); }   // QR TIME: per series
 }
 // As teclas da aba Estilo. Devolve 0 so para "Voltar" sem controle aberto (o
 // chamador fecha o painel); o resto e sempre tratado aqui.

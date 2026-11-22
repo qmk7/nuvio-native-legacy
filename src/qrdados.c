@@ -118,7 +118,7 @@ int qrdados_e_cache(const char *n) {
     "ficha-*.json", "serieaud-*.txt", "catalogo-*.bin",
     "anime-fribb.idx", "anime-fribb.retry", "explorar-mapa.txt", "explorar-viz.txt",
     "explorar-climas.txt", "frases-*.txt", "recomendacoes-feed.json", "recomendacoes-amigo.json",
-    "negcache.txt", "corviva.txt", "loc-texto.txt", NULL };
+    "negcache.txt", "corviva.txt", "loc-texto.txt", "legenda-ar-*.srt", NULL };
   static const char *const pastas[] = { "cache", "trailer", "extras", "fontes", "legendas", "tendencia", NULL };
   if (!n || !*n || strchr(n, '/') || strstr(n, "..")) return 0;
   for (int i = 0; pastas[i]; i++) if (!strcmp(n, pastas[i])) return 1;

@@ -473,6 +473,8 @@ void menu_definir_destino(int d) {
   if (!aberto) linha = d;
 }
 int menu_mudou_destino(void) { int m = mudou; mudou = 0; return m; }
+// QR TIME: go to a section as if chosen in the side bar (LG launcher shortcuts).
+void menu_ir(int d) { if (d < 0 || d >= MENU_N) return; menu_definir_destino(d); mudou = 1; }
 const char *menu_rotulo(int d) {
   return (d >= 0 && d < MENU_N) ? ROTULOS[d] : "";
 }

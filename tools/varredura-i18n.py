@@ -264,6 +264,7 @@ def contexto(txt, i):
 # virar teste ela nao impede a proxima regressao.
 IGNORAR = {
     "QR TIME",                       # the app's own name (proper noun, same in every language)
+    "legenda-ar-*.srt", "legenda-ar-%08lx.srt",  # legtrad.c / qrdados.c: cache file names of translated subtitles
     "conta-", "epg-conta-",          # dados.c dados_e_secreto: credential filename prefixes, never UI text
     "catalogo-*.bin",                # androidcache.c: cache filename pattern, never UI text
     "ltv-fontes.txt", "ltv-fontes-p%d.txt",  # ltv.c: preference filenames, never UI labels
@@ -642,8 +643,9 @@ def varrer():
     ]
     for arq in sorted(arquivos):
         # esportenomes.c: an English->Arabic DICTIONARY of team names (data
-        # compared against ESPN and guide titles), not interface text.
-        if arq.name in ("idioma.c", "esportenomes.c"):
+        # compared against ESPN and guide titles); intencao.c: the spoken
+        # phrases a voice command is matched against. Neither is interface text.
+        if arq.name in ("idioma.c", "esportenomes.c", "intencao.c"):
             continue
         txt = arq.read_text(encoding="utf-8")
         txt = sem_corpo_em_js(txt)

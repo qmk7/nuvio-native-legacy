@@ -1,5 +1,6 @@
 // Ver central.h.
 #define NV_ESCALA_TELA
+#include "noite.h"
 #include "central.h"
 #include "centrallista.h"
 #include "chsegura.h"
@@ -64,7 +65,7 @@ static int foco;                // botao em foco; == nBotoes e "Editar atalhos"
 static int focoEd;              // item do catalogo em foco na edicao
 // FOCO E INTERRUPTOR EM MOLA por botao (0..1): o anel nao salta de botao em
 // botao e o realce do atalho liga/desliga em ~120 ms em vez de num quadro.
-static float animFoco[CENTRAL_MAX + 1], animLig[CENTRAL_MAX + 1];
+static float animFoco[CENTRAL_MAX + 2], animLig[CENTRAL_MAX + 2];
 static void centralPassoFoco(float dt);
 static float rolaEd;            // rolagem da lista de edicao (px)
 static float rolaBotoes, quadroDt;
@@ -113,6 +114,8 @@ static void gravar(void) {
 // uma opcao de Ajustes nem mora na lista da pessoa: e uma acao, e so existe
 // enquanto ha o que medir. op = CC_OP_ESTAT, item = -1.
 #define CC_OP_ESTAT (-2)
+// QR TIME: "Sugestão" (noite.c), always offered after the statistics tile.
+#define CC_OP_NOITE (-3)
 #ifdef CENTRAL_TESTE
 static int testeEstat;
 #endif
@@ -131,6 +134,9 @@ static int botoes(int *op, int *item) {
     if (item) item[n] = -1;
     n++;
   }
+  if (op) op[n] = CC_OP_NOITE;
+  if (item) item[n] = -1;
+  n++;
   for (i = 0; i < lista.n; i++) {
     const CentralItem *c = central_catalogo(lista.item[i]);
     int o = c ? ajustes_rapido_op(c->chave) : -1;
@@ -143,7 +149,7 @@ static int botoes(int *op, int *item) {
 }
 // (ver o comentario nas variaveis, no topo do arquivo)
 static void centralPassoFoco(float dt) {
-  int op[CENTRAL_MAX + 1], item[CENTRAL_MAX + 1], n = botoes(op, item), i;
+  int op[CENTRAL_MAX + 2], item[CENTRAL_MAX + 2], n = botoes(op, item), i;
   int red = ajustes_animacoes_reduzidas();
   for (i = 0; i <= n; i++) {
     float aF = i == foco ? 1.0f : 0.0f, aL = 0.0f;
@@ -200,7 +206,7 @@ static int ehCh(const SDL_Event *e) {
 }
 
 static void ativarBotao(int i) {
-  int op[CENTRAL_MAX + 1], n = botoes(op, NULL);
+  int op[CENTRAL_MAX + 2], n = botoes(op, NULL);
   if (i == n) {
     int it[64], m = ofertas(it), j;
     editando = 1; focoEd = 0; rolaEd = 0;
@@ -220,6 +226,11 @@ static void ativarBotao(int i) {
   if (op[i] == CC_OP_ESTAT) {
     central_fechar();
     estatvivo_abrir();
+    return;
+  }
+  if (op[i] == CC_OP_NOITE) {
+    central_fechar();
+    noite_sugerir();
     return;
   }
   if (ajustes_rapido_passo(op[i], 1))
@@ -619,7 +630,7 @@ static float rolagemBotoes(float h) {
 }
 
 static void desenhaBotoes(float x, float y, float w, float h, float a) {
-  int op[CENTRAL_MAX + 1], item[CENTRAL_MAX + 1], n = botoes(op, item), i;
+  int op[CENTRAL_MAX + 2], item[CENTRAL_MAX + 2], n = botoes(op, item), i;
   float bw = (w - CC_GAP * (CC_COLS - 1)) / CC_COLS;
   float scroll = 0;
   if (foco > n) foco = n;
@@ -639,6 +650,7 @@ static void desenhaBotoes(float x, float y, float w, float h, float a) {
                   bw, CC_BOTAO_H };
     if (r.y + r.h < y || r.y > y + h) continue;
     if (i < n && op[i] == CC_OP_ESTAT) botao(r, "aj_gauge", "Estatísticas", "", -1, 0.0f, animFoco[i], a);
+    else if (i < n && op[i] == CC_OP_NOITE) botao(r, "aj_dices", "Sugestão", "", -1, 0.0f, animFoco[i], a);
     else if (i < n) {
       const CentralItem *c = central_catalogo(item[i]);
       int lig = ajustes_rapido_ligado(op[i]);

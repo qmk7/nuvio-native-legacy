@@ -861,6 +861,13 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "esporteui.h"
 #include "esportealerta.h"
 #include "salat.h"
+#include "bomdia.h"
+#include "semana.h"
+#include "anterior.h"
+#include "songid.h"
+#include "ezviz.h"
+#include "qualialerta.h"
+#include "atalhoslg.h"
 #include "ytui.h"
 #include "mcui.h"
 #include "qrcontasui.h"
@@ -7038,6 +7045,9 @@ void app_atualizar(float dt, Uint32 agora) {
   }
 #endif
   player_atualizar(dt, agora);
+  anterior_passo(agora);   // QR TIME: "previously on" when back to a series
+  songidui_passo();        // QR TIME: "what's this song?" result
+  player_legtrad_passo();  // QR TIME: Arabic subtitle by DeepL
   // A barra por cima da pagina: o trailer do fundo fica mudo enquanto ela
   // esta aberta (detail_sob_menu). O pedido de barra da pagina e lido em
   // app_evento, no mesmo evento da ESQUERDA, e abre por cima dela.
@@ -7160,6 +7170,11 @@ void app_atualizar(float dt, Uint32 agora) {
     glem_passo(dt, agora);
     esportealerta_passo(agora);   // QR TIME: followed teams' reminders and goals
     salat_passo(agora);           // QR TIME: prayer times
+    ezviz_passo(agora);           // QR TIME: EZVIZ doorbell alerts
+    qualialerta_passo(agora);     // QR TIME: 4K / DV versions of films on the list
+    { int d = atalhoslg_destino(); if (d >= 0) menu_ir(d); }   // QR TIME: LG launcher shortcut
+    bomdia_passo(agora);          // QR TIME: morning greeting
+    semana_passo(agora);          // QR TIME: weekly summary (Friday evening)
     // "Assistir" no cartao: o canal em tela cheia, de onde a pessoa estiver.
     if (aguardandoFonte != 2 && glem_pediu_assistir(lid, sizeof lid, lnome, sizeof lnome,
                                                      lbase, sizeof lbase)) {

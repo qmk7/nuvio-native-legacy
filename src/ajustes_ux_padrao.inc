@@ -360,3 +360,7 @@
   2, /* followed teams: match reminders and goals */
   0, /* prayer times: off */
   0, /* at prayer time: notice only */
+  0, /* morning greeting: On (V_LIGA 0) */
+  0, /* guest session: off */
+  0, /* LG launcher shortcuts: action, no stored value */
+  0, /* better-version notice: On (V_LIGA 0) */

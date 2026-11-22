@@ -7,8 +7,12 @@
 
 enum {
   QRC_IPTV = 1, QRC_ADDONS, QRC_MUSICA, QRC_TRAKT, QRC_SIMKL, QRC_YOUTUBE, QRC_LASTFM,
-  QRC_SPOTIFY, QRC_TMDB, QRC_TSDB, QRC_JELLYFIN, QRC_PLEX
+  QRC_SPOTIFY, QRC_TMDB, QRC_TSDB, QRC_JELLYFIN, QRC_PLEX,
+  QRC_SERVIDOR, QRC_ESPN,  // QR TIME health check: the account server, the Sport Center feed
+  QRC_DEEPL, QRC_AUDD      // keys typed on the TV: Arabic subtitles, song recognition
 };
+// TMDB key kind: 1 = v3 key (32 hex), 2 = v4 read token (eyJ...), 0 = none/other.
+int qrc_tmdb_tipo(const char *k);
 // State shown on the row.
 enum { QRC_E_NAO = 0,      // not configured
        QRC_E_CONFIG,       // configured (no connection check made)

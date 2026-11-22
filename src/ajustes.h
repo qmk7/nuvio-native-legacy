@@ -828,6 +828,11 @@ int  ajustes_esporte_alertas(void);
 // Prayer times (salat.c): 0 off, else 1 + index into salat_cidades(); mode 1 = also pause.
 int  ajustes_salat_cidade(void);
 int  ajustes_salat_modo(void);
+int  ajustes_bom_dia(void);
+int  ajustes_quali_alerta(void);   // better-version notices (qualialerta.c)
+// Guest session (nothing recorded); always off at start (main.c).
+int  ajustes_visitante(void);
+void ajustes_visitante_zerar(void);   // morning greeting on (bomdia.c)
 void ajustes_sono_zerar(void);
 
 // O CAMINHO DE VOLTA (#85): devolve em *saida uma copia do blob `base` (o mesmo

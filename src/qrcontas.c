@@ -1,4 +1,9 @@
 #include "qrcontas.h"
+#include "legtrad.h"
+#include "songid.h"
+#include <ctype.h>
+#include "rede.h"
+#include "nuvem.h"
 #include "iptvfontes.h"
 #include "iptvteste.h"
 #include "xtream.h"
@@ -129,9 +134,18 @@ int qrc_montar(QrcLinha *out, int max) {
       mcsp_tem_chave() ? "Só metadados públicos (playlists)" : "Sem chave da API");
   {
     const char *k = desc_chave_tmdb();
-    add(out, &n, max, QRC_TMDB, "", "TMDB", 0, k && k[0] ? QRC_E_CONFIG : QRC_E_NAO, QRC_P_ABRIR,
-        k && k[0] ? "Metadados, elenco e datas" : "Sem chave: elenco só com nomes");
+    int tt = qrc_tmdb_tipo(k);
+    add(out, &n, max, QRC_TMDB, "", "TMDB", 0, k && k[0] ? QRC_E_CONFIG : QRC_E_NAO, QRC_P_ABRIR | (k && k[0] ? QRC_P_TESTAR : 0),
+        !(k && k[0]) ? "Sem chave: elenco só com nomes" : tt == 2 ? "Token de leitura v4 (eyJ…): o app usa a chave v3 de 32 caracteres"
+        : tt == 1 ? "Chave v3: metadados, elenco e datas" : "Formato de chave desconhecido");
   }
+  add(out, &n, max, QRC_SERVIDOR, "", "Servidor da conta QR TIME", 1, nuvem_url()[0] ? QRC_E_CONFIG : QRC_E_NAO,
+      nuvem_url()[0] ? QRC_P_TESTAR : 0, nuvem_url()[0] ? "Login, perfis e sincronização" : "Não configurado nesta versão");
+  add(out, &n, max, QRC_ESPN, "", "ESPN (Centro de Esportes)", 1, QRC_E_CONFIG, QRC_P_TESTAR, "Jogos, placares e horários");
+  add(out, &n, max, QRC_DEEPL, "", "DeepL", 0, legtrad_tem_chave() ? QRC_E_CONFIG : QRC_E_NAO, QRC_P_CHAVE,
+      legtrad_tem_chave() ? "Legenda árabe automática no player" : "Sem chave: sem legenda árabe automática");
+  add(out, &n, max, QRC_AUDD, "", "AudD", 0, songid_tem_chave() ? QRC_E_CONFIG : QRC_E_NAO, QRC_P_CHAVE,
+      songid_tem_chave() ? "\"Que música é essa?\" no player" : "Sem chave: sem reconhecimento de música");
   add(out, &n, max, QRC_TSDB, "", "TheSportsDB", 0, QRC_E_CONFIG, QRC_P_CHAVE,
       tsdb_chave_pessoal() ? "Chave pessoal" : "Chave pública gratuita (limitada)");
   if (jellyfin_servidor_curto()[0]) {
@@ -176,9 +190,39 @@ static void *fioTestar(void *u) {
     anotar(p.tipo, p.ref, r == YT_OK ? QRC_E_LIGADO : QRC_E_ERRO, msgYt(r));
     printf("[contas] test YouTube key -> %s\n", r == YT_OK ? "ok" : "failed");
   }
+  else if (p.tipo == QRC_TMDB || p.tipo == QRC_SERVIDOR || p.tipo == QRC_ESPN) {
+    // One real request each; the answer's HTTP status decides. Keys go only
+    // where they belong and never into the log.
+    char url[400], cab[400];
+    const char *cabs[3] = { NULL, NULL, NULL };
+    int st = 0, ok;
+    char *r;
+    if (p.tipo == QRC_TMDB) {
+      const char *k = desc_chave_tmdb();
+      if (qrc_tmdb_tipo(k) == 2) { snprintf(cab, sizeof cab, "Authorization: Bearer %s", k); cabs[0] = cab; snprintf(url, sizeof url, "https://api.themoviedb.org/3/configuration"); }
+      else snprintf(url, sizeof url, "https://api.themoviedb.org/3/configuration?api_key=%s", k ? k : "");
+    } else if (p.tipo == QRC_SERVIDOR) {
+      snprintf(url, sizeof url, "%s/auth/v1/health", nuvem_url());
+      snprintf(cab, sizeof cab, "apikey: %s", nuvem_anon()); cabs[0] = cab;
+    } else snprintf(url, sizeof url, "https://site.api.espn.com/apis/site/v2/sports/soccer/ksa.1/scoreboard");
+    r = rede_baixar_st(url, 12, cabs, &st);
+    memset(url, 0, sizeof url); memset(cab, 0, sizeof cab);
+    ok = r && st >= 200 && st < 300;
+    anotar(p.tipo, p.ref, ok ? QRC_E_LIGADO : QRC_E_ERRO,
+           ok ? "Respondeu" : !r || st == 0 ? "Sem resposta (rede ou servidor fora)" : st == 401 || st == 403 ? "Recusou a chave" : "Erro do servidor");
+    printf("[contas] test %s -> HTTP %d\n", p.tipo == QRC_TMDB ? "TMDB" : p.tipo == QRC_SERVIDOR ? "account server" : "ESPN", st);
+    free(r);
+  }
   fflush(stdout);
   pthread_mutex_lock(&trava); testando = 0; pthread_mutex_unlock(&trava);
   return NULL;
+}
+int qrc_tmdb_tipo(const char *k) {
+  size_t n = k ? strlen(k) : 0;
+  if (!n) return 0;
+  if (!strncmp(k, "eyJ", 3) && n > 100) return 2;
+  if (n == 32) { for (size_t i = 0; i < n; i++) if (!isxdigit((unsigned char)k[i])) return 0; return 1; }
+  return 0;
 }
 int qrc_testar(const QrcLinha *l) {
   pthread_t t;
@@ -191,7 +235,7 @@ int qrc_testar(const QrcLinha *l) {
     for (int i = 0; i < k; i++) if (c[i].id == id) return iptvteste_iniciar(id, c[i].tipo);
     return 0;
   }
-  if (l->tipo != QRC_MUSICA && l->tipo != QRC_YOUTUBE) return 0;
+  if (l->tipo != QRC_MUSICA && l->tipo != QRC_YOUTUBE && l->tipo != QRC_TMDB && l->tipo != QRC_SERVIDOR && l->tipo != QRC_ESPN) return 0;
   pthread_mutex_lock(&trava);
   if (testando) { pthread_mutex_unlock(&trava); return 0; }
   testando = 1;

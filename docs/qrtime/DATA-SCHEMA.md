@@ -90,6 +90,16 @@ R = regenerable.
 | `esporte-p<N>.txt` | profile | `esporte.c` | leagues, teams, event→channel links, hide-scores flag | |
 | `skip-series-p<N>.txt` | profile | `pularserie.c` | `imdb\tmask\tintro presses\trecap presses` (mask 1 = intro, 2 = recap skip on their own) | |
 | `cinema-backup.txt` | settings folder | `ajustes.c` | `<setting key> <value>` per line: the values cinema mode replaced, restored when it is switched off | |
+| `esporte-alertas-p<N>.txt` | profile | `esportealerta.c` | event ids already given an automatic reminder | |
+| `semana-p<N>.txt` | profile | `semana.c` | `day\timdb\ttype\tseconds\ttitle\tgenre` (60 days, local only) | |
+| `semana-vista-p<N>.txt`, `bomdia-p<N>.txt` | profile | `semana.c`, `bomdia.c` | last week / day the card was shown | |
+| `velocidade-p<N>.txt` | profile | `velmem.c` | `imdb\tspeed` per series | |
+| `qualidade-p<N>.txt` | profile | `qualialerta.c` | `imdb\theight\tdv\tchecked` | |
+| `skip-series-p<N>.txt` | profile | `pularserie.c` | see above | |
+| `perfil-foto-p<N>.txt`, `perfil-foto-p<N>-<time>.jpg` | profile | `perfilfoto.c` | the current photo's file name; the JPEG | |
+| `audd.txt`, `deepl.txt`, `ezviz.txt` | TV | `songid.c`, `legtrad.c`, `ezviz.c` | AudD token; DeepL key; EZVIZ AppKey + Secret | S |
+| `legenda-ar-<hash>.srt` | TV | `legtrad.c` | translated subtitles | R |
+| `cinema-backup.txt` | settings folder | `ajustes.c` | values cinema mode replaced | |
 | `qrtime-quality.txt` | TV | `qrdados.c` | `pendente` / `feito` (schema v2 max-quality defaults) | |
 
 The base app's own files are listed by `tools/arm.sh`:

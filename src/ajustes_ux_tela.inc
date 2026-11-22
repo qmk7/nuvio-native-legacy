@@ -15,6 +15,7 @@ static const Item TELA[] = {
   SEC("Reprodução", "Qualidade, som e o que o player faz", "aj_circle-play"),
     ROT("Imagem e som"),
       OPC(AJ_QUALIDADE), OPC(AJ_FONTE_HDR), OPC(AJ_DV), OPC(AJ_ATMOS),
+      OPC(AJ_QUALI_ALERTA),
 #ifdef NV_TPK
       OPC(AJ_AUDIO_OFFSET),
 #endif
@@ -185,10 +186,12 @@ static const Item TELA[] = {
       OPC(AJ_FONTE_UI), OPC(AJ_TAMANHO_UI), OPC(AJ_ESCALA_TEXTO), OPC(AJ_DET_ESPACO), OPC(AJ_TAMANHO_AJUSTES), OPC(AJ_LAYOUT_AJUSTES),
     ROT("Movimento e relógio"),
       OPC(AJ_ANIM), OPC(AJ_RELOGIO), OPC(AJ_RELOGIO_12H),
+      OPC(AJ_BOM_DIA),
     ROT("Tela de descanso"),
       OPC(AJ_ESMAECER), OPC(AJ_DESCANSO_ESTILO), OPC(AJ_DESCANSO_FONTE),
     ROT("Temporizador de sono"), OPC(AJ_SONO),
     ROT("Modo cinema"), OPC(AJ_CINEMA),
+    ROT("Modo visitante"), OPC(AJ_VISITANTE),
     MAIS(),
     ROT("Cores e vidro"), OPC(AJ_VIDRO_OPAC), OPC(AJ_VIDRO_FOSCO), OPC(AJ_VIDRO_QUALIDADE),
 
@@ -259,6 +262,7 @@ static const Item TELA[] = {
 OPC(AJ_RESOLUCAO), OPC(AJ_GPU_EFEITOS), OPC(AJ_AMPLIAR_UI), OPC(AJ_AMPLIACAO_ALGO), OPC(AJ_AMPLIACAO_NITIDEZ), OPC(AJ_HDR_INTERFACE), OPC(AJ_QUALIDADE_IMG),
     OPC(AJ_NAV_RAPIDA), OPC(AJ_MEDIDOR), OPC(AJ_DIAGNOSTICO), OPC(AJ_VELOCIDADE), OPC(AJ_ESPACO),
     ROT("Horários de oração"), OPC(AJ_SALAT_CIDADE), OPC(AJ_SALAT_MODO),
+    ROT("Atalhos no menu da LG"), OPC(AJ_ATALHOS_LG),
 #ifdef NV_ANDROID
     OPC(AJ_LIMPAR_CACHE),
 #endif

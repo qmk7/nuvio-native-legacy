@@ -159,4 +159,5 @@ void menu_atualizar(float dt, Uint32 agora);
 // Desenhe por ULTIMO: o menu escurece e cobre tudo que veio antes.
 void menu_desenhar(Uint32 agora);
 
+void menu_ir(int d);   // QR TIME: as if chosen in the side bar
 #endif

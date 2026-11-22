@@ -150,6 +150,7 @@
 // SEM DATA nao vira data. As series encerradas, canceladas ou sem anuncio caem
 // depois de um separador, com o eixo TRACEJADO e a situacao no lugar do
 // numeral. "A definir" escrito onde deveria haver um dia e metadado inventado.
+#include "salat.h"
 #include "menu.h"
 #include "agendaui.h"
 #include "agenda.h"
@@ -3121,6 +3122,12 @@ static void desenhaCalendarioMensal(void) {
   else gfx_cor(painel, 28.0f / painel.h, .065f, .07f, .082f, .96f);
   snprintf(rot, sizeof rot, "%d %s %d", calDia,
            idioma_mes_data(calMes, agenda_mes_nome(calMes)), calAno);
+  // QR TIME: the Hijri date next to the Gregorian one (tabular calendar,
+  // salat.h: it can differ from Umm al-Qura by one day).
+  { struct tm u = { 0 }; int ha, hm, hd; size_t k = strlen(rot);
+    u.tm_year = calAno - 1900; u.tm_mon = calMes - 1; u.tm_mday = calDia; u.tm_hour = 12;
+    if (salat_hijri(timegm(&u), &ha, &hm, &hd))
+      snprintf(rot + k, sizeof rot - k, "  ·  %d %s %d", hd, i18n(salat_mes_hijri(hm)), ha); }
   if (agColunaUnica())
     txC1(TXT_TITULO3, 48, rot, 246, 247, 250, painel.x + P(22), painel.y + P(agTelefonePx(18)),
          agTelefonePx(40), painel.w - P(44), 1);

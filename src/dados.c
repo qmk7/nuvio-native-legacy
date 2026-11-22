@@ -548,7 +548,7 @@ int dados_e_secreto(const char *nome) {
   static const char *const pre[] = {
     "trakt", "simkl", "conta-", "debrid", "tmdb.txt", "mdblist", "fanart", "youtube", "lastfm", "spotify",
     "music-sources", "xtream-", "stalker-", "m3u-p", "livetv-contas", "jellyfin", "emby", "plex", "discord",
-    "addons.txt", "sessao", "cliente", "nuvem", "epg-conta-", "p2p.txt", "seekr", "tsdb", NULL };
+    "addons.txt", "sessao", "cliente", "nuvem", "epg-conta-", "p2p.txt", "seekr", "tsdb", "audd", "ezviz", "deepl", NULL };
   if (!nome) return 0;
   for (int i = 0; pre[i]; i++) if (!strncmp(nome, pre[i], strlen(pre[i]))) return 1;
   return 0;

@@ -28,7 +28,8 @@ static const char *const LISTA[] = {
   "music-sources-p*.txt", "music-favorites-p*.txt", "music-playlists-p*.txt", "music-settings-p*.txt",
   "lastfm.txt", "lastfm-sessao-p*.txt", "youtube.txt", "youtube-account-p*.txt", "spotify.txt",
   "esporte-p*.txt", "agenda-follows-p*.txt", "skip-series-p*.txt", "tsdb.txt",
-  "jellyfin-p*.txt", "emby-p*.txt", "plex-p*.txt", NULL };
+  "jellyfin-p*.txt", "emby-p*.txt", "plex-p*.txt",
+  "audd.txt", "deepl.txt", "ezviz.txt", "skip-series-p*.txt", "velocidade-p*.txt", NULL };
 
 int qrbackup_nome_ok(const char *n) {
   if (!n || !n[0] || strchr(n, '/') || strchr(n, '\\') || strstr(n, "..") || strlen(n) > 80) return 0;

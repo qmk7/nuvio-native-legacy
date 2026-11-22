@@ -101,3 +101,8 @@ qrtime_backup:900
 qrtime_festa:900
 qrtime_esportealerta:900
 qrtime_salat
+qrtime_extras:900
+qrtime_intencao
+qrtime_songid
+qrtime_ezviz
+qrtime_legtrad

@@ -29,6 +29,10 @@
 #include "player.h"
 #include "pularserie.h"
 #include "sono.h"
+#include "semana.h"
+#include "velmem.h"
+#include "songid.h"
+#include "legtrad.h"
 #include "legfontes.h"
 #include "memlog.h"
 #include "dvtela.h"
@@ -238,6 +242,8 @@ extern int trakt_scrobble_alvo(int, const TraktScrobbleAlvo *, double, double,
 enum { PLR_PLAY, PLR_CC, PLR_AUDIO, PLR_ASPECTO,
        PLR_FONTES, PLR_EPISODIOS, PLR_PROXIMO, PLR_REINICIAR, PLR_NESTE,
        PLR_SO_AUDIO,   // QR TIME: listen only (screen off, sound goes on; sono.h)
+       PLR_MUSICA,     // QR TIME: what's this song? (songid.h; only with an AudD token)
+       PLR_TRADUZIR,   // QR TIME: Arabic subtitle by DeepL (legtrad.h; only with a key)
        PLR_NBTNS };
 
 // Avanco em curso: enquanto vale, posSeg e do DONO e nao do pipeline.
@@ -671,6 +677,7 @@ static const char *rotuloAudioOsd(void) {
   return txt;
 }
 const char *player_id_canal(void) { return canalSessao ? itemCanal.imdb : ""; }
+const char *player_serie_imdb(void) { const CatItem *c = canalSessao ? NULL : item(); return c && !strcmp(c->tipo, "series") ? c->imdb : ""; }
 const char *player_tipo_canal(void) { return canalSessao ? itemCanal.tipo : ""; }
 
 // Programa do canal no ar: a XMLTV (epgIdx) ou, num canal Xtream que nao
@@ -723,6 +730,18 @@ static double retomarFonteSeg = -1.0;
 static double basePos, baseDur;
 static int basePct, baseTocou, baseT = -1, baseE = -1;
 static int epT, epE, pedFontes, erroFonte, pedProxT, pedProxE;
+// QR TIME (legtrad.c): the Arabic subtitle arrives from the worker.
+void player_legtrad_passo(void) {
+  char *srt = NULL;
+  int r = legtrad_resultado(&srt);
+  if (r < 0) return;
+  if (r == LT_OK && srt && player_aberto()) { legenda_definir_corpo(srt); player_toast(i18n("Legenda em árabe (tradução automática)"), 3500); }
+  else if (r != LT_OK) player_toast(i18n(r == LT_SEM_CHAVE ? "Falta a chave do DeepL (Contas, provedores e dados)." : r == LT_CHAVE_RECUSADA ? "O DeepL recusou a chave."
+                                         : r == LT_COTA ? "A cota do DeepL deste mês acabou." : "Sem resposta do DeepL."), 4500);
+  free(srt);
+}
+// QR TIME (anterior.c): the catalogue index and episode playing; -1 when not a series episode.
+int player_serie_episodio(int *t, int *e) { const CatItem *c = canalSessao ? NULL : item(); if (!c || strcmp(c->tipo, "series") || epE <= 0) return -1; *t = epT; *e = epE; return idxAtual(); }
 // Sinopse do episodio em exibicao (do catalogo); vazia se ele nao a trouxe,
 // e ai a pausa usa a da serie.
 static const char *sinopseEpisodioAtual(void) {
@@ -1982,6 +2001,9 @@ void player_abrir(int indiceCatalogo, const char *url) {
   // O modo de proporcao e do APARELHO, nao da sessao: reler aqui e o que faz
   // "Zoom cinema" continuar valendo no filme seguinte, como no web.
   prefsLer();
+  // QR TIME: a series keeps the speed chosen in it (velmem.h); films start at 1x.
+  { const CatItem *ci = item(); int v = ci && !strcmp(ci->tipo, "series") ? velmem_ler(ci->imdb) : 0;
+    if (v) { video_velocidade(v); printf("[velocidade] serie: %d%%\n", v); } }
   // #202: Proporcao padrao (Ajustes > Reproducao). So em memoria: o arquivo
   // guarda o ultimo modo escolhido na mao, que continua valendo para "Ultimo usado".
   { int pad = ajustes_proporcao_padrao(); if (pad >= 0 && pad < PLR_ASP_N) aspecto = pad; }
@@ -2728,7 +2750,7 @@ static void fecharSessao(int manter, int trocaFonte) {
       if (assistiu) partes_ponto_esquecer(alvoA, sessao_usuario(), perfis_ativo());
       else if (video_pronto() && posSeg > 1.0f) {
         pt.pos = posSeg;
-        partes_ponto_guardar(alvoA, sessao_usuario(), perfis_ativo(), &pt);
+        if (!ajustes_visitante()) partes_ponto_guardar(alvoA, sessao_usuario(), perfis_ativo(), &pt);
       }
     } }
   // Concluido e concluido: o registro leva o "alcancado tocando" que o selo
@@ -2737,8 +2759,9 @@ static void fecharSessao(int manter, int trocaFonte) {
   if (duracaoContradita) chegou = 0;
   // Sem ela a posicao REAL continua gravada (barra, Continuar assistindo,
   // conta): so o arredondamento para 100% e o visto ficam de fora.
+  // QR TIME guest session (Modo visitante): nothing below is recorded.
   if (identidadeValida() && !duracaoErrada && !jaRetido && prova && video_pronto() && duracaoSeg >= 120.0f &&
-      !ehCanal()) {
+      !ehCanal() && !ajustes_visitante()) {
     // CANAL nao grava progresso: uma transmissao ao vivo nao tem "onde parou" —
     // guardar posSeg contra a duracao reserva colocaria "Globo 68%" em
     // Continuar assistindo, que e justamente o que nao pode acontecer.
@@ -2776,6 +2799,7 @@ static void fecharSessao(int manter, int trocaFonte) {
     // A posicao gravada e sempre a REAL (ponto de retomada), com o como ela
     // foi alcancada: cat_visto e a proxima base leem `tocou`.
     if (ia >= 0) cat_salvar_progresso_ep(ia, pos, durG, epT, epE, chegou);
+    if (ci) semana_registrar(ci->imdb, ci->tipo, ci->titulo, ci->genero, assistidoSeg, time(NULL));   // QR TIME weekly summary (local only)
     // E tambem para o Trakt, que e de onde o "continue assistindo" vem: gravar
     // so aqui deixaria este app discordando dos outros aparelhos do dono.
     // Personal-server items stay private: no Trakt, friends feed or social
@@ -2954,6 +2978,7 @@ void player_preparar_retencao(void) {
 #define PLR_PARCIAL_SEEK_S 0.7f
 #define PLR_PARCIAL_LIMIAR_S 5.0
 static void gravarProgressoParcial(int conta, const char *porque) {
+  if (ajustes_visitante()) return;   // QR TIME guest session: nothing recorded
   atualizarIdentidade();
   const CatItem *ci = item();
   double base;
@@ -2987,8 +3012,8 @@ static void gravarProgressoParcial(int conta, const char *porque) {
     else snprintf(id, sizeof id, "%s", ci->imdb);
     double sp = posSeg, sd = duracaoSeg;
     partesVirt(&sp, &sd, NULL);
-    scrobbleTrakt(SCR_EV_PONTO, ci, sp, sd, assistidoSeg, 0);
-    simkl_scrobble(SCR_EV_PONTO, id, sp, sd, assistidoSeg, 0);
+    if (!ajustes_visitante()) { scrobbleTrakt(SCR_EV_PONTO, ci, sp, sd, assistidoSeg, 0);
+    simkl_scrobble(SCR_EV_PONTO, id, sp, sd, assistidoSeg, 0); }
     parcialConta = 0;
   }
   parcialPos = posSeg;
@@ -3387,6 +3412,8 @@ static int transporteAcoes(PlrAcao a[PLR_NBTNS]) {
   if (temUltimoBotao()) a[n++] = (PlrAcao){PLR_EPISODIOS, 1};
   if (serie) a[n++] = (PlrAcao){PLR_NESTE, 1};
   a[n++] = (PlrAcao){PLR_SO_AUDIO, comVideo && video_ativo()};
+  if (!ehCanal() && songid_tem_chave()) a[n++] = (PlrAcao){PLR_MUSICA, comVideo && video_ativo()};
+  if (legtrad_tem_chave()) a[n++] = (PlrAcao){PLR_TRADUZIR, 1};
   return n;
 }
 static int transporteHabilitado(int id) {
@@ -4247,6 +4274,12 @@ static int ativarBotao(int i, int repetiu) {
     case PLR_FONTES: pedFontes = 1; break;
     case PLR_NESTE: nesteAberto = 1; nesteT = epT; nesteE = epE; break;
     case PLR_SO_AUDIO: esconderControles(); sono_so_audio(); break;
+    case PLR_MUSICA: songidui_iniciar(video_url_atual(), posSeg); break;
+    case PLR_TRADUZIR: {
+      int r = legtrad_iniciar();
+      player_toast(i18n(r == LT_OK ? "Traduzindo a legenda para árabe…" : r == LT_SEM_LEGENDA ? "Ligue uma legenda (em qualquer idioma) para traduzir."
+                        : r == LT_OCUPADO ? "Já está traduzindo." : "Não foi possível começar a tradução."), 4000);
+      break; }
     case PLR_EPISODIOS:
       if (ehCanal()) pedGuia = 1;
       else if (epE > 0) episodios_abrir(idxAtual(), epT, epE);
@@ -4956,8 +4989,8 @@ void player_atualizar(float dt, Uint32 agora) {
       if (tocouS >= PLR_SCR_TOCOU_S) {
         { double sp = posSeg, sd = duracaoSeg;
           partesVirt(&sp, &sd, NULL);
-          scrobbleTrakt(SCR_EV_TOCANDO, cs, sp, sd, assistidoSeg, 0);
-          simkl_scrobble(SCR_EV_TOCANDO, id, sp, sd, assistidoSeg, 0); }
+          if (!ajustes_visitante()) { scrobbleTrakt(SCR_EV_TOCANDO, cs, sp, sd, assistidoSeg, 0);
+          simkl_scrobble(SCR_EV_TOCANDO, id, sp, sd, assistidoSeg, 0); } }
         wsTocando();
       }
       parcialRelogio += dt;
@@ -4978,8 +5011,8 @@ void player_atualizar(float dt, Uint32 agora) {
         else snprintf(id, sizeof id, "%s", cs->imdb);
         { double sp = posSeg, sd = duracaoSeg;
           partesVirt(&sp, &sd, NULL);
-          scrobbleTrakt(SCR_EV_PAUSOU, cs, sp, sd, assistidoSeg, 0);
-          simkl_scrobble(SCR_EV_PAUSOU, id, sp, sd, assistidoSeg, 0); }
+          if (!ajustes_visitante()) { scrobbleTrakt(SCR_EV_PAUSOU, cs, sp, sd, assistidoSeg, 0);
+          simkl_scrobble(SCR_EV_PAUSOU, id, sp, sd, assistidoSeg, 0); } }
         if (!saindo) wsPausou();
         parcialPausa = 1;
       }
@@ -5371,6 +5404,8 @@ static const char *iconeBotao(int i) {
     case PLR_REINICIAR: return "pl_rotate-ccw";
     case PLR_NESTE:     return "pl_users";
     case PLR_SO_AUDIO:  return "pl_eye-off";
+    case PLR_MUSICA:    return "aj_music";
+    case PLR_TRADUZIR:  return "aj_languages";
     default:            return epE > 0 ? "pl_list-video" : "pl_film";
   }
 }
@@ -5385,6 +5420,8 @@ static const char *rotuloBotao(int i) {
     case PLR_REINICIAR: return "Assistir do começo";
     case PLR_NESTE:     return "Neste episódio";
     case PLR_SO_AUDIO:  return "Só áudio";
+    case PLR_MUSICA:    return "Que música é essa?";
+    case PLR_TRADUZIR:  return "Legenda árabe (IA)";
     default:            return ehCanal() ? "Guia" : epE > 0 ? "Epis\xc3\xb3""dios" : "Relacionados";
   }
 }

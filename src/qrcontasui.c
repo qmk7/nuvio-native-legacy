@@ -8,6 +8,8 @@
 #include "ilha.h"
 #include "teclado.h"
 #include "celapps.h"
+#include "legtrad.h"
+#include "songid.h"
 #include "qrtex.h"
 #include <stdio.h>
 #include <string.h>
@@ -94,10 +96,17 @@ static void executar(void) {
       if (qrc_atualizar(l)) ilha_avisar("qrcontas", ILHA_INFO, NULL, i18n("Atualizando. Os dados atuais ficam na tela até chegar a nova versão."), 3500u, 0);
       break;
     case B_CHAVE:
-      tecladoTsdb = 1;
-      teclado_contexto("TheSportsDB");
-      teclado_abrir_com("Chave pessoal do TheSportsDB", "Vazio volta para a chave pública gratuita.", 40,
-                        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_", NULL);
+      tecladoTsdb = l->tipo;
+      teclado_contexto(l->tipo == QRC_DEEPL ? "DeepL" : l->tipo == QRC_AUDD ? "AudD" : "TheSportsDB");
+      if (l->tipo == QRC_DEEPL)
+        teclado_abrir_com("Chave da API do DeepL", "Em deepl.com/pro-api (o plano gratuito serve). Vazio remove.", 80,
+                          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-:", NULL);
+      else if (l->tipo == QRC_AUDD)
+        teclado_abrir_com("Token da API do AudD", "Em dashboard.audd.io. Vazio remove.", 64,
+                          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_", NULL);
+      else
+        teclado_abrir_com("Chave pessoal do TheSportsDB", "Vazio volta para a chave pública gratuita.", 40,
+                          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_", NULL);
       teclado_permitir_vazio(1);
       teclado_mascarar(1);
       break;
@@ -165,7 +174,8 @@ void qrcui_atualizar(float dt, Uint32 agora) {
     if (teclado_aberto()) teclado_atualizar(dt, agora);
     r = teclado_resultado();
     if (r == TECLADO_PRONTO) {
-      int okG = qrc_tsdb_chave(teclado_texto());
+      int okG = tecladoTsdb == QRC_DEEPL ? legtrad_definir_chave(teclado_texto()) :
+                tecladoTsdb == QRC_AUDD ? songid_definir_chave(teclado_texto()) : qrc_tsdb_chave(teclado_texto());
       teclado_esquecer();
       ilha_avisar("qrcontas", ILHA_INFO, NULL, i18n(okG ? "Salvo neste aparelho." : "Valor inválido: use só letras, números, - _ ."), 3000u, 0);
       tecladoTsdb = 0; montar();

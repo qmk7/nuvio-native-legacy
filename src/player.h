@@ -154,6 +154,9 @@ int   player_texto_legenda_nativa(char *dst, int tam);
 float player_posicao_seg(void);
 int   player_pausado(void);
 int   player_pausa_pessoa(void);   // so a pausa pedida pela pessoa (#302)
+const char *player_serie_imdb(void);
+int   player_serie_episodio(int *t, int *e);   // QR TIME: catalogue index, -1 = not a series episode
+void  player_legtrad_passo(void);   // QR TIME: apply the DeepL Arabic subtitle when ready
 void  player_sono_pausar(void);     // QR TIME sleep timer: pause as if the person did
 // Fator de cor do OSD do player (Ajustes > Brilho da interface no player + degrau
 // automatico com a barra parada). 1 = sem efeito. Ver esmaecer.h.

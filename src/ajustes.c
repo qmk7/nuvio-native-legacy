@@ -4,6 +4,7 @@
 // IDs, chaves persistidas e indices de valores continuam os legados.
 #include "ajustes.h"
 #include "admin.h"
+#include "atalhoslg.h"
 #include "legfontes.h"
 #include "logrede.h"
 #include "jsw.h"
@@ -735,6 +736,10 @@ typedef enum {
   AJ_ESPORTE_ALERTAS,   // QR TIME: followed teams: automatic match reminders, goal notices (esportealerta.c). LOCAL.
   AJ_SALAT_CIDADE,   // QR TIME: prayer times city (salat.c); 0 = off. LOCAL.
   AJ_SALAT_MODO,   // QR TIME: at prayer time: 0 notice only, 1 notice and pause. LOCAL.
+  AJ_BOM_DIA,   // QR TIME: morning greeting (bomdia.c). LOCAL; V_LIGA, on.
+  AJ_VISITANTE,   // QR TIME: guest session: nothing recorded (no progress, Trakt/Simkl, history). LOCAL; Off at every start.
+  AJ_ATALHOS_LG,   // QR TIME: action, adds Sport Center / Music / Live TV tiles to the LG launcher (atalhoslg.c).
+  AJ_QUALI_ALERTA,   // QR TIME: notice when a film on the list gets a 4K / DV source (qualialerta.c). LOCAL; V_LIGA, on.
   AJ_N
 } OpcaoId;
 _Static_assert(DEBRID_RD == 0 && DEBRID_TB == 1 && DEBRID_PM == 2 && DEBRID_AD == 3,
@@ -815,6 +820,7 @@ static const char *V_FONTE_HDR[] = { "Preferir", "Indiferente", "Evitar" };
 static const char *V_ESP_ALERTA[] = { "Desligado", "Lembrete dos jogos", "Lembrete e gols" };
 static const char *V_SALAT[] = { "Desligado", "Riyadh", "Jeddah", "Makkah", "Madinah", "Dammam", "Khobar", "Al Ahsa", "Taif", "Abha", "Tabuk", "Buraidah", "Hail", "Jazan", "Najran", "Dubai", "Abu Dhabi", "Doha", "Kuwait City", "Manama", "Muscat", "Cairo", "Amman" };
 static const char *V_SALAT_MODO[] = { "Só o aviso", "Aviso e pausa" };
+static const char *V_VISITANTE[] = { "Desligado", "Ligado" };
 static const char *V_SONO[] = { "Desligado", "15 min", "30 min", "1 hora", "1h30", "2 horas" };
 static const char *V_ESMAECER[] = { "Desligado", "30 s", "1 min", "2 min", "5 min", "10 min" };
 static const char *V_DESCANSO_ESTILO[] = { "Vitrine", "Relógio", "Só escurecer" };
@@ -1884,6 +1890,10 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Avisos dos seus times", V_ESP_ALERTA, 3),   // local: esporteAlertasLocal
   ESC("Horários de oração", V_SALAT, 23),   // local: salatCidadeLocal
   ESC("Na hora da oração", V_SALAT_MODO, 2),   // local: salatModoLocal
+  ESC("Bom dia", V_LIGA, 2),   // local: bomDiaLocal
+  ESC("Modo visitante", V_VISITANTE, 2),   // local: visitanteLocal
+  ACAO("Atalhos no menu da LG"),
+  ESC("Avisar quando sair versão melhor", V_LIGA, 2),   // local: qualiAlertaLocal
 };
 
 // Nome de cada opcao no arquivo. O formato era POSICIONAL — uma linha por
@@ -2224,6 +2234,10 @@ static const char *CHAVE[] = {
   "esporteAlertasLocal",
   "salatCidadeLocal",
   "salatModoLocal",
+  "bomDiaLocal",
+  "visitanteLocal",
+  "-atalhosLg",
+  "qualiAlertaLocal",
 };
 // QUATRO VETORES PARALELOS indexados pelo mesmo enum AJ_*: OPCOES, CHAVE,
 // valor e as secoes. OPCOES ja e declarado [AJ_N], e `valor` aceita inicializacao
@@ -2942,6 +2956,10 @@ int ajustes_busca_cinemeta(void)   { return lig(AJ_BUSCA_CINEMETA); }
 int ajustes_esporte_alertas(void) { int v = valor[AJ_ESPORTE_ALERTAS]; return v < 0 || v > 2 ? 0 : v; }
 int ajustes_salat_cidade(void) { int v = valor[AJ_SALAT_CIDADE]; return v < 0 || v > 22 ? 0 : v; }
 int ajustes_salat_modo(void) { return valor[AJ_SALAT_MODO] == 1; }
+int ajustes_bom_dia(void) { return lig(AJ_BOM_DIA); }
+int ajustes_visitante(void) { return valor[AJ_VISITANTE] == 1; }
+void ajustes_visitante_zerar(void) { if (valor[AJ_VISITANTE]) { valor[AJ_VISITANTE] = 0; gravar(); } }
+int ajustes_quali_alerta(void) { return lig(AJ_QUALI_ALERTA); }
 int ajustes_sono_minutos(void) { static const int m[6] = { 0, 15, 30, 60, 90, 120 }; int v = valor[AJ_SONO]; return v < 0 || v > 5 ? 0 : m[v]; }
 void ajustes_sono_zerar(void) { if (valor[AJ_SONO]) { valor[AJ_SONO] = 0; gravar(); } }
 int ajustes_esmaecer(void)         { int v = valor[AJ_ESMAECER]; return v < 0 || v > 5 ? 3 : v; }
@@ -6097,7 +6115,7 @@ static int somenteDesteAparelho(int op) {
     case AJ_BUSCA_CINEMETA: /* o web nao tem esta escolha */
     case AJ_BUSCA_NUVIO: case AJ_BUSCA_ORIGEM: /* idem (#311) */
     case AJ_ESMAECER: case AJ_BRILHO_PLAYER: /* o painel OLED e desta TV */
-    case AJ_SONO: case AJ_CINEMA: case AJ_SALAT_MODO: case AJ_SALAT_CIDADE: case AJ_ESPORTE_ALERTAS:
+    case AJ_SONO: case AJ_CINEMA: case AJ_QUALI_ALERTA: case AJ_VISITANTE: case AJ_BOM_DIA: case AJ_SALAT_MODO: case AJ_SALAT_CIDADE: case AJ_ESPORTE_ALERTAS:
     case AJ_PROPORCAO_PADRAO: /* o aspecto e a tela desta TV */
     case AJ_RETOMADA_MORNA: case AJ_MANTER_PRAZO:
     case AJ_MANTER_VIDEO:   /* a memoria e o decoder sao desta TV */
@@ -7827,6 +7845,10 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_ESPORTE_ALERTAS: return "Para os times que você segue no Centro de Esportes: um lembrete automático de cada jogo (com o canal, se estiver ligado) e, se quiser, um aviso a cada gol. Com os placares ocultos, os gols não aparecem.";
     case AJ_SALAT_CIDADE: return "Mostra um aviso discreto na hora de cada oração, calculada nesta TV para a cidade escolhida (Umm al-Qura nas cidades sauditas; o método oficial de cada país nas demais). Sem internet.";
     case AJ_SALAT_MODO: return "Com Aviso e pausa, o filme, a série ou a música pausam na hora da oração. OK continua de onde parou.";
+    case AJ_BOM_DIA: return "Na primeira abertura da manhã (5h às 12h), uma vez por dia: o tempo na cidade escolhida em Horários de oração, os jogos e lembretes de hoje e as séries com episódio novo.";
+    case AJ_VISITANTE: return "Para alguém de fora assistir: enquanto estiver ligado, nada é gravado neste perfil — nem onde parou, nem Trakt ou Simkl, nem histórico ou resumo da semana. Desliga sozinho quando o app reinicia.";
+    case AJ_ATALHOS_LG: return "Põe três atalhos no menu de apps da TV: Centro de Esportes, Música e TV ao vivo. Cada um abre o QR TIME direto ali.";
+    case AJ_QUALI_ALERTA: return "Os filmes da sua lista são conferidos nos seus add-ons, um por vez, devagar, enquanto o app está aberto. Quando um deles ganha uma fonte em 4K ou Dolby Vision, aparece um aviso.";
     case AJ_SONO: return "Ao fim do tempo pausa o filme, a série ou a música e desliga a tela. Um aviso aparece um minuto antes. Volta a Desligado quando dispara e quando o app reinicia.";
     case AJ_QR_CONTAS: return "Todos os provedores num lugar: estado, teste de conexão, ligar ou desligar e atualizar. Também o cache e as operações de limpeza, sempre com confirmação.";
     case AJ_GUIA_FONTE: return "Fontes exibidas no Guia de TV.";
@@ -10015,6 +10037,10 @@ static void eventoTela(const SDL_Event *e) {
     if (focoOp == AJ_FONTE_REGEX_PADRAO) { frRegexAbrir(); return; }
     if (focoOp == AJ_DIAGNOSTICO) { pediuDiagnostico = 1; return; }
     if (focoOp == AJ_QR_CONTAS) { pediuContas = 1; return; }
+    if (focoOp == AJ_ATALHOS_LG) {
+      uxNotificar(atalhoslg_criar() ? "Pedido enviado à TV. Os atalhos aparecem no menu de apps." : "Só na TV LG.");
+      return;
+    }
     if (focoOp == AJ_LEG1_RESTAURAR || focoOp == AJ_LEG2_RESTAURAR) {
       int ok;
       if (focoOp == AJ_LEG1_RESTAURAR) {

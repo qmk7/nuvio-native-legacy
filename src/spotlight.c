@@ -1,3 +1,6 @@
+#include "intencao.h"
+#include "noite.h"
+#include "menu.h"
 #include "arteurl.h"
 // Spotlight: a caixa de busca por cima da tela. O porque e quem abre estao em
 // spotlight.h; aqui so as decisoes de forma e de custo.
@@ -1037,6 +1040,20 @@ static void lerSistema(void) {
   int voz = ouvindo();
   if (r == ST_NADA) return;
   if (r == ST_PEDE_TECLADO) { painel = P_CAMPO; abrirTecladoSis(); return; }
+  // QR TIME voice intents (intencao.h): a spoken command goes where it says;
+  // "play X" searches X. Only for speech, never for typed text.
+  if (r == ST_FIM && voz) {
+    char b[SP_MAX_TXT * 2];
+    int in = intencao_analisar(t, b, sizeof b);
+    if (in != INT_NADA) printf("[voz] intencao %d\n", in);
+    if (in == INT_BUSCA) snprintf(t, sizeof t, "%s", b);
+    else if (in != INT_NADA) {
+      spot_fechar();
+      if (in == INT_SUGESTAO) noite_sugerir();
+      else menu_ir(in == INT_ESPORTES ? MENU_ESPORTES : in == INT_MUSICA ? MENU_MUSICA : in == INT_AOVIVO ? MENU_GUIA : MENU_AJUSTES);
+      return;
+    }
+  }
   if (r == ST_TEXTO || r == ST_FIM) campoDefinir(t, voz || r == ST_FIM);
   if (r == ST_FIM) {
     registrar();
