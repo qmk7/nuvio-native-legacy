@@ -10,6 +10,8 @@
 #include "mcoffline.h"
 #include "agenda.h"
 #include "esporte.h"
+#include "pularserie.h"
+#include "intro.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -104,6 +106,27 @@ int main(void) {
     CONFERE(!existe("youtube.txt") && !existe("spotify.txt") && existe("youtube-account-p2.txt") && existe("progresso.txt"),
             "delete API keys: keys gone, nothing else");
     CONFERE(!qrdados_resetar(QRR_N) && !qrdados_resetar(-1), "unknown reset: refused");
+  }
+
+  // ---- skip intro/recap for good, per series and profile ----
+  {
+    perfis_definir_ativo(1);
+    CONFERE(!pularserie_manual("tt0903747", INTRO_ABERTURA) && !pularserie_sempre("tt0903747", INTRO_ABERTURA),
+            "first manual intro skip: not automatic yet");
+    CONFERE(pularserie_manual("tt0903747", INTRO_ABERTURA) && pularserie_sempre("tt0903747", INTRO_ABERTURA)
+            && !pularserie_sempre("tt0903747", INTRO_RESUMO) && !pularserie_sempre("tt0944947", INTRO_ABERTURA),
+            "second: automatic for that series and kind only");
+    CONFERE(!pularserie_manual("tt0903747", INTRO_ABERTURA), "already automatic: no second announcement");
+    CONFERE(!pularserie_manual("tt0903747", INTRO_CREDITOS) && !pularserie_sempre("tt0903747", INTRO_CREDITOS),
+            "credits are not remembered (they have their own rules)");
+    pularserie_recarregar();
+    CONFERE(pularserie_sempre("tt0903747", INTRO_ABERTURA), "survives a restart");
+    perfis_definir_ativo(2);
+    CONFERE(!pularserie_sempre("tt0903747", INTRO_ABERTURA), "profile 2 does not inherit it");
+    perfis_definir_ativo(1);
+    CONFERE(qrdados_resetar(QRR_PULO_SERIES) && !pularserie_sempre("tt0903747", INTRO_ABERTURA)
+            && !existe("skip-series-p1.txt"), "reset: forgotten for this profile");
+    CONFERE(!pularserie_manual("x", 0) && !pularserie_manual(NULL, INTRO_ABERTURA), "bad input refused");
   }
 
   // ---- a music source switched off ----

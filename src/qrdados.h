@@ -18,9 +18,9 @@
 // check (0 = first start with QR TIME data). Never deletes anything.
 int  qrdados_esquema_iniciar(void);
 int  qrdados_esquema_disco(void);   // version on disk now
-int  qrdados_mais_novo(void);
+int  qrdados_mais_novo(void);       // 1 = data written by a NEWER app: left untouched, not downgraded
 // After the settings load: applies the schema-v2 max-quality defaults once.
-int  qrdados_qualidade_aplicar(void);       // 1 = data written by a NEWER app: left untouched, not downgraded
+int  qrdados_qualidade_aplicar(void);
 
 // Tests: replace the upgrade steps (step i upgrades from i+1 to i+2).
 typedef int (*QrdPasso)(void);
@@ -42,6 +42,7 @@ enum {
   QRR_TRAKT_REGISTRO,   // record of what this app sent to Trakt history (this profile)
   QRR_CONTAS_PERFIL,    // YouTube / Last.fm links of this profile
   QRR_CHAVES_TV,        // YouTube / Last.fm / Spotify API keys (this TV)
+  QRR_PULO_SERIES,      // series that skip intro/recap on their own (this profile)
   QRR_N
 };
 const char *qrdados_reset_nome(int op);      // i18n key

@@ -1,6 +1,6 @@
 # QR TIME — Persistent data schema
 
-Schema version: **1** (`QRD_ESQUEMA` in `src/qrdados.h`), recorded in
+Schema version: **2** (`QRD_ESQUEMA` in `src/qrdados.h`), recorded in
 `qrtime-schema.txt` (`schema=<N>`).
 
 ## Where data lives
@@ -28,7 +28,14 @@ Schema version: **1** (`QRD_ESQUEMA` in `src/qrdados.h`), recorded in
      next start retries that step only.
 3. **Newer version on disk** (an older app installed over newer data): nothing
    is converted, downgraded or deleted. `qrdados_mais_novo()` reports it.
-4. **An upgrade step may rewrite or add, never delete.** A format change is
+4. **Steps so far:**
+   - v1: marks the base app's old first-run cards as seen.
+   - v2: writes `qrtime-quality.txt=pendente`. After the settings load,
+     `qrdados_qualidade_aplicar` moves the playback options **still at their
+     factory value** to the best this TV chain takes (4K, prefer DV/HDR, DV and
+     Atmos on, "Qualidade máxima" priority, no size limit, DV in MKV, 256 MB
+     read-ahead), then writes `feito`. A value the person chose stays.
+5. **An upgrade step may rewrite or add, never delete.** A format change is
    read-compatible both ways where possible. Example: the music sources'
    on/off column is an optional 7th field.
    - Old files load as switched on.
@@ -50,6 +57,7 @@ confirmation, with **Cancel** focused by default.
 | Forget what was sent to Trakt | `trakt-sent-p<N>` (nothing is deleted on Trakt) | profile |
 | Disconnect YouTube and Last.fm | `youtube-account-p<N>`, `lastfm-sessao-p<N>`, `lastfm-pendentes-p<N>` | profile |
 | Delete API keys | `youtube.txt`, `lastfm.txt`, `spotify.txt` | TV |
+| Forget series that skip on their own | `skip-series-p<N>` | profile |
 
 **Cache recovery:**
 - A cache file that fails to parse is treated as a miss. The parsers are
@@ -80,6 +88,8 @@ R = regenerable.
 | `agenda-p<N>.txt`, `lembretes-p<N>.txt` | profile | `agenda.c` | Agenda cache, reminders | |
 | `agenda-follows-p<N>.txt` | profile | `agenda.c` | `imdb\ttitle\tposter` | |
 | `esporte-p<N>.txt` | profile | `esporte.c` | leagues, teams, event→channel links, hide-scores flag | |
+| `skip-series-p<N>.txt` | profile | `pularserie.c` | `imdb\tmask\tintro presses\trecap presses` (mask 1 = intro, 2 = recap skip on their own) | |
+| `qrtime-quality.txt` | TV | `qrdados.c` | `pendente` / `feito` (schema v2 max-quality defaults) | |
 
 The base app's own files are listed by `tools/arm.sh`:
 - `ARQ_DE_PESSOA`

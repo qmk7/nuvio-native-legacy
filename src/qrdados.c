@@ -1,4 +1,5 @@
 #include "qrdados.h"
+#include "pularserie.h"
 #include "dados.h"
 #include "perfis.h"
 #include "mcfila.h"
@@ -173,6 +174,7 @@ static const struct { const char *nome, *desc; int porTv; } RESETS[QRR_N] = {
   [QRR_TRAKT_REGISTRO] = { "Esquecer o que foi enviado ao Trakt", "Só deste perfil. Nada é apagado no Trakt; o app só deixa de lembrar o que já enviou.", 0 },
   [QRR_CONTAS_PERFIL]  = { "Desconectar YouTube e Last.fm", "Só deste perfil. As chaves de API desta TV ficam.", 0 },
   [QRR_CHAVES_TV]      = { "Apagar chaves de API desta TV", "YouTube, Last.fm e Spotify, para todos os perfis desta TV.", 1 },
+  [QRR_PULO_SERIES]    = { "Esquecer as séries com pulo automático", "Só deste perfil. A abertura e o resumo voltam a ter só o botão Pular nessas séries.", 0 },
 };
 const char *qrdados_reset_nome(int op) { return op >= 0 && op < QRR_N ? RESETS[op].nome : ""; }
 const char *qrdados_reset_desc(int op) { return op >= 0 && op < QRR_N ? RESETS[op].desc : ""; }
@@ -214,6 +216,7 @@ int qrdados_resetar(int op) {
       dados_apagar("youtube.txt"); dados_apagar("lastfm.txt"); dados_apagar("spotify.txt");
       mclfm_carregar();
       break;
+    case QRR_PULO_SERIES: apagarPerfil("skip-series-p%d.txt"); pularserie_recarregar(); break;
     default: return 0;
   }
   printf("[dados] reset %d (%s) -> %s\n", op, qrdados_reset_por_tv(op) ? "this TV" : "this profile", ok ? "ok" : "partial");

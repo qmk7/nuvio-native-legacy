@@ -27,6 +27,7 @@
 #include "mediaurl.h"
 #include "horafmt.h"
 #include "player.h"
+#include "pularserie.h"
 #include "legfontes.h"
 #include "memlog.h"
 #include "dvtela.h"
@@ -544,6 +545,22 @@ static const CatItem *item(void) {
   if (canalSessao) return &itemCanal;
   if (temFixo) return &itemFixo;
   return cat_item(idx);
+}
+
+// QR TIME: "Skip" pressed by hand in a series. The second time for the same
+// kind (intro or recap), that series skips it on its own from now on
+// (pularserie.h). Called BEFORE the jump: the button's kind is read here.
+static void skipManualSerie(void) {
+  const CatItem *ci = item();
+  int tp = 0;
+  if (!ci || strcmp(ci->tipo, "series") || !intro_botao_visivel(NULL, &tp)) return;
+  if (pularserie_manual(ci->imdb, tp))
+    player_toast(tp == INTRO_RESUMO ? i18n("Esta série vai pular o resumo sozinha")
+                                    : i18n("Esta série vai pular a abertura sozinha"), 3500);
+}
+static int serieSempre(int tipo) {
+  const CatItem *ci = item();
+  return ci && !strcmp(ci->tipo, "series") && pularserie_sempre(ci->imdb, tipo);
 }
 // O indice CORRENTE do titulo aberto: re-resolvido pelo IMDb, porque o que foi
 // guardado em `idx` pode ter sido deslocado por uma republicacao. Cai em `idx`
@@ -4432,6 +4449,7 @@ void player_evento(const SDL_Event *e) {
       // ar. Manter esta linha faria o OK disparar a troca duas vezes.
       { double fim;if(trechoPulavel(&fim)){
           { int tp=0;if(intro_botao_visivel(NULL,&tp)&&tp==INTRO_CREDITOS)player_aprender_creditos(); }
+          skipManualSerie();
           pularTrecho(puloDestino(fim));if(comVideo)buscarUsuario(posSeg);return; } }
       // O OK com os controles escondidos e o Play/Pause: os controles sobem
       // com o foco NO PLAY, nao onde ficou da ultima vez (Legendas, Audio,
@@ -4480,6 +4498,7 @@ void player_evento(const SDL_Event *e) {
     double fim;
     if (!trechoPulavel(&fim)) skipFoco = 0;          // o trecho acabou por baixo do foco
     else if (k == SDLK_RETURN || k == SDLK_KP_ENTER || k == SDLK_SPACE) {
+      skipManualSerie();
       pularTrecho(puloDestino(fim)); if (comVideo) buscarUsuario(posSeg);
       skipFoco = 0; acordar(); return;
     } else if (k == SDLK_DOWN) { skipFoco = 0; acordar(); return; }
@@ -5025,7 +5044,8 @@ void player_atualizar(float dt, Uint32 agora) {
       !video_bufferando_ms() && !creditosAuto.buscaPendente) {
     double fimT = 0.0; int tipoT = 0;
     if (intro_auto_ativo(posSeg, &fimT, &tipoT) &&
-        intro_auto_pular(tipoT, fimT, duracaoSeg, ajustes_pular_abertura(), ajustes_pular_resumo(),
+        intro_auto_pular(tipoT, fimT, duracaoSeg, ajustes_pular_abertura() || serieSempre(INTRO_ABERTURA),
+                         ajustes_pular_resumo() || serieSempre(INTRO_RESUMO),
                          ajustes_pular_creditos() && !creditosAuto.fonteMudou) &&
         !intro_auto_ja(tipoT, fimT)) {
       intro_auto_marcar(tipoT, fimT);
