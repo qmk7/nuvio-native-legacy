@@ -860,6 +860,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "addonslocal.h"
 #include "esporteui.h"
 #include "esportealerta.h"
+#include "salat.h"
 #include "ytui.h"
 #include "mcui.h"
 #include "qrcontasui.h"
@@ -7158,6 +7159,7 @@ void app_atualizar(float dt, Uint32 agora) {
     CatItem it;
     glem_passo(dt, agora);
     esportealerta_passo(agora);   // QR TIME: followed teams' reminders and goals
+    salat_passo(agora);           // QR TIME: prayer times
     // "Assistir" no cartao: o canal em tela cheia, de onde a pessoa estiver.
     if (aguardandoFonte != 2 && glem_pediu_assistir(lid, sizeof lid, lnome, sizeof lnome,
                                                      lbase, sizeof lbase)) {

@@ -305,6 +305,8 @@ static const char *uxSinonimos(int op) {
       return "lento lenta lentidao travando trava falha erro desempenho diagnostico rede internet";
     case AJ_CINEMA: return "cinema filme sessao noite escuro qualidade atmos dolby vision sem distracao";
     case AJ_ESPORTE_ALERTAS: return "esporte esportes futebol jogo partida time gol aviso lembrete sport match goal";
+    case AJ_SALAT_CIDADE: return "oracao salat adhan reza horario prayer namaz cidade";
+    case AJ_SALAT_MODO: return "oracao pausar pausa salat prayer pause";
     case AJ_SONO: return "sono dormir temporizador desligar timer sleep apagar tela minutos";
     case AJ_QR_CONTAS:
       return "conta contas provedor provedores iptv musica navidrome webdav trakt youtube lastfm spotify cache limpar dados apagar redefinir";

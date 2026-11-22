@@ -825,6 +825,9 @@ int  ajustes_qualidade_maxima_padrao(void);
 int  ajustes_sono_minutos(void);
 // Followed teams: 0 off, 1 match reminders, 2 reminders and goals (esportealerta.c).
 int  ajustes_esporte_alertas(void);
+// Prayer times (salat.c): 0 off, else 1 + index into salat_cidades(); mode 1 = also pause.
+int  ajustes_salat_cidade(void);
+int  ajustes_salat_modo(void);
 void ajustes_sono_zerar(void);
 
 // O CAMINHO DE VOLTA (#85): devolve em *saida uma copia do blob `base` (o mesmo

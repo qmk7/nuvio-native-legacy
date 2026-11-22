@@ -358,3 +358,5 @@
   0, /* sleep timer: Off */
   1, /* cinema mode: Off (V_LIGA 1) */
   2, /* followed teams: match reminders and goals */
+  0, /* prayer times: off */
+  0, /* at prayer time: notice only */

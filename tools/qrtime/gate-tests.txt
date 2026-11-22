@@ -100,3 +100,4 @@ qrtime_lanweb
 qrtime_backup:900
 qrtime_festa:900
 qrtime_esportealerta:900
+qrtime_salat

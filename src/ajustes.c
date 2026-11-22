@@ -733,6 +733,8 @@ typedef enum {
   AJ_SONO,             // QR TIME: sleep timer (sono.c). LOCAL; back to Off at every start.
   AJ_CINEMA,           // QR TIME: cinema mode, one switch (cinemaDefinir). LOCAL; V_LIGA, Off by default.
   AJ_ESPORTE_ALERTAS,   // QR TIME: followed teams: automatic match reminders, goal notices (esportealerta.c). LOCAL.
+  AJ_SALAT_CIDADE,   // QR TIME: prayer times city (salat.c); 0 = off. LOCAL.
+  AJ_SALAT_MODO,   // QR TIME: at prayer time: 0 notice only, 1 notice and pause. LOCAL.
   AJ_N
 } OpcaoId;
 _Static_assert(DEBRID_RD == 0 && DEBRID_TB == 1 && DEBRID_PM == 2 && DEBRID_AD == 3,
@@ -811,6 +813,8 @@ static const char *V_FONTE_HDR[] = { "Preferir", "Indiferente", "Evitar" };
 // 2.0: "ate 30 s" (dono, 05/10). Indices = esmaecer.h (ESM_ESCOLHAS); o
 // ajuste nunca saiu numa versao publicada, entao os indices antigos nao migram.
 static const char *V_ESP_ALERTA[] = { "Desligado", "Lembrete dos jogos", "Lembrete e gols" };
+static const char *V_SALAT[] = { "Desligado", "Riyadh", "Jeddah", "Makkah", "Madinah", "Dammam", "Khobar", "Al Ahsa", "Taif", "Abha", "Tabuk", "Buraidah", "Hail", "Jazan", "Najran", "Dubai", "Abu Dhabi", "Doha", "Kuwait City", "Manama", "Muscat", "Cairo", "Amman" };
+static const char *V_SALAT_MODO[] = { "Só o aviso", "Aviso e pausa" };
 static const char *V_SONO[] = { "Desligado", "15 min", "30 min", "1 hora", "1h30", "2 horas" };
 static const char *V_ESMAECER[] = { "Desligado", "30 s", "1 min", "2 min", "5 min", "10 min" };
 static const char *V_DESCANSO_ESTILO[] = { "Vitrine", "Relógio", "Só escurecer" };
@@ -1878,6 +1882,8 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Temporizador de sono", V_SONO, 6),   // local: sonoLocal
   ESC("Modo cinema", V_LIGA, 2),            // local: cinemaLocal
   ESC("Avisos dos seus times", V_ESP_ALERTA, 3),   // local: esporteAlertasLocal
+  ESC("Horários de oração", V_SALAT, 23),   // local: salatCidadeLocal
+  ESC("Na hora da oração", V_SALAT_MODO, 2),   // local: salatModoLocal
 };
 
 // Nome de cada opcao no arquivo. O formato era POSICIONAL — uma linha por
@@ -2216,6 +2222,8 @@ static const char *CHAVE[] = {
   "sonoLocal",
   "cinemaLocal",
   "esporteAlertasLocal",
+  "salatCidadeLocal",
+  "salatModoLocal",
 };
 // QUATRO VETORES PARALELOS indexados pelo mesmo enum AJ_*: OPCOES, CHAVE,
 // valor e as secoes. OPCOES ja e declarado [AJ_N], e `valor` aceita inicializacao
@@ -2932,6 +2940,8 @@ int ajustes_fonte_prioridade(void) { int v = valor[AJ_FONTE_PRIORIDADE]; return 
 int ajustes_enquetes(void)         { return lig(AJ_ENQUETES); }
 int ajustes_busca_cinemeta(void)   { return lig(AJ_BUSCA_CINEMETA); }
 int ajustes_esporte_alertas(void) { int v = valor[AJ_ESPORTE_ALERTAS]; return v < 0 || v > 2 ? 0 : v; }
+int ajustes_salat_cidade(void) { int v = valor[AJ_SALAT_CIDADE]; return v < 0 || v > 22 ? 0 : v; }
+int ajustes_salat_modo(void) { return valor[AJ_SALAT_MODO] == 1; }
 int ajustes_sono_minutos(void) { static const int m[6] = { 0, 15, 30, 60, 90, 120 }; int v = valor[AJ_SONO]; return v < 0 || v > 5 ? 0 : m[v]; }
 void ajustes_sono_zerar(void) { if (valor[AJ_SONO]) { valor[AJ_SONO] = 0; gravar(); } }
 int ajustes_esmaecer(void)         { int v = valor[AJ_ESMAECER]; return v < 0 || v > 5 ? 3 : v; }
@@ -6087,7 +6097,7 @@ static int somenteDesteAparelho(int op) {
     case AJ_BUSCA_CINEMETA: /* o web nao tem esta escolha */
     case AJ_BUSCA_NUVIO: case AJ_BUSCA_ORIGEM: /* idem (#311) */
     case AJ_ESMAECER: case AJ_BRILHO_PLAYER: /* o painel OLED e desta TV */
-    case AJ_SONO: case AJ_CINEMA: case AJ_ESPORTE_ALERTAS:
+    case AJ_SONO: case AJ_CINEMA: case AJ_SALAT_MODO: case AJ_SALAT_CIDADE: case AJ_ESPORTE_ALERTAS:
     case AJ_PROPORCAO_PADRAO: /* o aspecto e a tela desta TV */
     case AJ_RETOMADA_MORNA: case AJ_MANTER_PRAZO:
     case AJ_MANTER_VIDEO:   /* a memoria e o decoder sao desta TV */
@@ -7490,6 +7500,7 @@ static int inativa(int op) {
     // Tela de descanso: o estilo depende de haver descanso; os titulos, de ele
     // ser a vitrine.
     case AJ_DESCANSO_ESTILO: return valor[AJ_ESMAECER] == 0;
+    case AJ_SALAT_MODO: return valor[AJ_SALAT_CIDADE] == 0;
     case AJ_DESCANSO_FONTE:  return valor[AJ_ESMAECER] == 0 || ajustes_descanso_estilo() != 0;
     case AJ_CW_OK: case AJ_CW_FONTE: case AJ_CW_PROXIMO:
     case AJ_CW_ESTILO: case AJ_CW_THUMB: case AJ_CW_FURTHEST:
@@ -7814,6 +7825,8 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_IPTV_TESTAR: return "Confere agora se o servidor responde e aceita esta conta, sem mudar nada.";
     case AJ_CINEMA: return "Um botão para a sessão de cinema: 4K, Dolby Vision e Atmos, sem trailers automáticos, sem painel ao pausar, sem relógio na tela e com a interface do player mais escura. Desligar devolve o que estava antes.";
     case AJ_ESPORTE_ALERTAS: return "Para os times que você segue no Centro de Esportes: um lembrete automático de cada jogo (com o canal, se estiver ligado) e, se quiser, um aviso a cada gol. Com os placares ocultos, os gols não aparecem.";
+    case AJ_SALAT_CIDADE: return "Mostra um aviso discreto na hora de cada oração, calculada nesta TV para a cidade escolhida (Umm al-Qura nas cidades sauditas; o método oficial de cada país nas demais). Sem internet.";
+    case AJ_SALAT_MODO: return "Com Aviso e pausa, o filme, a série ou a música pausam na hora da oração. OK continua de onde parou.";
     case AJ_SONO: return "Ao fim do tempo pausa o filme, a série ou a música e desliga a tela. Um aviso aparece um minuto antes. Volta a Desligado quando dispara e quando o app reinicia.";
     case AJ_QR_CONTAS: return "Todos os provedores num lugar: estado, teste de conexão, ligar ou desligar e atualizar. Também o cache e as operações de limpeza, sempre com confirmação.";
     case AJ_GUIA_FONTE: return "Fontes exibidas no Guia de TV.";
