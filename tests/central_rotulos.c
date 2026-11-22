@@ -39,7 +39,7 @@ int main(void) {
   gfx_tamanho_alvo(1920, 1080);
   assert(gfx_iniciar());
   assert(txt_iniciar("deploy/app", 1));
-  assert(central_catalogo_n() == 28);
+  assert(central_catalogo_n() == 29);
   // Montserrat (a da TV do dono) e a Inter de fabrica.
   for (f = 0; f < 2; f++) {
   txt_definir_fonte_interface(FAM[f]);
@@ -61,6 +61,6 @@ int main(void) {
   txt_encerrar(); gfx_encerrar();
   SDL_GL_DeleteContext(gl); SDL_DestroyWindow(w); SDL_Quit();
   if (falhas) { printf("%d nome(s) nao cabem\n", falhas); return 1; }
-  puts("PASS: os 28 nomes cabem nos 30 idiomas");
+  puts("PASS: os 29 nomes cabem nos 30 idiomas");
   return 0;
 }

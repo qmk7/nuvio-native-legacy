@@ -12,6 +12,9 @@ void sono_atualizar(Uint32 agora);   // once per frame
 int  sono_entrada(const SDL_Event *e);
 void sono_desenhar(void);            // black frame while the screen is "off"
 int  sono_tela_apagada(void);
+// "Listen only" (player button): the screen off now, nothing paused. The
+// first key turns it back on, as after the timer.
+void sono_so_audio(void);
 // Test hook: what the timer would act on (NULL = the real player/music).
 typedef struct {
   int  (*minutos)(void);

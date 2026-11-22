@@ -466,6 +466,8 @@ static SDL_Event soltarMouse;
 
 // The QR TIME intro takes injected keys the same way as the remote's: skip.
 static void introInjetada(const SDL_Event *e) { if (e->type == SDL_KEYDOWN) qrintro_tecla(); }
+// Injected keys meet the sleep timer as real keys do (the event loop's sono_entrada).
+static void appInjetada(const SDL_Event *e) { if (!sono_entrada(e)) app_evento(e); }
 static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
   if (soltarMouseEm && SDL_GetTicks() >= soltarMouseEm) {
     soltarMouseEm = 0;
@@ -2093,7 +2095,7 @@ int main(int argc, char **argv) {
       app_evento(&e);
     }
     central_tecla_quadro(SDL_GetTicks(), entregarCh);
-    teclasInjetadas(qrintro_ativa() ? introInjetada : app_evento);
+    teclasInjetadas(qrintro_ativa() ? introInjetada : appInjetada);
 #ifdef NV_TOUCH_UI
     // A saved mode change must refresh every target even when SDL keeps the
     // same drawable size and sends no window event.

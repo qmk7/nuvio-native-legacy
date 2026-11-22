@@ -28,6 +28,7 @@
 #include "horafmt.h"
 #include "player.h"
 #include "pularserie.h"
+#include "sono.h"
 #include "legfontes.h"
 #include "memlog.h"
 #include "dvtela.h"
@@ -235,7 +236,9 @@ extern int trakt_scrobble_alvo(int, const TraktScrobbleAlvo *, double, double,
 // IDs estaveis: a ordem visual e de navegacao vem de transporteAcoes.
 // Na serie, Anterior/Proximo ficam ao lado do Play; o restante conserva a ordem.
 enum { PLR_PLAY, PLR_CC, PLR_AUDIO, PLR_ASPECTO,
-       PLR_FONTES, PLR_EPISODIOS, PLR_PROXIMO, PLR_REINICIAR, PLR_NESTE, PLR_NBTNS };
+       PLR_FONTES, PLR_EPISODIOS, PLR_PROXIMO, PLR_REINICIAR, PLR_NESTE,
+       PLR_SO_AUDIO,   // QR TIME: listen only (screen off, sound goes on; sono.h)
+       PLR_NBTNS };
 
 // Avanco em curso: enquanto vale, posSeg e do DONO e nao do pipeline.
 static int    scrubbing, scrubPassos, scrubTocava, scrubDir, scrubToque;
@@ -3383,6 +3386,7 @@ static int transporteAcoes(PlrAcao a[PLR_NBTNS]) {
   a[n++] = (PlrAcao){PLR_FONTES, 1};
   if (temUltimoBotao()) a[n++] = (PlrAcao){PLR_EPISODIOS, 1};
   if (serie) a[n++] = (PlrAcao){PLR_NESTE, 1};
+  a[n++] = (PlrAcao){PLR_SO_AUDIO, comVideo && video_ativo()};
   return n;
 }
 static int transporteHabilitado(int id) {
@@ -4242,6 +4246,7 @@ static int ativarBotao(int i, int repetiu) {
     case PLR_AUDIO: pedFaixas = 1; break;
     case PLR_FONTES: pedFontes = 1; break;
     case PLR_NESTE: nesteAberto = 1; nesteT = epT; nesteE = epE; break;
+    case PLR_SO_AUDIO: esconderControles(); sono_so_audio(); break;
     case PLR_EPISODIOS:
       if (ehCanal()) pedGuia = 1;
       else if (epE > 0) episodios_abrir(idxAtual(), epT, epE);
@@ -5365,6 +5370,7 @@ static const char *iconeBotao(int i) {
     case PLR_PROXIMO:   return "pl_chevron-right";
     case PLR_REINICIAR: return "pl_rotate-ccw";
     case PLR_NESTE:     return "pl_users";
+    case PLR_SO_AUDIO:  return "pl_eye-off";
     default:            return epE > 0 ? "pl_list-video" : "pl_film";
   }
 }
@@ -5378,6 +5384,7 @@ static const char *rotuloBotao(int i) {
     case PLR_PROXIMO:   return "Próximo episódio";
     case PLR_REINICIAR: return "Assistir do começo";
     case PLR_NESTE:     return "Neste episódio";
+    case PLR_SO_AUDIO:  return "Só áudio";
     default:            return ehCanal() ? "Guia" : epE > 0 ? "Epis\xc3\xb3""dios" : "Relacionados";
   }
 }

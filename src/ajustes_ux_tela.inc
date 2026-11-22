@@ -187,6 +187,7 @@ static const Item TELA[] = {
     ROT("Tela de descanso"),
       OPC(AJ_ESMAECER), OPC(AJ_DESCANSO_ESTILO), OPC(AJ_DESCANSO_FONTE),
     ROT("Temporizador de sono"), OPC(AJ_SONO),
+    ROT("Modo cinema"), OPC(AJ_CINEMA),
     MAIS(),
     ROT("Cores e vidro"), OPC(AJ_VIDRO_OPAC), OPC(AJ_VIDRO_FOSCO), OPC(AJ_VIDRO_QUALIDADE),
 

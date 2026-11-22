@@ -89,6 +89,7 @@ R = regenerable.
 | `agenda-follows-p<N>.txt` | profile | `agenda.c` | `imdb\ttitle\tposter` | |
 | `esporte-p<N>.txt` | profile | `esporte.c` | leagues, teams, event→channel links, hide-scores flag | |
 | `skip-series-p<N>.txt` | profile | `pularserie.c` | `imdb\tmask\tintro presses\trecap presses` (mask 1 = intro, 2 = recap skip on their own) | |
+| `cinema-backup.txt` | settings folder | `ajustes.c` | `<setting key> <value>` per line: the values cinema mode replaced, restored when it is switched off | |
 | `qrtime-quality.txt` | TV | `qrdados.c` | `pendente` / `feito` (schema v2 max-quality defaults) | |
 
 The base app's own files are listed by `tools/arm.sh`:

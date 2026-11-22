@@ -731,6 +731,7 @@ typedef enum {
   AJ_IPTV_TESTAR,      // QR TIME: action, test the selected IPTV account now (iptvteste.h).
   AJ_QR_CONTAS,        // QR TIME phase 8: action, opens Accounts, providers and data (qrcontasui.c).
   AJ_SONO,             // QR TIME: sleep timer (sono.c). LOCAL; back to Off at every start.
+  AJ_CINEMA,           // QR TIME: cinema mode, one switch (cinemaDefinir). LOCAL; V_LIGA, Off by default.
   AJ_N
 } OpcaoId;
 _Static_assert(DEBRID_RD == 0 && DEBRID_TB == 1 && DEBRID_PM == 2 && DEBRID_AD == 3,
@@ -1873,6 +1874,7 @@ static const Opcao OPCOES[AJ_N] = {
   ACAO("Testar conexão"),
   ACAO("Contas, provedores e dados"),
   ESC("Temporizador de sono", V_SONO, 6),   // local: sonoLocal
+  ESC("Modo cinema", V_LIGA, 2),            // local: cinemaLocal
 };
 
 // Nome de cada opcao no arquivo. O formato era POSICIONAL — uma linha por
@@ -2209,6 +2211,7 @@ static const char *CHAVE[] = {
   "-iptvTestar",
   "-qrContas",
   "sonoLocal",
+  "cinemaLocal",
 };
 // QUATRO VETORES PARALELOS indexados pelo mesmo enum AJ_*: OPCOES, CHAVE,
 // valor e as secoes. OPCOES ja e declarado [AJ_N], e `valor` aceita inicializacao
@@ -6079,7 +6082,7 @@ static int somenteDesteAparelho(int op) {
     case AJ_BUSCA_CINEMETA: /* o web nao tem esta escolha */
     case AJ_BUSCA_NUVIO: case AJ_BUSCA_ORIGEM: /* idem (#311) */
     case AJ_ESMAECER: case AJ_BRILHO_PLAYER: /* o painel OLED e desta TV */
-    case AJ_SONO:
+    case AJ_SONO: case AJ_CINEMA:
     case AJ_PROPORCAO_PADRAO: /* o aspecto e a tela desta TV */
     case AJ_RETOMADA_MORNA: case AJ_MANTER_PRAZO:
     case AJ_MANTER_VIDEO:   /* a memoria e o decoder sao desta TV */
@@ -7804,6 +7807,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_IPTV_NOME: return "Nome da conta";
     case AJ_IPTV_REMOVER: return "Apaga apenas a conta selecionada e seus canais.";
     case AJ_IPTV_TESTAR: return "Confere agora se o servidor responde e aceita esta conta, sem mudar nada.";
+    case AJ_CINEMA: return "Um botão para a sessão de cinema: 4K, Dolby Vision e Atmos, sem trailers automáticos, sem painel ao pausar, sem relógio na tela e com a interface do player mais escura. Desligar devolve o que estava antes.";
     case AJ_SONO: return "Ao fim do tempo pausa o filme, a série ou a música e desliga a tela. Um aviso aparece um minuto antes. Volta a Desligado quando dispara e quando o app reinicia.";
     case AJ_QR_CONTAS: return "Todos os provedores num lugar: estado, teste de conexão, ligar ou desligar e atualizar. Também o cache e as operações de limpeza, sempre com confirmação.";
     case AJ_GUIA_FONTE: return "Fontes exibidas no Guia de TV.";
@@ -9659,6 +9663,58 @@ static int ajFonteAplicar(int op, int novo) {
   }
   return 1;
 }
+// QR TIME CINEMA MODE: one switch for the evening film. On: each option below
+// moves to its cinema value and the value it had is kept in cinema-backup.txt
+// (by CHAVE, stable across versions). Off: each goes back, unless the person
+// changed it meanwhile (then their newer choice stays).
+static const struct { const char *chave; int v; } CINEMA[] = {
+  { "qualidade", 1 }, { "fonteHdrLocal", 0 }, { "dolbyVision", 0 }, { "dolbyAtmos", 0 },
+  { "fontePrioridadeLocal", 1 },
+  { "trailerAuto", 1 }, { "trailerHero", 1 },     // V_LIGA: 1 = Off
+  { "pauseOverlayEnabled", 1 }, { "relogioTelaLocal", 1 },
+  { "brilhoPlayerLocal", 2 },                      // 65%
+};
+static int opDaChave(const char *k) {
+  for (int i = 0; i < AJ_N; i++) if (CHAVE[i] && !strcmp(CHAVE[i], k)) return i;
+  return -1;
+}
+static int cinemaDefinir(int novo) {
+  char arq[700];
+  int n = (int)(sizeof CINEMA / sizeof *CINEMA), ligar = novo == 0, mudou = 0;
+  if (ligar == (valor[AJ_CINEMA] == 0)) return 1;
+  snprintf(arq, sizeof arq, "%s/cinema-backup.txt", dirAjustes);
+  if (ligar) {
+    char buf[1024]; size_t u = 0; FILE *f;
+    buf[0] = 0;
+    for (int i = 0; i < n; i++) {
+      int op = opDaChave(CINEMA[i].chave);
+      if (op < 0 || !ajOpcaoDisponivel(op)) continue;
+      u += (size_t)snprintf(buf + u, sizeof buf - u, "%s %d\n", CINEMA[i].chave, valor[op]);
+      if (valor[op] != CINEMA[i].v) { valor[op] = CINEMA[i].v; mudou++; }
+    }
+    f = fopen(arq, "w");
+    if (f) { fputs(buf, f); fclose(f); }
+  } else {
+    FILE *f = fopen(arq, "r");
+    char linha[96];
+    while (f && fgets(linha, sizeof linha, f)) {
+      char k[64]; int v, op, alvo = -1;
+      if (sscanf(linha, "%63s %d", k, &v) != 2 || (op = opDaChave(k)) < 0) continue;
+      for (int i = 0; i < n; i++) if (!strcmp(CINEMA[i].chave, k)) alvo = CINEMA[i].v;
+      if (alvo < 0 || valor[op] != alvo) continue;   // changed during cinema: theirs stays
+      v = limita(op, v);
+      if (valor[op] != v) { valor[op] = v; mudou++; }
+    }
+    if (f) fclose(f);
+    remove(arq);
+  }
+  valor[AJ_CINEMA] = ligar ? 0 : 1;
+  gravar();
+  printf("[cinema] %s: %d opcao(oes)\n", ligar ? "ligado" : "desligado", mudou);
+  fflush(stdout);
+  return 1;
+}
+
 static int definirValorDireto(int op, int novo) {
   int antes, memoriaAntes = memoriaEscolhida, bibliotecaAntes = bibliotecaFonteEscolhida;
   if (op < 0 || op >= AJ_N || !ajOpcaoDisponivel(op) ||
@@ -9702,6 +9758,7 @@ static int definirValorDireto(int op, int novo) {
   if (op == AJ_LEG2_POS) valor[AJ_LEG2_POSICAO] = 0;
   if (op == AJ_VIDRO_FOSCO && novo == 2) gpun_fosco_reiniciar();
   if (op == AJ_PERFIL_INFANTIL) return pfMudarInfantil(novo == 0);
+  if (op == AJ_CINEMA) return cinemaDefinir(novo);
   antes = valor[op];
   if (novo == antes && !(op == AJ_LEG2_POS && posicaoAntes != 0) &&
       (op != AJ_TEX_MB || memoriaEscolhida) && (op != AJ_SALVOS_DEST || bibliotecaFonteEscolhida)) return 1;

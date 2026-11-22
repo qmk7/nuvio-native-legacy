@@ -16,6 +16,7 @@ int mcp_estado(void) { return 0; }
 void mcp_alternar_pausa(void) {}
 int player_aberto(void) { return 0; }
 void player_toast_ex(const char *t, unsigned ms, const char *i, int a) { (void)t; (void)ms; (void)i; (void)a; }
+void ilha_retirar(const char *c) { (void)c; }
 void ilha_avisar(const char *c, int t, const char *i, const char *x, unsigned ms, int k) { (void)c; (void)t; (void)i; (void)x; (void)ms; (void)k; }
 const char *i18n(const char *s) { return s; }
 
@@ -63,5 +64,13 @@ int main(void) {
   CONFERE(video == 1, "changing 30 -> 60 min restarts the count from the change");
   sono_atualizar(200000 + 29 * 60000 + 60 * 60000);
   CONFERE(video == 2, "...and fires at the new time");
+  // Listen only: screen off now, nothing paused, the first key wakes it.
+  sono_entrada(&k);   // wake from the timer above
+  { int v0 = video, m0 = musica, a0 = apagou, c0 = acendeu;
+    sono_so_audio();
+    CONFERE(apagou == a0 + 1 && video == v0 && musica == m0 && sono_tela_apagada(), "listen only: screen off, nothing paused");
+    sono_so_audio();
+    CONFERE(apagou == a0 + 1, "listen only twice: one request");
+    CONFERE(sono_entrada(&k) && acendeu == c0 + 1 && !sono_tela_apagada(), "listen only: first key turns the screen on"); }
   return falhas ? 1 : 0;
 }

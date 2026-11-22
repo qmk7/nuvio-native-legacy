@@ -10,6 +10,7 @@
 #include "video.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #if !defined(__APPLE__) && !defined(NV_LINUX_DESKTOP) && !defined(NV_TPK) && !defined(NV_ANDROID) && !defined(__EMSCRIPTEN__)
 #define SONO_WEBOS 1
@@ -31,6 +32,7 @@ static void respTela(const char *payload, void *u) {
 }
 #endif
 static void apagarTela(int apagar) {
+  if (apagar) ilha_retirar("sono");   // the countdown notice must not greet the person after waking
 #ifdef SONO_WEBOS
   video_luna(apagar ? "luna://com.webos.service.tvpower/power/turnOffScreen"
                     : "luna://com.webos.service.tvpower/power/turnOnScreen", "{}", apagar ? respTela : NULL, NULL);
@@ -47,6 +49,14 @@ static void aviso(int seg) {
 static const SonoAlvo REAL = { ajustes_sono_minutos, ajustes_sono_zerar, pausarVideo, pausarMusica, apagarTela, aviso };
 static const SonoAlvo *A(void) { return alvo ? alvo : &REAL; }
 
+// Desktop e2e only: QRT_SONO_SEG=1 makes each "minute" one second.
+static Uint32 unidadeMs(void) {
+#ifdef NV_LINUX_DESKTOP
+  const char *e = getenv("QRT_SONO_SEG");
+  if (e && *e == '1') return 1000u;
+#endif
+  return 60000u;
+}
 void sono_teste_alvo(const SonoAlvo *a) { alvo = a; minutosVistos = -1; prazo = 0; avisou = 0; apagada = 0; }
 
 void sono_atualizar(Uint32 agora) {
@@ -61,14 +71,14 @@ void sono_atualizar(Uint32 agora) {
   if (m != minutosVistos) {
     minutosVistos = m;
     avisou = 0;
-    prazo = m ? agora + (Uint32)m * 60000u : 0;
+    prazo = m ? agora + (Uint32)m * unidadeMs() : 0;
     if (m && !prazo) prazo = 1;
     printf("[sono] %s\n", m ? "ligado" : "desligado");
     if (m) printf("[sono] dispara em %d min\n", m);
     fflush(stdout);
   }
   if (!prazo) return;
-  if (!avisou && (int)(prazo - agora) <= 60000) { avisou = 1; A()->aviso((int)((prazo - agora + 999) / 1000)); }
+  if (!avisou && (int)(prazo - agora) <= (int)unidadeMs()) { avisou = 1; A()->aviso((int)((prazo - agora + 999) / 1000)); }
   if ((int)(prazo - agora) > 0) return;
   prazo = 0;
   printf("[sono] disparou: pausa e tela desligada\n");
@@ -92,6 +102,14 @@ int sono_entrada(const SDL_Event *e) {
 }
 
 int sono_tela_apagada(void) { return apagada; }
+
+void sono_so_audio(void) {
+  if (apagada) return;
+  printf("[sono] so audio: tela desligada, o som continua\n");
+  fflush(stdout);
+  A()->apagar_tela(1);
+  apagada = 1;
+}
 
 void sono_desenhar(void) {
   GfxRect tela = { 0, 0, NV_TELA_W, NV_TELA_H };
