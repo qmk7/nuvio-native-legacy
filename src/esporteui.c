@@ -98,8 +98,8 @@ static void carregar(void) {
 }
 
 // ---------------------------------------------------------------- view state
-enum { ABA_MEUS, ABA_TODOS, ABA_VIVO, ABA_PROX, ABA_FIM, ABA_LIGAS, ABA_TIMES, ABA_FAV, ABA_N };
-static const char *const ABAS[ABA_N] = { "Meus esportes", "Todos", "Ao vivo", "Próximos", "Encerrados", "Ligas", "Times", "Favoritos" };
+enum { ABA_MEUS, ABA_TODOS, ABA_VIVO, ABA_PROX, ABA_FIM, ABA_LIGAS, ABA_TIMES, ABA_FAV, ABA_TABELA, ABA_N };
+static const char *const ABAS[ABA_N] = { "Meus esportes", "Todos", "Ao vivo", "Próximos", "Encerrados", "Ligas", "Times", "Favoritos", "Tabela do campeonato" };
 enum { Z_ABAS, Z_FILTROS, Z_LISTA, Z_DETALHE, Z_ESCOLHER };
 enum { F_ESPORTE, F_LIGA, F_DIA, F_PLACAR, F_N };
 static int aba, zona = Z_LISTA, foco, filtroFoco, sair, abertoUmaVez;
@@ -128,6 +128,44 @@ static char busca[64];
 static CatItem pedido; static int temPedido;
 static char abrirPend[24];
 
+// QR TIME standings tab: the league of the League filter, else the first
+// followed league. Fetched on a worker (espn_tabela), cached on disk.
+static EspPos tab[120]; static int nTab = -1, tabFio, tabPronto, tabFalhou;
+static char tabLiga[32], tabQuer[32];
+static time_t tabQuando;
+static pthread_mutex_t tabTrava = PTHREAD_MUTEX_INITIALIZER;
+static void *fioTabela(void *u) {
+  char liga[32];
+  static EspPos v[120];
+  time_t q = 0; int f = 0, n;
+  (void)u;
+  pthread_mutex_lock(&tabTrava); snprintf(liga, sizeof liga, "%s", tabQuer); pthread_mutex_unlock(&tabTrava);
+  n = espn_tabela(liga, v, 120, &q, &f);
+  pthread_mutex_lock(&tabTrava);
+  if (n > 0) memcpy(tab, v, sizeof *v * (size_t)n);
+  nTab = n < 0 ? 0 : n; tabQuando = q; tabFalhou = f; snprintf(tabLiga, sizeof tabLiga, "%s", liga);
+  tabPronto = 1; tabFio = 0;
+  pthread_mutex_unlock(&tabTrava);
+  return NULL;
+}
+static const char *ligaDaTabela(void) {
+  const EspLiga *ls;
+  int n = espn_ligas(&ls);
+  if (fLiga >= 0 && fLiga < n) return ls[fLiga].chave;
+  for (int i = 0; i < n; i++) if (esporte_segue_liga(ls[i].chave)) return ls[i].chave;
+  return n ? ls[0].chave : "";
+}
+static void tabelaPasso(void) {
+  const char *l = ligaDaTabela();
+  pthread_mutex_lock(&tabTrava);
+  if (!tabFio && l[0] && strcmp(l, tabLiga) && strcmp(l, tabQuer)) {
+    pthread_t t;
+    snprintf(tabQuer, sizeof tabQuer, "%s", l);
+    nTab = -1; tabFio = 1;
+    if (pthread_create(&t, NULL, fioTabela, NULL)) tabFio = 0; else pthread_detach(t);
+  }
+  pthread_mutex_unlock(&tabTrava);
+}
 static const char *esporteDe(const char *liga) { const EspLiga *l = espn_liga(liga); return l ? l->esporte : ""; }
 static const char *nomeLiga(const char *liga) { const EspLiga *l = espn_liga(liga); return l ? esporte_liga_tela(l->nome) : liga; }
 static int diaDe(time_t t) {
@@ -171,6 +209,7 @@ static void montar(void) {
   visto = revisao;
   pthread_mutex_unlock(&trava);
   nOrd = 0;
+  for (int i = 0; i < nVista; i++) esporte_vivo_anotar(vista[i].id, vista[i].estado == ESP_AO_VIVO);
   for (int i = 0; i < nVista && nOrd < EV_MAX; i++) {
     const EspEvento *e = &vista[i];
     int ok;
@@ -209,6 +248,7 @@ static int nLinhas(void) {
   const EspLiga *ls;
   if (aba == ABA_LIGAS) return espn_ligas(&ls);
   if (aba == ABA_TIMES) return nTimesV;
+  if (aba == ABA_TABELA) return esporte_esconder_placar() || nTab < 0 ? 0 : nTab;
   return nOrd;
 }
 
@@ -494,6 +534,8 @@ void esporteui_evento(const SDL_Event *e) {
       carregar();
     } else if (aba == ABA_TIMES) {
       esporte_alternar_time(timesV[foco].liga, timesV[foco].id, timesV[foco].nome);
+    } else if (aba == ABA_TABELA) {
+      esporte_alternar_time(tabLiga, tab[foco].id, tab[foco].nome);   // OK follows / unfollows the team
     } else abrirDetalhe(&vista[ord[foco]]);
   }
 }
@@ -507,6 +549,7 @@ void esporteui_atualizar(float dt, Uint32 agora) {
     if (r == TECLADO_PRONTO) { snprintf(busca, sizeof busca, "%s", teclado_texto()); tecladoAberto = 0; buscarCanais(busca); }
     else if (r == TECLADO_CANCELOU) tecladoAberto = 0;
   }
+  if (aba == ABA_TABELA) tabelaPasso();
   if (visto != revisao) {
     montar();
     // A newer score for the open match page.
@@ -728,7 +771,45 @@ void esporteui_desenhar(Uint32 agora) {
   {
     float rh = 92, area = NV_TELA_H - 90 - y;
     int visiveis = (int)(area / rh), de = foco >= visiveis ? foco - visiveis + 1 : 0, n = nLinhas();
-    if (!n) {
+    if (aba == ABA_TABELA) {
+      char cab[160];
+      int bball = !strcmp(esporteDe(tabLiga), "basketball");
+      if (esporte_esconder_placar()) { texto(TXT_BODY, i18n("Classificação oculta: os placares estão ocultos (filtro Placares)."), x, y + 20, 0.7f, 240, 242, 248); n = 0; }
+      else if (nTab < 0) { texto(TXT_BODY, i18n("Carregando a classificação…"), x, y + 20, 0.7f, 240, 242, 248); n = 0; }
+      else if (!nTab) { texto(TXT_BODY, i18n("Sem classificação para esta liga agora."), x, y + 20, 0.7f, 240, 242, 248); n = 0; }
+      else {
+        snprintf(cab, sizeof cab, "%s%s", nomeLiga(tabLiga), tabFalhou ? i18n("  ·  cópia salva (sem rede)") : "");
+        texto(TXT_CAPTION, cab, x, y - 6, 0.7f, 240, 242, 248);
+        texto(TXT_CAPTION, i18n("Jogos"), x + 900, y - 6, 0.6f, 240, 242, 248);
+        texto(TXT_CAPTION, i18n(bball ? "V–D" : "V–E–D"), x + 1040, y - 6, 0.6f, 240, 242, 248);
+        if (!bball) { texto(TXT_CAPTION, i18n("Saldo"), x + 1240, y - 6, 0.6f, 240, 242, 248);
+                      texto(TXT_CAPTION, i18n("Pontos"), x + 1380, y - 6, 0.6f, 240, 242, 248); }
+        y += 34; area -= 34; visiveis = (int)(area / rh); de = foco >= visiveis ? foco - visiveis + 1 : 0;
+      }
+      for (int i = de; i < n && i < de + visiveis; i++) {
+        int f = zona == Z_LISTA && i == foco;
+        float ry = y + (float)(i - de) * rh;
+        const EspPos *p = &tab[i];
+        if (f) gfx_cor((GfxRect){ x - 12, ry - 8, w + 24, rh - 8 }, 0.25f, 1, 1, 1, 0.12f);
+        snprintf(b, sizeof b, "%d", p->pos);
+        texto(TXT_CALLOUT, b, x + 8, ry + 16, 1, 255, 255, 255);
+        logo(p->logo, x + 70, ry + 10, 52);
+        snprintf(b, sizeof b, "%s%s", esporte_segue_time(tabLiga, p->id) ? "★ " : "", esporte_nome_tela(p->nome));
+        textoCorta(TXT_BODY, b, x + 140, ry + 18, 700, f ? 1 : 0.85f);
+        snprintf(b, sizeof b, "%d", bball ? p->v + p->d : p->jogos);
+        texto(TXT_BODY, b, x + 900, ry + 18, f ? 1 : 0.85f, 240, 242, 248);
+        if (bball) snprintf(b, sizeof b, "%d–%d", p->v, p->d); else snprintf(b, sizeof b, "%d–%d–%d", p->v, p->e, p->d);
+        texto(TXT_BODY, b, x + 1040, ry + 18, f ? 1 : 0.85f, 240, 242, 248);
+        if (!bball) {
+          snprintf(b, sizeof b, "%+d", p->saldo); texto(TXT_BODY, b, x + 1240, ry + 18, f ? 1 : 0.85f, 240, 242, 248);
+          snprintf(b, sizeof b, "%d", p->pts); texto(TXT_CALLOUT, b, x + 1380, ry + 16, 1, 255, 255, 255);
+        }
+        if (n > 1 && (i == 0 || strcmp(p->grupo, tab[i - 1].grupo)) && tab[0].grupo[0] && strcmp(tab[0].grupo, tab[n - 1].grupo))
+          textoCorta(TXT_CAPTION, p->grupo, x + 1500, ry + 22, w - 1500, 0.6f);   // conference / group
+      }
+      n = 0;
+    }
+    if (!n && aba != ABA_TABELA) {
       texto(TXT_BODY, i18n(carregando ? "Carregando jogos…" :
                            aba == ABA_VIVO ? "Nenhum jogo ao vivo agora." :
                            aba == ABA_MEUS || aba == ABA_FAV ? "Siga times em \"Times\" ou ligas em \"Ligas\" para montar a sua lista." :

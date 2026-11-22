@@ -26,4 +26,6 @@ int  mcui_teste_zona(void);   // 0 menu, 1 list, 2 now playing, 3 form, 4 action
 // Spotify playlist import (official Web API, the TV's own client id/secret):
 // runs in the background, saves a local playlist, says the result on the island.
 void mcui_importar_spotify(const char *url);
+// QR TIME: a genre name that means the Quran (Music home's Quran block).
+int mcui_eh_quran(const char *genero);
 #endif

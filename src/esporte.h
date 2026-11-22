@@ -54,4 +54,9 @@ int  esporte_sugerir(const EspEvento *e, const EspCanalInfo *canais, int n, EspP
                      EspSugestao *out, int max);
 // Word-level team match used by the suggestions (tests).
 int  esporte_time_em(const EspTime *t, const char *texto);
+// QR TIME: which matches are live now (fed by the Sport Center and the alerts),
+// and, for a channel that just died, another channel linked to the same LIVE
+// match. 1 = found.
+void esporte_vivo_anotar(const char *evento, int aoVivo);
+int  esporte_alternativa(const char *canalAtual, char *canal, size_t nc, char *nome, size_t nn);
 #endif

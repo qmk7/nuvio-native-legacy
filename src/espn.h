@@ -69,4 +69,9 @@ void espn_definir_base(const char *base);
 // cache time); *falhou = 1 when the network did not give a valid answer.
 int espn_buscar(const char *liga, time_t agora, int (*cb)(const EspEvento *e, void *u), void *u,
                 time_t *quando, int *falhou);
+// ---- league standings (QR TIME) ----
+typedef struct { char grupo[48], id[16], nome[64], curto[40], logo[256]; int pos, jogos, v, e, d, saldo, pts; } EspPos;
+int espn_tabela_parse(const char *json, EspPos *out, int max);   // rows by group then position; -1 not standings
+// BLOCKS (worker): fetch (cache esporte-tabela-<league>.json on success, used when offline).
+int espn_tabela(const char *liga, EspPos *out, int max, time_t *quando, int *falhou);
 #endif

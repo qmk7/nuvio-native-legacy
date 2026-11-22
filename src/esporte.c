@@ -365,3 +365,38 @@ int esporte_sugerir(const EspEvento *e, const EspCanalInfo *canais, int n, EspPr
   qsort(out, (size_t)k, sizeof *out, cmpSug);
   return k;
 }
+
+// ---- QR TIME: matches live now (for switching to an alternate channel) ----
+#define VIVO_MAX 48
+static struct { char id[24]; time_t ate; } vivos[VIVO_MAX];
+void esporte_vivo_anotar(const char *evento, int aoVivo) {
+  time_t agora = time(NULL);
+  int livre = -1;
+  if (!evento || !evento[0]) return;
+  pthread_mutex_lock(&trava);
+  for (int i = 0; i < VIVO_MAX; i++) {
+    if (!strcmp(vivos[i].id, evento)) { vivos[i].ate = aoVivo ? agora + 20 * 60 : 0; pthread_mutex_unlock(&trava); return; }
+    if (livre < 0 && vivos[i].ate < agora) livre = i;
+  }
+  if (aoVivo && livre >= 0) { snprintf(vivos[livre].id, sizeof vivos[livre].id, "%s", evento); vivos[livre].ate = agora + 20 * 60; }
+  pthread_mutex_unlock(&trava);
+}
+int esporte_alternativa(const char *canalAtual, char *canal, size_t nc, char *nome, size_t nn) {
+  time_t agora = time(NULL);
+  int ok = 0;
+  if (!canalAtual || !canalAtual[0]) return 0;
+  pthread_mutex_lock(&trava);
+  garantirLocked();
+  for (int v = 0; v < VIVO_MAX && !ok; v++) {
+    int temAtual = 0;
+    if (!vivos[v].id[0] || vivos[v].ate < agora) continue;
+    for (int i = 0; i < nLigs; i++) if (!strcmp(ligs[i].evento, vivos[v].id) && !strcmp(ligs[i].canal, canalAtual)) temAtual = 1;
+    if (!temAtual) continue;
+    for (int i = 0; i < nLigs; i++)
+      if (!strcmp(ligs[i].evento, vivos[v].id) && strcmp(ligs[i].canal, canalAtual)) {
+        snprintf(canal, nc, "%s", ligs[i].canal); snprintf(nome, nn, "%s", ligs[i].nome); ok = 1; break;
+      }
+  }
+  pthread_mutex_unlock(&trava);
+  return ok;
+}

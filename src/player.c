@@ -385,6 +385,7 @@ static void corFocoPlayer(float *r, float *g, float *b) { ajustes_acento(r, g, b
 // outra ha a busca de fonte, que pode levar segundos). Zero enquanto nao houve.
 // A guia parental se apoia nisto para aparecer UMA vez, no comeco, e sumir.
 static Uint32 inicioImagem = 0;
+static int atmosConferido;   // QR TIME: "another source has Atmos" checked this session
 static int memQuadroPendente; // Um primeiro quadro por load, nao por volta da ilha.
 // MEDIDA DO RETOMAR (05/10): desde player_abrir ate o pronto e ate o primeiro
 // "tocando" depois de aplicada a retomada. E o numero para comparar, na TV, o
@@ -1970,7 +1971,7 @@ void player_abrir(int indiceCatalogo, const char *url) {
     // overlay do guia dependem dela. Idempotente.
     if (canalSessao) { guia_carregar(); epg_iniciar(); } }
   tocando = 1; pausaPessoa = 0; retomandoSalto = 0; visivel = 1; anim = 0.0f; entrada = 0.0f; soBarra = 0; cheio = 1.0f; fileira = 1.0f;
-  pedFontes = erroFonte = pedFaixas = pedProxT = pedProxE = trocaEpisodio = 0; inicioImagem = 0;
+  pedFontes = erroFonte = pedFaixas = pedProxT = pedProxE = trocaEpisodio = 0; inicioImagem = 0; atmosConferido = 0;
   durFonteAvisada = durFontePulou = pedProximaFonte = durFonteCurta = durFonteForaCache = 0;
   durFonteAcaoAte = 0; durFonteSkipEm = 0; durFonteManter = 0;
   abrindoExp = 0; abrindoT = 0.0f; abrindoDesde = 0;
@@ -4693,6 +4694,23 @@ void player_atualizar(float dt, Uint32 agora) {
   if (memQuadroPendente && comVideo && video_pronto() && video_tocando() && video_pos() > 0.0) {
     memQuadroPendente = 0;
     memlog_evento("primeiro-quadro");
+  }
+  // QR TIME: 5 s into a film or episode whose source has no Atmos, when
+  // another source of the same title declares it (Q990F + eARC), say so once.
+  if (!atmosConferido && inicioImagem && agora - inicioImagem > 5000u && comVideo && !ehCanal()) {
+    atmosConferido = 1;
+    if (ajustes_dolby_atmos() && !video_tem_atmos()) {
+      const Stream *cur = stream_item(stream_atual());
+      int alt = 0;
+      for (int i = 0; i < stream_n() && cur && !cur->dolbyAtmos; i++) {
+        const Stream *s = stream_item(i);
+        if (s && s != cur && s->dolbyAtmos && s->altura >= cur->altura) { alt = 1; break; }
+      }
+      if (alt) {
+        player_toast_ex(i18n("Outra fonte deste título tem Dolby Atmos (botão Fontes)."), 6000, "pl_audio-lines", 0);
+        printf("[atmos] ha fonte com Atmos na lista\n");
+      }
+    }
   }
   if (!inicioImagem && comVideo && video_pronto()) {
     inicioImagem = agora; acordar();

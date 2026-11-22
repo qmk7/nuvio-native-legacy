@@ -331,3 +331,104 @@ int espn_buscar(const char *liga, time_t agora, int (*cb)(const EspEvento *, voi
   total = jan.n;
   return algum ? total : -1;
 }
+
+// ---------------------------------------------------------------- standings (QR TIME)
+// site.api.espn.com/apis/v2/sports/<league>/standings: "children" (groups:
+// one for a league, conferences in the NBA), each with standings.entries[]
+// {team{id,displayName,shortDisplayName,logos[{href}]}, stats[{name,value}]}.
+static double estat(const char *ent, const char *fim, const char *nome, double padrao) {
+  const char *p;
+  for (p = js_array(ent, fim, "stats"); p && *p == '{'; ) {
+    const char *f = js_fim(p);
+    char n[40] = "";
+    if (!f) break;
+    js_texto_raiz_em(p, f, "name", n, sizeof n);
+    if (!strcmp(n, nome)) return js_num(p, f, "value", padrao);
+    p = js_prox(f);
+  }
+  return padrao;
+}
+static int cmpPos(const void *a, const void *b) {
+  const EspPos *x = a, *y = b;
+  int g = strcmp(x->grupo, y->grupo);
+  return g ? g : x->pos - y->pos;
+}
+int espn_tabela_parse(const char *json, EspPos *out, int max) {
+  const char *g;
+  int n = 0;
+  if (!json || !strstr(json, "\"standings\"")) return -1;
+  for (g = js_array(json, NULL, "children"); g && *g == '{' && n < max; ) {
+    const char *gf = js_fim(g), *st, *e;
+    char grupo[48] = "";
+    if (!gf) break;
+    js_texto_raiz_em(g, gf, "name", grupo, sizeof grupo);
+    if ((st = strstr(g, "\"standings\"")) && st < gf && (st = strchr(st, '{')) && st < gf) {
+      for (e = js_array(st, js_fim(st), "entries"); e && *e == '{' && n < max; ) {
+        const char *ef = js_fim(e), *t;
+        EspPos *x = &out[n];
+        if (!ef) break;
+        memset(x, 0, sizeof *x);
+        snprintf(x->grupo, sizeof x->grupo, "%s", grupo);
+        if ((t = strstr(e, "\"team\"")) && t < ef && (t = strchr(t, '{')) && t < ef) {
+          const char *tf = js_fim(t), *lg;
+          js_texto_raiz_em(t, tf, "id", x->id, sizeof x->id);
+          js_texto_raiz_em(t, tf, "displayName", x->nome, sizeof x->nome);
+          js_texto_raiz_em(t, tf, "shortDisplayName", x->curto, sizeof x->curto);
+          if ((lg = js_array(t, tf, "logos")) && *lg == '{') js_texto_raiz_em(lg, js_fim(lg), "href", x->logo, sizeof x->logo);
+        }
+        x->jogos = (int)estat(e, ef, "gamesPlayed", 0);
+        x->v = (int)estat(e, ef, "wins", 0);
+        x->e = (int)estat(e, ef, "ties", 0);
+        x->d = (int)estat(e, ef, "losses", 0);
+        x->saldo = (int)estat(e, ef, "pointDifferential", 0);
+        x->pts = (int)estat(e, ef, "points", -1);
+        x->pos = (int)estat(e, ef, "rank", 0);
+        if (x->nome[0]) n++;
+        e = js_prox(ef);
+      }
+    }
+    g = js_prox(gf);
+  }
+  // Basketball has no "rank": by wins, then fewer losses.
+  for (int i = 0; i < n; i++) if (!out[i].pos) {
+    int r = 1;
+    for (int j = 0; j < n; j++) if (!strcmp(out[j].grupo, out[i].grupo) && (out[j].v > out[i].v || (out[j].v == out[i].v && out[j].d < out[i].d))) r++;
+    out[i].pos = r;
+  }
+  qsort(out, (size_t)n, sizeof *out, cmpPos);
+  return n;
+}
+int espn_tabela(const char *liga, EspPos *out, int max, time_t *quando, int *falhou) {
+  static const char *const cab[] = {
+    "User-Agent: Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", NULL };
+  char url[400], nome[112], raiz[200], *corpo, *sp;
+  int n;
+  time_t agora = time(NULL);
+  if (quando) *quando = 0;
+  if (falhou) *falhou = 0;
+  if (!espn_liga(liga)) return -1;
+  // The scoreboard base is ".../apis/site/v2/sports"; standings live at ".../apis/v2/sports".
+  snprintf(raiz, sizeof raiz, "%s", base);
+  if ((sp = strstr(raiz, "/apis/site/v2/"))) memmove(sp + 6, sp + 11, strlen(sp + 11) + 1);
+  snprintf(url, sizeof url, "%s/%s/standings", raiz, liga);
+  snprintf(nome, sizeof nome, "esporte-tabela-%s.json", liga);
+  for (char *c = nome; *c; c++) if (*c == '/') *c = '_';
+  corpo = rede_baixar_com(url, 15, cab);
+  if (corpo && (n = espn_tabela_parse(corpo, out, max)) > 0) {
+    size_t len = strlen(corpo);
+    char *t = malloc(len + 32);
+    if (t) { snprintf(t, len + 32, "%lld\n%s", (long long)agora, corpo); dados_gravar_leve(nome, t); free(t); }
+    if (quando) *quando = agora;
+    free(corpo);
+    return n;
+  }
+  free(corpo);
+  if (falhou) *falhou = 1;
+  {
+    char *c = dados_ler(nome), *body;
+    n = -1;
+    if (c && (body = strchr(c, '\n')) != NULL && (n = espn_tabela_parse(body + 1, out, max)) > 0 && quando) *quando = (time_t)atoll(c);
+    free(c);
+    return n;
+  }
+}

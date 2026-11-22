@@ -38,6 +38,14 @@ account or a host this build environment cannot reach.
 | EZVIZ doorbell / camera alerts | Accounts › Phone › Home | parser checks on documented answers | EZVIZ developer app + doorbell |
 | Better version (4K / DV) of films on your list | Settings › Playback | builds | your add-ons |
 
+## Added after the batch (not yet in a build)
+| Feature | Where | Verified |
+|---|---|---|
+| "Another source has Dolby Atmos" notice | player, 5 s in | builds |
+| Alternate channel when a live match's channel dies | Live TV (channels linked in Sport Center) | 4 checks |
+| League standings (W-D-L, GD, points; NBA conferences) | Sport Center › Standings | real ESPN answers (Saudi League, NBA, UCL) |
+| Holy Quran block and "continue the recitation" | Music home | genre-name checks |
+
 ## Already in the app before this batch
 - Real quality badge (decoder-reported resolution, DV/HDR10, Atmos, codec).
 - Audio and subtitle choice remembered per series and per profile.

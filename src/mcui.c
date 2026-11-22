@@ -144,6 +144,24 @@ static void *fioCarga(void *u) {
         for (int i = 0; i < n; i++) { Linha *l = novaLinha(&tmp); if (l) linhaAlbum(l, &al[i]); }
       }
       free(al);
+      // QR TIME: the Holy Quran, when the person's servers tag it as a genre
+      // ("Quran", "Holy Quran", "Koran", "قرآن", "القرآن الكريم"...).
+      {
+        McGenero *g = calloc(300, sizeof *g);
+        int ng = 0, titulado = 0;
+        if (g && mccat_generos(g, 300, &ng) == MC_OK)
+          for (int i = 0; i < ng; i++) {
+            Linha *l;
+            if (!mcui_eh_quran(g[i].nome)) continue;
+            if (!titulado) { titulo(&tmp, i18n("O Alcorão")); titulado = 1; }
+            if (!(l = novaLinha(&tmp))) break;
+            l->tipo = L_GENERO;
+            snprintf(l->ref, sizeof l->ref, "%s", g[i].nome);
+            snprintf(l->t1, sizeof l->t1, "%s", g[i].nome);
+            snprintf(l->t2, sizeof l->t2, "%d %s  ·  %d %s", g[i].faixas, i18n("faixas"), g[i].albuns, i18n("álbuns"));
+          }
+        free(g);
+      }
       break; }
     case P_ARTISTAS: {
       McArtista *ar = calloc(PAG_MAX, sizeof *ar);
@@ -457,6 +475,18 @@ static void construirLocal(Pagina *pg) {
   printf("[musica] pagina %d: %d linha(s) (local)\n", pg->tipo, pg->n);
   fflush(stdout);
 }
+// QR TIME: does this genre name mean the Quran? (folded: case, "al-", hamza forms)
+int mcui_eh_quran(const char *g) {
+  char b[96];
+  size_t k = 0;
+  if (!g || !g[0]) return 0;
+  for (const unsigned char *p = (const unsigned char *)g; *p && k + 1 < sizeof b; p++) b[k++] = (char)(*p < 0x80 ? tolower(*p) : *p);
+  b[k] = 0;
+  return strstr(b, "quran") || strstr(b, "qur'an") || strstr(b, "koran") || strstr(b, "coran") || strstr(b, "alcor")
+      || strstr(b, "\xd9\x82\xd8\xb1\xd8\xa2\xd9\x86")     /* قرآن */
+      || strstr(b, "\xd9\x82\xd8\xb1\xd8\xa7\xd9\x86")     /* قران */
+      || strstr(b, "\xd8\xaa\xd9\x84\xd8\xa7\xd9\x88\xd8\xa9");   /* تلاوة */
+}
 static int ehLocal(int tipo) { return tipo == P_RECENTES || tipo == P_OFFLINE || tipo == P_FILA || tipo == P_SERVICOS || tipo == P_AJUSTES; }
 static void carregar(Pagina *pg) {
   if (ehLocal(pg->tipo)) construirLocal(pg);
@@ -468,6 +498,25 @@ static void carregar(Pagina *pg) {
       char t[300];
       snprintf(t, sizeof t, "%s: %s — %s", i18n("Continuar"), mcq_faixa_atual()->titulo, mcq_faixa_atual()->artista);
       acao(pg, A_RETOMAR, t, i18n("De onde parou, na mesma fila"));
+    }
+    // QR TIME: continue the recitation: the album (surah collection) of the
+    // last Quran track in this profile's history.
+    for (int i = 0; i < mch_n() && i < 200; i++) {
+      const McFaixa *f = mch_item(i);
+      Linha *l;
+      if (!f || !mcui_eh_quran(f->genero) || !f->albumId[0]) continue;
+      if ((l = novaLinha(pg)) != NULL) {
+        char fonte[24];
+        const char *local = NULL;
+        l->tipo = L_ALBUM;
+        // Album ids are qualified by their source, like the track's.
+        if (mcfontes_partir(f->id, fonte, sizeof fonte, &local)) snprintf(l->ref, sizeof l->ref, "%s:%s", fonte, f->albumId);
+        else snprintf(l->ref, sizeof l->ref, "%s", f->albumId);
+        snprintf(l->t1, sizeof l->t1, "%s: %s", i18n("Continuar a recitação"), f->titulo);
+        snprintf(l->t2, sizeof l->t2, "%s  ·  %s", f->artista, f->album);
+        snprintf(l->capa, sizeof l->capa, "%s", f->capa);
+      }
+      break;
     }
     pedir(pg, 1);
   } else pedir(pg, 0);

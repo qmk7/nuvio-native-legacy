@@ -860,6 +860,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
 #include "addonslocal.h"
 #include "esporteui.h"
 #include "esportealerta.h"
+#include "esporte.h"
 #include "salat.h"
 #include "bomdia.h"
 #include "semana.h"
@@ -3600,6 +3601,26 @@ static void tocarCanal(const CatItem *it) {
   printf("[canal] tocar id=%s titulo=%s\n", it->imdb, it->titulo);
   fflush(stdout);
   guia_canal_assistido(it->imdb);
+}
+
+// QR TIME: every source of the channel died during a LIVE match that has
+// another channel linked to it (Sport Center): go there instead of the error
+// card. At most 3 switches in 10 minutes, so two dead channels never ping-pong.
+static int alternativaDoJogo(void) {
+  static Uint32 janela;
+  static int trocas;
+  char canal[80], nome[96];
+  CatItem it;
+  Uint32 agora = SDL_GetTicks();
+  if (agora - janela > 600000u) { janela = agora; trocas = 0; }
+  if (trocas >= 3 || !esporte_alternativa(player_id_canal(), canal, sizeof canal, nome, sizeof nome)) return 0;
+  if (!guia_item_do_canal(canal, nome, "", &it)) return 0;
+  trocas++;
+  printf("[esporte] canal caiu durante o jogo: indo para o canal alternativo (%d/3)\n", trocas);
+  fflush(stdout);
+  player_toast_ex(i18n("O canal caiu. Indo para o canal alternativo do jogo…"), 4000, "aj_trophy", 1);
+  tocarCanal(&it);
+  return 1;
 }
 
 // O CANAL NO AR VAI PARA O GUIA, sem recarregar (25/09/2026). O mesmo fluxo
@@ -6638,6 +6659,7 @@ void app_atualizar(float dt, Uint32 agora) {
           }
           stalkerRenovando = 0;
         }
+        if (!player_mini_ativo() && alternativaDoJogo()) return;   // QR TIME: alternate channel of the live match
         {
           canalFonteIdx = -1;
           if (player_mini_ativo()) player_fechar_mini();
@@ -6667,6 +6689,8 @@ void app_atualizar(float dt, Uint32 agora) {
                             ? CANAL_FONTE_PRAZO_MS : CANAL_FONTE_PRAZO_MUDA_MS;
         { static char viaProxy[NV_MEDIA_URL_MAX + 128];
           player_definir_fonte(urlCanal(s, viaProxy, sizeof viaProxy)); }
+      } else if (!player_mini_ativo() && alternativaDoJogo()) {
+        return;   // QR TIME: the match goes on on its alternate channel
       } else {
         canalFonteIdx = -1;
         // Sem mais fonte na lista: na tela cheia vira o erro de sempre; no

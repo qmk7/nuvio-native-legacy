@@ -232,6 +232,7 @@ static void aoSinalTerminar(int sig) {
 #include "sono.h"
 #include "celapps.h"
 #include "atalhoslg.h"
+#include "menu.h"
 #include "descanso.h"
 
 // RSS DO PROCESSO, em MB, lido de /proc/self/statm. E o numero que responde
@@ -527,6 +528,8 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
       if ((u = fopen("/tmp/nuvio-lanweb-url", "w")) != NULL) { fputs(celapps_url(a), u); fclose(u); }
       continue;
     }
+    // "tela:esportes" opens the Sport Center (as the side bar does).
+    if (dp && !strcmp(linha, "tela:esportes")) { menu_ir(MENU_ESPORTES); continue; }
     // "tela:central" opens the Control Center (as holding CH+ does).
     if (dp && !strcmp(linha, "tela:central")) { if (app_central_pode()) central_abrir(); else printf("[central] porta de teste: agora nao (tela ocupada)\n"); fflush(stdout); continue; }
 #endif

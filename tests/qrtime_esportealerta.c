@@ -7,6 +7,8 @@
 #include "lembrete.h"
 #include "dados.h"
 #include "perfis.h"
+#include "espn.h"
+#include "mcui.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,5 +55,30 @@ int main(void) {
     EspEvento d = ev("700009", ESP_AO_VIVO, agora, "2", "0");
     CONFERE(!esportealerta_gol(&a, &d, m, sizeof m), "another match: not compared");
   }
+  {
+    char c[80], n[96];
+    esporte_ligar("800001", "ch:ssc1", "SSC 1"); esporte_ligar("800001", "ch:ssc2", "SSC 2");
+    CONFERE(!esporte_alternativa("ch:ssc1", c, sizeof c, n, sizeof n), "match not live: no channel switch");
+    esporte_vivo_anotar("800001", 1);
+    CONFERE(esporte_alternativa("ch:ssc1", c, sizeof c, n, sizeof n) && !strcmp(c, "ch:ssc2") && !strcmp(n, "SSC 2"),
+            "live match: the other linked channel");
+    CONFERE(!esporte_alternativa("ch:other", c, sizeof c, n, sizeof n), "a channel not linked to the match: nothing");
+    esporte_vivo_anotar("800001", 0);
+    CONFERE(!esporte_alternativa("ch:ssc1", c, sizeof c, n, sizeof n), "match over: nothing");
+  }
+  {
+    static EspPos p[60];
+    FILE *f = fopen("tests/qrtime_espn_tabela_ksa.json", "rb");
+    char *j; long sz; int n;
+    if (f) { fseek(f, 0, SEEK_END); sz = ftell(f); rewind(f); j = malloc((size_t)sz + 1); sz = (long)fread(j, 1, (size_t)sz, f); j[sz] = 0; fclose(f); }
+    else { j = strdup(""); }
+    n = espn_tabela_parse(j, p, 60);
+    CONFERE(n == 18 && p[0].pos == 1 && !strcmp(p[0].nome, "Al Hilal") && p[0].pts == 30 && p[0].jogos == 11 && p[0].saldo == 23 && p[17].pos == 18,
+            "standings (real ESPN answer, 22/11/2026): 18 teams in order, points, played, goal difference");
+    CONFERE(espn_tabela_parse("{\"events\":[]}", p, 60) == -1, "not a standings answer: -1");
+    free(j);
+  }
+  CONFERE(mcui_eh_quran("Quran") && mcui_eh_quran("Holy Qur'an") && mcui_eh_quran("القرآن الكريم") && mcui_eh_quran("قران")
+          && mcui_eh_quran("تلاوة") && !mcui_eh_quran("Rock") && !mcui_eh_quran("Arabic Pop"), "Quran genre names");
   return falhas ? 1 : 0;
 }

@@ -167,6 +167,7 @@ void esportealerta_passo(Uint32 agoraMs) {
     for (int i = 0; i < nEv; i++) {
       const EspEvento *e = &ev[i];
       if (e->estado == ESP_AO_VIVO || (e->estado == ESP_PRE && e->ini - agora < 20 * 60 && e->ini > agora - 3600)) quente = 1;
+      esporte_vivo_anotar(e->id, e->estado == ESP_AO_VIVO);
       if (modo >= 1) esportealerta_lembrar(e, agora);
       for (int j = 0; modo >= 1 && j < nAntes; j++)
         if (!strcmp(antes[j].id, e->id) && antes[j].estado == ESP_AO_VIVO && e->estado == ESP_FIM) fimDeJogo(e);
