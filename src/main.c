@@ -229,6 +229,7 @@ static void aoSinalTerminar(int sig) {
 #include "plugins.h"
 #include "plex.h"
 #include "esmaecer.h"
+#include "sono.h"
 #include "descanso.h"
 
 // RSS DO PROCESSO, em MB, lido de /proc/self/statm. E o numero que responde
@@ -502,6 +503,8 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     if (dp && !strncmp(linha, "colar:", 6)) { extern void teclado_porta_colar(const char *); teclado_porta_colar(dp + 1); continue; }
     // "tela:contas" opens Settings > Accounts, providers and data (as OK on that row does).
     if (dp && !strcmp(linha, "tela:contas")) { extern void app_ir_contas(void); app_ir_contas(); continue; }
+    // "tela:central" opens the Control Center (as holding CH+ does).
+    if (dp && !strcmp(linha, "tela:central")) { if (app_central_pode()) central_abrir(); else printf("[central] porta de teste: agora nao (tela ocupada)\n"); fflush(stdout); continue; }
 #endif
     // "ime:abrir", "ime:voz", "ime:fechar": teclado do sistema direto
     // (entrada_texto.h), para medir na TV sem depender da tela que o liga.
@@ -1811,6 +1814,7 @@ int main(int argc, char **argv) {
   // Ajustes tambem sao do USUARIO, nao do pacote.
   ajustes_dir(dirDados);
   ajustes_migrar_escopo();   // 2.1: cada perfil parte do que esta TV usa hoje (uma vez, com backup)
+  qrdados_qualidade_aplicar();   // QR TIME: max-quality defaults, once (schema v2)
   // Icone do app (apoiadores): a arte vem do pacote; o alias do launcher do
   // Android e a abertura do .wgt seguem o que ficou gravado (idempotente).
   iconeapp_iniciar(dirArte);
@@ -1961,6 +1965,7 @@ int main(int argc, char **argv) {
                  player_aberto(), trailer_aberto(), trailer_pausado(), video_ativo(), video_tocando());
           fflush(stdout);
         }
+        if (sono_entrada(&e)) { esmaecer_entrada(SDL_GetTicks(), 0); continue; }   // QR TIME sleep timer: the key only wakes the screen
         if (esmaecer_entrada(SDL_GetTicks(), age)) continue;
       }
       // Teclado do sistema (entrada_texto.h): ve o texto ANTES de qualquer tela.
@@ -2243,6 +2248,7 @@ int main(int argc, char **argv) {
     // desenho deste quadro so le o resultado (ajustes_acento, NV_COR_FUNDO_*).
     // PROTECAO DE OLED: "parado" = nenhuma tecla E nenhum video tocando de
     // verdade (pausado conta como parado).
+    sono_atualizar(agora);   // QR TIME sleep timer
     esmaecer_escolha(ajustes_esmaecer());
     // Com o player aberto (filme pausado) fica so o escurecer de antes: a
     // vitrine pediria texturas de tela cheia com o decodificador ocupado.
@@ -2334,6 +2340,7 @@ int main(int argc, char **argv) {
       abertura_desenhar(agora, dt, pend);
     }
     esmaecer_desenhar(agora);   // o veu da protecao de OLED, UMA passada no fim do quadro
+    sono_desenhar();            // QR TIME sleep timer: black while the screen is off
     ponteiro_desenhar();
     // GIF QUE NINGUEM DESENHOU ha 1,5 s sai da memoria (tela de perfis
     // fechada, foco fora do cartaz). Ver gif_ocioso em gif.h.

@@ -819,6 +819,11 @@ void ajustes_edicao_encerrar(void);
 // Padroes seguros de perfil infantil aplicados aos ajustes do perfil (sem
 // enquetes/Seekr, sem notas de terceiros, classificacao no player ligada).
 void ajustes_padroes_infantis(int perfil);
+// QR TIME: maximum-quality defaults for options still at their factory value (once, schema v2).
+int  ajustes_qualidade_maxima_padrao(void);
+// Sleep timer (sono.c): minutes chosen (0 = off), and back to Off.
+int  ajustes_sono_minutos(void);
+void ajustes_sono_zerar(void);
 
 // O CAMINHO DE VOLTA (#85): devolve em *saida uma copia do blob `base` (o mesmo
 // objeto `settings_json` que ajustes_aplicar_blob le) com os valores DESTA TV

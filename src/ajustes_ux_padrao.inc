@@ -355,3 +355,4 @@
   0, /* folder hero details: On (V_LIGA 0) */
   0, /* IPTV connection test: action, no stored value */
   0, /* accounts, providers and data: action, no stored value */
+  0, /* sleep timer: Off */

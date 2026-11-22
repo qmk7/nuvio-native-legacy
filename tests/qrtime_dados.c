@@ -30,23 +30,24 @@ int main(void) {
 
   // ---- schema ----
   dados_gravar("progresso.txt", "user progress");
-  CONFERE(qrdados_esquema_iniciar() == 0 && qrdados_esquema_disco() == QRD_ESQUEMA && contem(QRD_ARQ, "schema=1"),
-          "first start: schema recorded");
+  CONFERE(qrdados_esquema_iniciar() == 0 && qrdados_esquema_disco() == QRD_ESQUEMA && contem(QRD_ARQ, "schema=2"),
+          "first start: schema recorded (v2)");
+  CONFERE(contem("qrtime-quality.txt", "pendente"), "v2: max-quality defaults marked for the first settings load");
   CONFERE(contem("progresso.txt", "user progress"), "first start: existing user data untouched");
   {
-    QrdPasso v[3] = { NULL, p1, p2 };   // [0] is never run again once at v1
-    v[0] = p1;
-    qrdados_teste_passos(v, 3, 3);
+    // Disk is at the app's version (2); steps [2] (2->3) and [3] (3->4) are the test's.
+    QrdPasso v[4] = { NULL, NULL, p1, p2 };
+    qrdados_teste_passos(v, 4, 4);
     qrdados_esquema_iniciar();
-    CONFERE(chamadas[0] == 1 && chamadas[1] == 1 && qrdados_esquema_disco() == 2 && contem(QRD_ARQ, "schema=2"),
-            "upgrade 1->2 done, 2->3 failed: stays at 2 (no partial jump)");
+    CONFERE(chamadas[0] == 1 && chamadas[1] == 1 && qrdados_esquema_disco() == 3 && contem(QRD_ARQ, "schema=3"),
+            "upgrade 2->3 done, 3->4 failed: stays at 3 (no partial jump)");
     CONFERE(contem("progresso.txt", "user progress"), "a failed upgrade removes nothing");
     falharPasso2 = 0;
     qrdados_esquema_iniciar();
-    CONFERE(chamadas[0] == 1 && chamadas[1] == 2 && qrdados_esquema_disco() == 3, "next start resumes at the failed step only");
+    CONFERE(chamadas[0] == 1 && chamadas[1] == 2 && qrdados_esquema_disco() == 4, "next start resumes at the failed step only");
     qrdados_teste_passos(NULL, 0, 0);
     qrdados_esquema_iniciar();
-    CONFERE(qrdados_mais_novo() && contem(QRD_ARQ, "schema=3") && contem("progresso.txt", "user progress"),
+    CONFERE(qrdados_mais_novo() && contem(QRD_ARQ, "schema=4") && contem("progresso.txt", "user progress"),
             "older app on newer data: nothing downgraded, nothing removed");
   }
 

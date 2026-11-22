@@ -11,14 +11,16 @@
 #define NV_QRDADOS_H
 #include <stdint.h>
 
-#define QRD_ESQUEMA 1        // current QR TIME data schema
+#define QRD_ESQUEMA 2        // current QR TIME data schema (2: max-quality defaults)
 #define QRD_ARQ "qrtime-schema.txt"
 
 // Startup, after dados_iniciar. Returns the schema found on disk before the
 // check (0 = first start with QR TIME data). Never deletes anything.
 int  qrdados_esquema_iniciar(void);
 int  qrdados_esquema_disco(void);   // version on disk now
-int  qrdados_mais_novo(void);       // 1 = data written by a NEWER app: left untouched, not downgraded
+int  qrdados_mais_novo(void);
+// After the settings load: applies the schema-v2 max-quality defaults once.
+int  qrdados_qualidade_aplicar(void);       // 1 = data written by a NEWER app: left untouched, not downgraded
 
 // Tests: replace the upgrade steps (step i upgrades from i+1 to i+2).
 typedef int (*QrdPasso)(void);

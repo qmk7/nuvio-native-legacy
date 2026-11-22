@@ -7779,7 +7779,8 @@ int app_zap_ativo(void) {
 }
 int app_central_pode(void) {
   if (central_aberta()) return 1;   // o CH+ que fecha passa pelo mesmo caminho
-  return tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL && login_concluido() &&
+  // QR TIME: "Continue without an account" gets the Control Center too.
+  return tela != TELA_LOGIN && tela != TELA_ESCOLHA_PERFIL && (login_concluido() || convidado_ativo()) &&
          perfilsel_concluido() && !registro_aberto() && !spot_aberto() &&
          !teclado_aberto() && !diagnostico_intro_aberto() && !novidades20_aberto() &&
          !novidades201_aberto() && !novidades202_aberto() && !novcartao_aberto() && !dicascontrole_ocupado();

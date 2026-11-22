@@ -28,6 +28,7 @@ static const CentralItem CATALOGO[] = {
   { "trailerAuto", "aj_clapperboard", "Trailer auto" },
   { "trailerHero", "aj_film", "Trailer no topo" },
   { "esmaecerLocal", "aj_moon", "Descanso" },
+  { "sonoLocal", "aj_alarm-clock", "Dormir" },
   { "brilhoPlayerLocal", "aj_sun-dim", "Brilho" },
   { "corDestaque", "aj_palette", "Cor" },
   { "vidroLocal", "aj_layers", "Efeito vidro" },
@@ -49,7 +50,7 @@ _Static_assert(CENTRAL_MAX == N_CAT, "CENTRAL_MAX must cover every catalog tile"
 // quando nao se quer; esmaecer e a protecao de tela da TV OLED.
 static const char *const PADRAO[] = {
   "qualidade", "dolbyVision", "dolbyAtmos",
-  "escolherFonteManual", "trailerAuto", "corDestaque", "esmaecerLocal",
+  "escolherFonteManual", "trailerAuto", "corDestaque", "esmaecerLocal", "sonoLocal",
 };
 
 int central_catalogo_n(void) { return N_CAT; }

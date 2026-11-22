@@ -24,8 +24,14 @@ int main(void) {
   assert(dir && *dir);
   ajustes_dir(dir);
   assert(SDL_Init(SDL_INIT_VIDEO) == 0);
+#ifdef NV_LINUX_DESKTOP
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
+#endif
   w = SDL_CreateWindow("rotulos", 0, 0, 64, 64, SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN);
   assert(w);
   gl = SDL_GL_CreateContext(w);
@@ -33,7 +39,7 @@ int main(void) {
   gfx_tamanho_alvo(1920, 1080);
   assert(gfx_iniciar());
   assert(txt_iniciar("deploy/app", 1));
-  assert(central_catalogo_n() == 27);
+  assert(central_catalogo_n() == 28);
   // Montserrat (a da TV do dono) e a Inter de fabrica.
   for (f = 0; f < 2; f++) {
   txt_definir_fonte_interface(FAM[f]);
@@ -55,6 +61,6 @@ int main(void) {
   txt_encerrar(); gfx_encerrar();
   SDL_GL_DeleteContext(gl); SDL_DestroyWindow(w); SDL_Quit();
   if (falhas) { printf("%d nome(s) nao cabem\n", falhas); return 1; }
-  puts("PASS: os 27 nomes cabem nos 30 idiomas");
+  puts("PASS: os 28 nomes cabem nos 30 idiomas");
   return 0;
 }

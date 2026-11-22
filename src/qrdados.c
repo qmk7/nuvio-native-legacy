@@ -38,7 +38,11 @@ static int passoV1(void) {
   { char *t = dados_ler("aviso-log.txt"); if (t) free(t); else dados_gravar("aviso-log.txt", "1\n"); }
   return 1;
 }
-static const QrdPasso PASSOS[] = { passoV1 };
+// v2 = maximum-quality playback defaults (LG B5 + eARC soundbar), applied
+// once after the settings load (qrdados_qualidade_aplicar), and only to
+// options still at their factory value. The step itself only leaves a mark.
+static int passoV2(void) { return dados_gravar("qrtime-quality.txt", "pendente\n"); }
+static const QrdPasso PASSOS[] = { passoV1, passoV2 };
 static const QrdPasso *passos = PASSOS;
 static int nPassos = (int)(sizeof PASSOS / sizeof *PASSOS), alvo = QRD_ESQUEMA;
 
@@ -84,6 +88,18 @@ int qrdados_esquema_iniciar(void) {
   return antes;
 }
 int qrdados_esquema_disco(void) { return disco; }
+#pragma weak ajustes_qualidade_maxima_padrao
+int ajustes_qualidade_maxima_padrao(void);
+int qrdados_qualidade_aplicar(void) {
+  char *t = dados_ler("qrtime-quality.txt");
+  int r = 0;
+  if (t && !strncmp(t, "pendente", 8) && ajustes_qualidade_maxima_padrao) {
+    r = ajustes_qualidade_maxima_padrao();
+    dados_gravar("qrtime-quality.txt", "feito\n");
+  }
+  free(t);
+  return r;
+}
 int qrdados_mais_novo(void) { return maisNovo; }
 
 // ---------------------------------------------------------------- cache

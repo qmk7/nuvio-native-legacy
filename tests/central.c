@@ -66,13 +66,13 @@ static void lista(void) {
   char buf[512];
   int i, n;
   centrallista_padrao(&l);
-  CONFERE(l.n == 7, "padrao: 7 atalhos (%d)", l.n);
+  CONFERE(l.n == 8, "padrao: 8 atalhos (%d)", l.n);
   for (i = 0; i < l.n; i++) CONFERE(central_catalogo(l.item[i]) != NULL, "padrao: item %d no catalogo", i);
   centrallista_escrever(&l, buf, sizeof buf);
   centrallista_ler(&m, buf);
   CONFERE(m.n == l.n && !memcmp(m.item, l.item, sizeof(int) * (size_t)l.n), "ida e volta");
   centrallista_ler(&m, NULL);
-  CONFERE(m.n == 7, "sem arquivo: padrao");
+  CONFERE(m.n == 8, "sem arquivo: padrao");
   m.n = 0;
   centrallista_escrever(&m, buf, sizeof buf);
   CONFERE(!strcmp(buf, "-\n"), "vazia grava '-' (%s)", buf);

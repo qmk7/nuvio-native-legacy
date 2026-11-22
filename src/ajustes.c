@@ -730,6 +730,7 @@ typedef enum {
   AJ_HERO_PASTA_DETALHES, // Device-local folder hero details, append-only; on by default.
   AJ_IPTV_TESTAR,      // QR TIME: action, test the selected IPTV account now (iptvteste.h).
   AJ_QR_CONTAS,        // QR TIME phase 8: action, opens Accounts, providers and data (qrcontasui.c).
+  AJ_SONO,             // QR TIME: sleep timer (sono.c). LOCAL; back to Off at every start.
   AJ_N
 } OpcaoId;
 _Static_assert(DEBRID_RD == 0 && DEBRID_TB == 1 && DEBRID_PM == 2 && DEBRID_AD == 3,
@@ -807,6 +808,7 @@ static const char *V_FONTE_PRIORIDADE[] = { "Equilíbrio", "Qualidade máxima", 
 static const char *V_FONTE_HDR[] = { "Preferir", "Indiferente", "Evitar" };
 // 2.0: "ate 30 s" (dono, 05/10). Indices = esmaecer.h (ESM_ESCOLHAS); o
 // ajuste nunca saiu numa versao publicada, entao os indices antigos nao migram.
+static const char *V_SONO[] = { "Desligado", "15 min", "30 min", "1 hora", "1h30", "2 horas" };
 static const char *V_ESMAECER[] = { "Desligado", "30 s", "1 min", "2 min", "5 min", "10 min" };
 static const char *V_DESCANSO_ESTILO[] = { "Vitrine", "Relógio", "Só escurecer" };
 // Faixa de tamanho: o INDICE e o gravado; ajustes_tamanho_*_gb() devolve os GB.
@@ -1870,6 +1872,7 @@ static const Opcao OPCOES[AJ_N] = {
   ESC("Mostrar detalhes da pasta no destaque", V_LIGA, 2),
   ACAO("Testar conexão"),
   ACAO("Contas, provedores e dados"),
+  ESC("Temporizador de sono", V_SONO, 6),   // local: sonoLocal
 };
 
 // Nome de cada opcao no arquivo. O formato era POSICIONAL — uma linha por
@@ -2205,6 +2208,7 @@ static const char *CHAVE[] = {
   "heroFolderDetailsLocal",
   "-iptvTestar",
   "-qrContas",
+  "sonoLocal",
 };
 // QUATRO VETORES PARALELOS indexados pelo mesmo enum AJ_*: OPCOES, CHAVE,
 // valor e as secoes. OPCOES ja e declarado [AJ_N], e `valor` aceita inicializacao
@@ -2920,6 +2924,8 @@ int ajustes_fonte_primeira(void)      { return ajustes_fonte_prioridade() == 3 |
 int ajustes_fonte_prioridade(void) { int v = valor[AJ_FONTE_PRIORIDADE]; return v < 0 || v > 3 ? 0 : v; }
 int ajustes_enquetes(void)         { return lig(AJ_ENQUETES); }
 int ajustes_busca_cinemeta(void)   { return lig(AJ_BUSCA_CINEMETA); }
+int ajustes_sono_minutos(void) { static const int m[6] = { 0, 15, 30, 60, 90, 120 }; int v = valor[AJ_SONO]; return v < 0 || v > 5 ? 0 : m[v]; }
+void ajustes_sono_zerar(void) { if (valor[AJ_SONO]) { valor[AJ_SONO] = 0; gravar(); } }
 int ajustes_esmaecer(void)         { int v = valor[AJ_ESMAECER]; return v < 0 || v > 5 ? 3 : v; }
 int ajustes_descanso_estilo(void)  { int v = valor[AJ_DESCANSO_ESTILO]; return v < 0 || v > 2 ? 0 : v; }
 int ajustes_descanso_fonte(void)   { int v = valor[AJ_DESCANSO_FONTE]; return v < 0 || v > 1 ? 0 : v; }
@@ -6073,6 +6079,7 @@ static int somenteDesteAparelho(int op) {
     case AJ_BUSCA_CINEMETA: /* o web nao tem esta escolha */
     case AJ_BUSCA_NUVIO: case AJ_BUSCA_ORIGEM: /* idem (#311) */
     case AJ_ESMAECER: case AJ_BRILHO_PLAYER: /* o painel OLED e desta TV */
+    case AJ_SONO:
     case AJ_PROPORCAO_PADRAO: /* o aspecto e a tela desta TV */
     case AJ_RETOMADA_MORNA: case AJ_MANTER_PRAZO:
     case AJ_MANTER_VIDEO:   /* a memoria e o decoder sao desta TV */
@@ -6516,6 +6523,28 @@ void ajustes_edicao_encerrar(void) {
   reaplicarEfeitosPerfil();
   printf("[ajustes] edicao do perfil %d encerrada\n", alvo);
   fflush(stdout);
+}
+
+// QR TIME: the highest quality this TV and receiver chain can take (LG B5 ->
+// eARC -> Q990F), applied once by the data schema step (qrdados.c). Only an
+// option still at its factory value changes: a choice the person made stays.
+int ajustes_qualidade_maxima_padrao(void) {
+  static const struct { int op, v; } Q[] = {
+    { AJ_QUALIDADE, 1 },          // 4K
+    { AJ_FONTE_HDR, 0 },          // prefer Dolby Vision / HDR
+    { AJ_DV, 0 }, { AJ_ATMOS, 0 },  // on
+    { AJ_FONTE_PRIORIDADE, 1 },   // "Qualidade máxima"
+    { AJ_TAM_MAX, 0 },            // no size limit
+    { AJ_DV_MKV, 0 },             // Dolby Vision in MKV (profile 5/8) on
+    { AJ_BUFFER, 3 },             // 256 MB read-ahead for heavy 4K files
+  };
+  int mudou = 0;
+  for (int i = 0; i < (int)(sizeof Q / sizeof *Q); i++)
+    if (valor[Q[i].op] == valorPadrao[Q[i].op] && valor[Q[i].op] != Q[i].v) { valor[Q[i].op] = Q[i].v; mudou++; }
+  if (mudou) gravar();
+  printf("[ajustes] qualidade maxima: %d opcao(oes) ajustada(s)\n", mudou);
+  fflush(stdout);
+  return mudou;
 }
 
 // Padroes seguros de perfil infantil: sem enquetes nem Seekr, sem as notas de
@@ -7775,6 +7804,7 @@ static const char *ajudaOpcaoBase(int op) {
     case AJ_IPTV_NOME: return "Nome da conta";
     case AJ_IPTV_REMOVER: return "Apaga apenas a conta selecionada e seus canais.";
     case AJ_IPTV_TESTAR: return "Confere agora se o servidor responde e aceita esta conta, sem mudar nada.";
+    case AJ_SONO: return "Ao fim do tempo pausa o filme, a série ou a música e desliga a tela. Um aviso aparece um minuto antes. Volta a Desligado quando dispara e quando o app reinicia.";
     case AJ_QR_CONTAS: return "Todos os provedores num lugar: estado, teste de conexão, ligar ou desligar e atualizar. Também o cache e as operações de limpeza, sempre com confirmação.";
     case AJ_GUIA_FONTE: return "Fontes exibidas no Guia de TV.";
     case AJ_GUIA_RECARREGAR: return "Mantém os canais disponíveis durante a atualização.";

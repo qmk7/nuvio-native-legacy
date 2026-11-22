@@ -1,5 +1,5 @@
 #!/bin/bash
-# Os nomes dos 27 botoes da Central cabem no botao, nos 30 idiomas, em
+# Os nomes dos 28 botoes da Central cabem no botao, nos 30 idiomas, em
 # Montserrat. Ver tests/central_rotulos.c (janela GL escondida).
 #
 #   bash tests/central_rotulos.sh

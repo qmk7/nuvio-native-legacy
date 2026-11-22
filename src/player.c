@@ -7434,3 +7434,16 @@ float player_osd_brilho(void) {
                              agora > ultimoInput ? agora - ultimoInput : 0u,
                              tocando);
 }
+
+// QR TIME sleep timer (sono.c): pause what is playing as the person's own
+// pause, so OK/Play resumes it. A live channel without a time window pauses
+// too: at that point nobody is watching, and OK picks it up again.
+void player_sono_pausar(void) {
+  if (!player_aberto() || !tocando) return;
+  retomandoSalto = 0;
+  tocando = 0;
+  pausaPessoa = 1;
+  if (comVideo) video_pausar(1);
+  printf("[sono] player pausado\n");
+  fflush(stdout);
+}
