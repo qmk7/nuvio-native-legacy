@@ -717,6 +717,16 @@ def varrer():
                 continue
             if RE_CABECALHO_HTTP.match(s):
                 continue
+            # QR TIME phone pages (celapps.c, mcfesta.c, qrbackup.c,
+            # perfilfoto.c): the HTML/JS of a page served to the phone, never
+            # drawn by the TV; their visible words go through i18n() into
+            # escaped %s fields. And the profile-photo file names.
+            if arq.name in ("celapps.c", "mcfesta.c", "qrbackup.c", "perfilfoto.c") and (
+                    s.lstrip().startswith(("<", "function ", "var ", "document.", "setInterval", "\"", "{\\\"")) or
+                    s.startswith(("perfil-foto-", "qrtime-backup-", "QRTIME-BACKUP", "F %zu", "festa", "{\"msg\"", "{\"erro\"", "{\"ok\"", "{\"pronto\"", "{\"restaurados\""))):
+                continue
+            if arq.name == "perfis.c" and s.startswith("perfil-foto-"):
+                continue
             onde = f"{arq.name}:{linha_de(ini)}"
             # MONTAGEM: o formato tem de ser envolvido na origem, porque a
             # string final nunca casa com chave. Sem "%", o literal chega

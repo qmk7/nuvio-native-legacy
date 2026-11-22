@@ -7,11 +7,15 @@
 #include "idioma.h"
 #include "ilha.h"
 #include "teclado.h"
+#include "celapps.h"
+#include "qrtex.h"
 #include <stdio.h>
 #include <string.h>
 
-enum { ABA_PROV, ABA_DADOS, ABA_N };
-static const char *const ABAS[ABA_N] = { "Provedores", "Dados e limpeza" };
+enum { ABA_PROV, ABA_DADOS, ABA_CEL, ABA_N };
+static const char *const ABAS[ABA_N] = { "Provedores", "Dados e limpeza", "Celular" };
+static GLuint texQr;
+static char qrDe[160];
 enum { Z_ABAS, Z_LISTA };
 static QrcLinha linhas[QRC_MAX];
 static int nLinhas, aba, zona, foco, botao, sair, pedido, tecladoTsdb;
@@ -47,7 +51,7 @@ static void montar(void) {
   nLinhas = qrc_montar(linhas, QRC_MAX);
   if (foco >= nLinhas) foco = nLinhas ? nLinhas - 1 : 0;
 }
-static int nItens(void) { return aba == ABA_PROV ? nLinhas : QRR_N; }
+static int nItens(void) { return aba == ABA_PROV ? nLinhas : aba == ABA_CEL ? CA_N : QRR_N; }
 
 void qrcui_abrir(void) {
   aba = ABA_PROV; zona = Z_LISTA; foco = 0; botao = 0; sair = 0; pedido = QRCUI_IR_NADA;
@@ -137,6 +141,18 @@ void qrcui_evento(const SDL_Event *e) {
     if (k == SDLK_LEFT && botao > 0) botao--;
     else if (k == SDLK_RIGHT && botao + 1 < nb) botao++;
     else if (ok) executar();
+    return;
+  }
+  if (aba == ABA_CEL) {
+    // OK puts the page on the network (or, when it is up, makes a new link:
+    // the old one stops working). Right also renews.
+    if (ok || k == SDLK_RIGHT) {
+      int ja = celapps_url(foco)[0] != 0;
+      if (ja) { celapps_renovar(foco); ilha_avisar("qrcontas", ILHA_INFO, "aj_qr-code", i18n("Novo link: o anterior deixou de funcionar."), 3000u, 0); }
+      else if (!celapps_abrir(foco)) ilha_avisar("qrcontas", ILHA_ERRO, "aj_smartphone", i18n("A TV não está numa rede local agora."), 3500u, 0);
+      printf("[contas] celular %d: %s\n", foco, celapps_url(foco)[0] ? "no ar" : "fora");
+      fflush(stdout);
+    }
     return;
   }
   if (ok) { confirmando = foco; botaoConf = 0; printf("[contas] confirmar reset %d (foco em Cancelar)\n", foco); fflush(stdout); }
@@ -235,6 +251,31 @@ static void desenharDados(float x, float y, float w) {
     corta(TXT_CAPTION, i18n(qrdados_reset_desc(i)), x, ry + 44, w, 0.6f);
   }
 }
+static void desenharCelular(float x, float y, float w) {
+  float rh = 104, lw = w * 0.52f, qx = x + lw + 60, lado = 380;
+  const char *u = celapps_url(foco);
+  corta(TXT_CAPTION, i18n("O celular precisa estar no mesmo Wi-Fi da TV. Cada página tem seu próprio link."), x, y, w, 0.7f);
+  y += 56;
+  for (int i = 0; i < CA_N; i++) {
+    int f = zona == Z_LISTA && i == foco, no = celapps_url(i)[0] != 0;
+    float ry = y + (float)i * rh;
+    if (f) gfx_cor((GfxRect){ x - 12, ry - 6, lw + 24, rh - 10 }, 0.25f, 1, 1, 1, 0.10f);
+    gfx_icone((GfxRect){ x, ry + 4, 36, 36 }, celapps_icone(i), 1, 1, 1, f ? 1 : 0.8f);
+    corta(TXT_BODY, i18n(celapps_nome(i)), x + 52, ry, lw - 180, f ? 1 : 0.9f);
+    if (no) { gfx_cor((GfxRect){ x + lw - 110, ry + 12, 12, 12 }, 0.5f, 0.30f, 0.80f, 0.45f, 1); corta(TXT_CAPTION, i18n("No ar"), x + lw - 92, ry + 4, 100, 0.8f); }
+    corta(TXT_CAPTION, i18n(celapps_desc(i)), x + 52, ry + 44, lw - 60, 0.6f);
+  }
+  if (zona != Z_LISTA) return;
+  if (u[0]) {
+    if (strcmp(qrDe, u)) { snprintf(qrDe, sizeof qrDe, "%s", u); qr_textura(&texQr, u); }
+    if (texQr) gfx_textura((GfxRect){ qx, y, lado, lado }, texQr);
+    corta(TXT_CAPTION, u, qx, y + lado + 16, w - lw - 60, 0.75f);
+    txt_bloco_corta(TXT_CAPTION, i18n("Leia com a câmera do celular. OK ou direita: novo link (o anterior para de funcionar)."),
+                    240, 242, 248, qx, y + lado + 60, w - lw - 60, 34, 0.6f, 3);
+  } else {
+    txt_bloco_corta(TXT_CALLOUT, i18n("Aperte OK para abrir esta página no celular."), 240, 242, 248, qx, y + 40, w - lw - 60, 44, 0.85f, 3);
+  }
+}
 static void desenharConfirmacao(void) {
   float w = 900, h = 330, x = (NV_TELA_W - w) / 2, y = (NV_TELA_H - h) / 2;
   gfx_cor((GfxRect){ 0, 0, NV_TELA_W, NV_TELA_H }, 0, 0, 0, 0, 0.6f);
@@ -266,7 +307,9 @@ void qrcui_desenhar(Uint32 agora) {
     }
     y += 84;
   }
-  if (aba == ABA_PROV) desenharProvedores(x, y, w); else desenharDados(x, y, w);
+  if (aba == ABA_PROV) desenharProvedores(x, y, w);
+  else if (aba == ABA_CEL) desenharCelular(x, y, w);
+  else desenharDados(x, y, w);
   if (confirmando >= 0) desenharConfirmacao();
   if (teclado_aberto()) teclado_desenhar(agora);
 }

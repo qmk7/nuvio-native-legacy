@@ -128,4 +128,6 @@ const char *teclado_texto(void);
 // Zera o que foi digitado (senha): quem leu teclado_texto() e nao precisa mais.
 void teclado_esquecer(void);
 
+// The phone remote / desktop test port: the whole value, then confirm.
+void teclado_porta_colar(const char *t);
 #endif

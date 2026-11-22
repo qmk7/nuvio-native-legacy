@@ -713,6 +713,7 @@ static void *fioSpotify(void *u) {
   pthread_mutex_unlock(&trava);
   return NULL;
 }
+static void spotifyConsumir(void);
 static void importarSpotify(const char *url) {
   pthread_t t;
   PedidoSp *p;
@@ -723,6 +724,37 @@ static void importarSpotify(const char *url) {
   pthread_detach(t);
   ilha_avisar("mcsp", ILHA_INFO, NULL, i18n("Lendo a playlist do Spotify e procurando na sua biblioteca…"), 4000u, 0);
 }
+
+// The Spotify import result (from Music or from the phone page, celapps.c):
+// consumed here, on the app thread, even when the Music screen is closed.
+static void spotifyConsumir(void) {
+  pthread_mutex_lock(&trava);
+  if (!spPronto) { pthread_mutex_unlock(&trava); return; }
+  {
+      McFaixa *v = spAchadas;
+      int a = spN, tot = spTotal, er = spErro;
+      char nome[160], msg[300];
+      snprintf(nome, sizeof nome, "%s", spNome);
+      spAchadas = NULL; spPronto = 0;
+      pthread_mutex_unlock(&trava);
+      if (er != MC_OK) snprintf(msg, sizeof msg, "%s", i18n(er == MC_ERRO_LOGIN ? "O Spotify recusou o Client ID ou o secret." :
+                                                       er == MC_ERRO_NAO_SUPORTA ? "Playlist não encontrada ou não pública (o Spotify não libera as playlists dele para apps novos)." :
+                                                       "Não foi possível ler a playlist do Spotify."));
+      else {
+        if (a) {
+          char t2[200];
+          int li;
+          snprintf(t2, sizeof t2, "%.150s (Spotify)", nome[0] ? nome : "Playlist");
+          li = mcl_criar(t2);
+          for (int i = 0; li >= 0 && i < a; i++) mcl_adicionar(li, &v[i]);
+        }
+        snprintf(msg, sizeof msg, i18n("%d de %d faixas encontradas na sua biblioteca; salvas em Playlists."), a, tot);
+      }
+      free(v);
+      ilha_avisar("mcsp", ILHA_INFO, NULL, msg, 6000u, 0);
+  }
+}
+void mcui_importar_spotify(const char *url) { importarSpotify(url); }
 
 // ---------------------------------------------------------------- source form
 enum { FC_NOME, FC_URL, FC_USUARIO, FC_SENHA, FC_TESTAR, FC_SALVAR, FC_N };
@@ -830,7 +862,7 @@ int mcui_quer_sair(void) { int v = sair; sair = 0; return v; }
 int mcui_teste_secao(void) { return secao; }
 int mcui_teste_n(void) { Pagina *pg = topo(); return pg ? pg->n : 0; }
 int mcui_teste_zona(void) { return zona; }
-void mcui_fundo(Uint32 agora) { if (abertoUmaVez) mcp_atualizar(agora); }
+void mcui_fundo(Uint32 agora) { if (abertoUmaVez) mcp_atualizar(agora); spotifyConsumir(); }
 
 static void ativar(Pagina *pg, int i) {
   Linha *l = &pg->v[i];
@@ -1189,30 +1221,7 @@ void mcui_atualizar(float dt, Uint32 agora) {
     if (lotePronto) { lp = 1; lv = lote; nl = nLote; la = loteAcao; lote = NULL; lotePronto = 0; }
     if (!formTestando && formResultado != -99) { ft = formResultado; formResultado = -99; }
     if (lfmResultado != -99) { lr = lfmResultado; lfmResultado = -99; }
-    if (spPronto) {
-      McFaixa *v = spAchadas;
-      int a = spN, tot = spTotal, er = spErro;
-      char nome[160], msg[300];
-      snprintf(nome, sizeof nome, "%s", spNome);
-      spAchadas = NULL; spPronto = 0;
-      pthread_mutex_unlock(&trava);
-      if (er != MC_OK) snprintf(msg, sizeof msg, "%s", i18n(er == MC_ERRO_LOGIN ? "O Spotify recusou o Client ID ou o secret." :
-                                                       er == MC_ERRO_NAO_SUPORTA ? "Playlist não encontrada ou não pública (o Spotify não libera as playlists dele para apps novos)." :
-                                                       "Não foi possível ler a playlist do Spotify."));
-      else {
-        if (a) {
-          char t2[200];
-          int li;
-          snprintf(t2, sizeof t2, "%.150s (Spotify)", nome[0] ? nome : "Playlist");
-          li = mcl_criar(t2);
-          for (int i = 0; li >= 0 && i < a; i++) mcl_adicionar(li, &v[i]);
-        }
-        snprintf(msg, sizeof msg, i18n("%d de %d faixas encontradas na sua biblioteca; salvas em Playlists."), a, tot);
-      }
-      free(v);
-      ilha_avisar("mcsp", ILHA_INFO, NULL, msg, 6000u, 0);
-      pthread_mutex_lock(&trava);
-    }
+    if (spPronto) { pthread_mutex_unlock(&trava); spotifyConsumir(); pthread_mutex_lock(&trava); }
     if (salvarResultado != -99) {
       int sr = salvarResultado;
       salvarResultado = -99;

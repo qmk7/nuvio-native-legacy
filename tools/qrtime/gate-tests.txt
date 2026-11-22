@@ -96,3 +96,5 @@ qrtime_intro:300
 qrtime_nuvem_chave
 qrtime_trakt_pkce
 qrtime_sono
+qrtime_lanweb
+qrtime_backup:900

@@ -44,6 +44,8 @@ int perfis_puxar(void);
 // Dispatch-time identity: responses from an older visit are discarded.
 int perfis_puxar_sessao(uint64_t sessao, const char *usuario, const char *jwt);
 
+// QR TIME: apply the photos chosen on the phone (perfilfoto.c) to the list.
+void perfis_fotos_locais(void);
 int           perfis_n(void);
 const ContaPerfil *perfis_item(int i);
 // O perfil em vigor, ou NULL quando a lista ainda nao chegou.

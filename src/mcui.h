@@ -23,4 +23,7 @@ void mcui_fundo(Uint32 agora);
 int  mcui_teste_secao(void);
 int  mcui_teste_n(void);
 int  mcui_teste_zona(void);   // 0 menu, 1 list, 2 now playing, 3 form, 4 actions
+// Spotify playlist import (official Web API, the TV's own client id/secret):
+// runs in the background, saves a local playlist, says the result on the island.
+void mcui_importar_spotify(const char *url);
 #endif

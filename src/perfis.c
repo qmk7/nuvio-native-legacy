@@ -1,5 +1,6 @@
 void servidores_perfil_trocou(void);   // servidores.c: cancel in-flight work, load this profile
 #include "perfis.h"
+#include <unistd.h>
 #include "sessao.h"
 #include "nuvem.h"
 #include "dados.h"
@@ -230,6 +231,22 @@ static void lerCache(void) {
     n = novos;
     printf("[perfis] %d perfil(is) do cache: a tela de escolha ja pode abrir\n", n);
   }
+  perfis_fotos_locais();
+}
+
+// QR TIME: a photo chosen on the phone (perfilfoto.c) replaces the account's
+// avatar on THIS TV. "perfil-foto-p<N>.txt" names the current JPEG in the
+// data folder; the image is a local path, which tex_cache loads as a file.
+void perfis_fotos_locais(void) {
+  for (int i = 0; i < n; i++) {
+    char arq[48], cam[600], *t;
+    snprintf(arq, sizeof arq, "perfil-foto-p%d.txt", lista[i].indice);
+    if (!(t = dados_ler(arq))) continue;
+    t[strcspn(t, "\r\n")] = 0;
+    if (t[0] && !strchr(t, '/') && dados_caminho(cam, sizeof cam, t) && !access(cam, R_OK))
+      snprintf(lista[i].avatarUrl, sizeof lista[i].avatarUrl, "%s", cam);
+    free(t);
+  }
 }
 
 // --- CATALOGO DE AVATARES OFICIAIS -------------------------------------------
@@ -394,6 +411,7 @@ publicar:
   if (!perfis_sessao_travar(pedido->sessao)) return 0;
   if (!pedidoPerfisAtual(pedido)) { perfis_sessao_destravar(); return 0; }
   memcpy(lista, tmp, sizeof lista); n = novos;
+  perfis_fotos_locais();
   snprintf(dono, sizeof dono, "%s", novoDono);
   if (publicarCache) gravarCache();
   printf("[perfis] %d perfil(is), dono=%s, ativo=%d\n", n, dono, ativo);

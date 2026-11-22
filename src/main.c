@@ -230,6 +230,7 @@ static void aoSinalTerminar(int sig) {
 #include "plex.h"
 #include "esmaecer.h"
 #include "sono.h"
+#include "celapps.h"
 #include "descanso.h"
 
 // RSS DO PROCESSO, em MB, lido de /proc/self/statm. E o numero que responde
@@ -374,6 +375,7 @@ static SDL_Keycode codigoDaTecla(const char *nome) {
   // "spotlight" abre a caixa de busca por cima da tela (a AMARELA), "voz" e o
   // botao de microfone (F6: abre e, onde ha ditado, ja comeca). spotlight.h.
   if (!strcmp(nome, "spotlight")) return SDLK_F5;
+  if (!strcmp(nome, "play"))  return SDLK_AUDIOPLAY;   // QR TIME phone remote: play/pause
   if (!strcmp(nome, "voz"))   return SDLK_F6;
   return 0;
 }
@@ -468,7 +470,17 @@ static SDL_Event soltarMouse;
 static void introInjetada(const SDL_Event *e) { if (e->type == SDL_KEYDOWN) qrintro_tecla(); }
 // Injected keys meet the sleep timer as real keys do (the event loop's sono_entrada).
 static void appInjetada(const SDL_Event *e) { if (!sono_entrada(e)) app_evento(e); }
+// QR TIME PHONE REMOTE (celapps.c): key names from the phone, delivered here
+// exactly like the injected test keys (same names, same path).
 static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
+  for (char nome[16]; celapps_tecla_remota(nome, sizeof nome); ) {
+    SDL_Keycode k = codigoDaTecla(nome);
+    SDL_Event e;
+    if (!k) continue;
+    esmaecer_entrada(SDL_GetTicks(), 0);
+    SDL_zero(e); e.type = SDL_KEYDOWN; e.key.keysym.sym = k; entregar(&e);
+    e.type = SDL_KEYUP; entregar(&e);
+  }
   if (soltarMouseEm && SDL_GetTicks() >= soltarMouseEm) {
     soltarMouseEm = 0;
     ponteiro_evento(&soltarMouse, entregar);
@@ -505,6 +517,15 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     if (dp && !strncmp(linha, "colar:", 6)) { extern void teclado_porta_colar(const char *); teclado_porta_colar(dp + 1); continue; }
     // "tela:contas" opens Settings > Accounts, providers and data (as OK on that row does).
     if (dp && !strcmp(linha, "tela:contas")) { extern void app_ir_contas(void); app_ir_contas(); continue; }
+    // "lanweb:<n>" (desktop tests only): writes phone page n's link to
+    // /tmp/nuvio-lanweb-url (never to the log), opening the page if needed.
+    if (dp && !strncmp(linha, "lanweb:", 7)) {
+      int a = atoi(dp + 1);
+      FILE *u;
+      if (!celapps_url(a)[0]) celapps_abrir(a);
+      if ((u = fopen("/tmp/nuvio-lanweb-url", "w")) != NULL) { fputs(celapps_url(a), u); fclose(u); }
+      continue;
+    }
     // "tela:central" opens the Control Center (as holding CH+ does).
     if (dp && !strcmp(linha, "tela:central")) { if (app_central_pode()) central_abrir(); else printf("[central] porta de teste: agora nao (tela ocupada)\n"); fflush(stdout); continue; }
 #endif
@@ -2251,6 +2272,7 @@ int main(int argc, char **argv) {
     // PROTECAO DE OLED: "parado" = nenhuma tecla E nenhum video tocando de
     // verdade (pausado conta como parado).
     sono_atualizar(agora);   // QR TIME sleep timer
+    celapps_atualizar(agora);   // QR TIME phone pages (lanweb.c)
     esmaecer_escolha(ajustes_esmaecer());
     // Com o player aberto (filme pausado) fica so o escurecer de antes: a
     // vitrine pediria texturas de tela cheia com o decodificador ocupado.

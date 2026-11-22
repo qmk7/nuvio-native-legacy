@@ -45,6 +45,7 @@ SVG="$DIR/lucide"
 # fileiras. O menu do cartaz (ctxmenu.c) usa info/library/eye/eye-off/users/
 # x/rows-3/folders, o traco do mockup "ilha" tela 7.
 NOMES="
+gamepad-2 party-popper tv qr-code upload camera moon-star sunrise calendar-days cloud-sun heart-pulse bell-ring door-open dices speaker user-round-plus
 circle-play file-text folders house
 images info layout-dashboard monitor-cog palette panel-top plug puzzle
 rotate-ccw-clock rows-3 star user-round mic keyboard smartphone shuffle
