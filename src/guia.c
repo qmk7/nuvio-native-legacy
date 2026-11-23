@@ -2958,7 +2958,7 @@ int guia_variantes(const char *id, GuiaVariante *out, int max) {
 // diferentes costumam ser servidores diferentes). Sem foco valido, a primeira
 // fonte com canal.
 int guia_canais_para_teste(GuiaVariante *out, char bases[][600], int max, char *grupo, size_t ng) {
-  int l = focoLin, c0 = focoCol, n = 0, k, total, f = -1, g;
+  int l = focoLin, c0 = focoCol, n = 0, k, total, f = -1, g, xtJunto = 0;
   GCanal *foco;
   if (l < 0 || l >= nLinhas()) l = 0;
   total = linhaN(l);
@@ -2978,6 +2978,21 @@ int guia_canais_para_teste(GuiaVariante *out, char bases[][600], int max, char *
     GCanal *g1 = linhaItem(l, (c0 + k) % total);
     if (g1) POE(g1);
   }
+  // QR TIME: the Xtream account is what the diagnostic is for. When the guide
+  // is focused on another source (an add-on such as PenguPlay), three of the
+  // account's channels join the test, so the account is never left untested.
+  {
+    int temXt = 0, nx = 0;
+    for (k = 0; k < n; k++) if (xtream_e_id(out[k].id)) temXt = 1;
+    // One channel from each of three categories (not three of the same
+    // group); "#### SPORTS ####" separator entries do not play and are skipped.
+    for (g = 0; !temXt && g < nCats && n < max && nx < 3; g++)
+      for (k = catIni[g]; k < catIni[g] + catN[g] && k < nCanais; k++)
+        if (xtream_e_id(canais[k].id) && canais[k].nome[0] != '#' && canais[k].nome[0] != '=' && canais[k].nome[0] != '-') {
+          int antes = n; POE(&canais[k]); nx += n > antes; break;
+        }
+    xtJunto = nx > 0;
+  }
   for (g = 0; g < nCats && n < max && f >= 0; g++)
     if (cats[g].fonte == f && catN[g] > 0) POE(&canais[catIni[g]]);
   for (k = 3; k < total && n < max; k++) {
@@ -2987,6 +3002,7 @@ int guia_canais_para_teste(GuiaVariante *out, char bases[][600], int max, char *
   #undef POE
   if (grupo && ng && f >= 0 && f < nLtvF && n > total)
     snprintf(grupo, ng, "%s", ltvF[f].nome);
+  if (xtJunto && grupo && ng) { size_t u = strlen(grupo); snprintf(grupo + u, ng - u, " + Xtream"); }
   return n;
 }
 
