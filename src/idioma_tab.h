@@ -6995,5 +6995,6 @@
   { "↓   Entrar na lista", "↓   Enter list" },
   { "↓ até o fim volta a seguir", "↓ to the end resumes following" },
   { "◀ ▶ avança ou volta 10 s", "◀ ▶ skips 10 s" },
+  { "● AO VIVO", "● LIVE" },
   { "✓ Assistido%s%s", "✓ Watched%s%s" },
   { "✓ Salvo", "✓ Saved" },

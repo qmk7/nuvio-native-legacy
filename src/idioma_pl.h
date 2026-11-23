@@ -6996,5 +6996,6 @@
   T("↓   Entrar na lista", "↓   Enter list"),
   T("↓ até o fim volta a seguir", "↓ do końca wznawia śledzenie"),
   T("◀ ▶ avança ou volta 10 s", "◀ ▶ skips 10 s"),
+  T("● AO VIVO", "● LIVE"),
   T("✓ Assistido%s%s", "✓ Obejrzane%s%s"),
   T("✓ Salvo", "✓ Saved"),

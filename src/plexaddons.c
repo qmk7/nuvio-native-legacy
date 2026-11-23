@@ -5,8 +5,12 @@
 
 static int origem(const char *id, const char *tipo, int (*cancelado)(void *), void *ctx,
                   OrigemAviso aviso, void *avisoU, void *saida) {
-  (void)aviso; (void)avisoU;   // one quiet lookup, no per-source progress rows
-  return plex_consultar(id, tipo, cancelado, ctx, (Stream **)saida);
+  int n;
+  if (aviso) aviso(avisoU, ADDONS_VAGA_PLEX, "Plex", "qrtime-plex", 1, NULL, 0);
+  n = plex_consultar(id, tipo, cancelado, ctx, (Stream **)saida);
+  if (aviso) aviso(avisoU, ADDONS_VAGA_PLEX, "Plex", "qrtime-plex", n >= 0 ? 2 : 3,
+                   n > 0 ? *(Stream **)saida : NULL, n > 0 ? n : 0);
+  return n;
 }
 
 static void *preparoCapturar(void) { return plex_preparo_capturar(); }
@@ -14,8 +18,11 @@ static int preparoAtual(const void *p) { return plex_preparo_atual(p); }
 static int preparoConsultar(const void *p, const char *id, const char *tipo,
                             int (*cancelado)(void *), void *ctx,
                             OrigemAviso aviso, void *avisoU, Stream **saida) {
-  (void)aviso; (void)avisoU;
-  return plex_preparo_consultar(p, id, tipo, cancelado, ctx, saida);
+  int n;
+  if (aviso) aviso(avisoU, ADDONS_VAGA_PLEX, "Plex", "qrtime-plex", 1, NULL, 0);
+  n = plex_preparo_consultar(p, id, tipo, cancelado, ctx, saida);
+  if (aviso) aviso(avisoU, ADDONS_VAGA_PLEX, "Plex", "qrtime-plex", n >= 0 ? 2 : 3, n > 0 ? *saida : NULL, n > 0 ? n : 0);
+  return n;
 }
 static void preparoLiberar(void *p) { plex_preparo_liberar(p); }
 void plex_ligar_aos_addons(void) {

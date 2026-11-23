@@ -35,6 +35,8 @@ typedef struct {
   char id[16], nome[64], curto[40], abrev[8], logo[256];
   char placar[8];        // "" when not started / unknown
   int  vencedor;
+  char cor[8], cor2[8];  // team colours, hex without '#' ("" = unknown)
+  char recorde[16];      // overall record ("10-2-3"), "" = none
 } EspTime;
 enum { ESP_PRE = 0, ESP_AO_VIVO, ESP_FIM, ESP_ADIADO };
 typedef struct {

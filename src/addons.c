@@ -3083,6 +3083,11 @@ void addons_definir_origem_extra_preparo(OrigemExtra f, const OrigemPreparoOps *
     return;
   }
 }
+static int (*localAceita)(const char *id);
+static int (*localTraduzir)(const char *id, char *out, size_t n);
+void addons_definir_traducao_local(int (*aceita)(const char *id), int (*traduzir)(const char *id, char *out, size_t n)) {
+  localAceita = aceita; localTraduzir = traduzir;
+}
 int addons_origem_extra_ativa(void) {
   int i;
   for (i = 0; i < nOrigensExtra; i++) if (origemExtraViva(i)) return 1;
@@ -3211,11 +3216,19 @@ static int consultar(const char *id, const char *tipo, const char *base, int fio
   PedidoExtra extra;
   pthread_t fioEx;
   int temExtra = 0;
+  const char *idAddons = id;
+  char idTraduzido[64];
   *saida = NULL;
   if (!id || !*id || !tipo || !*tipo) return 0;
   if (!nv_perfil_sessao_atual(sessao)) return -1;
   memset(&c, 0, sizeof c); c.sessao = sessao;
   c.origens = capturarPedidos(sessao, &c.nOrigens, &c.versao);
+  // A local library id never goes to an add-on: its IMDb id does, or nothing.
+  if (jfid_e(id)) {
+    idAddons = localAceita && localAceita(id) && localTraduzir && localTraduzir(id, idTraduzido, sizeof idTraduzido)
+                 && idbase_e_imdb(idTraduzido) ? idTraduzido : NULL;
+    if (!idAddons) { free(c.origens); c.origens = NULL; c.nOrigens = 0; }
+  }
   // So na busca ampla: canal com origem conhecida pergunta a um addon so.
   memset(&extra, 0, sizeof extra);
   if (!(base && *base) && addons_origem_extra_ativa()) {
@@ -3237,7 +3250,7 @@ static int consultar(const char *id, const char *tipo, const char *base, int fio
     free(extra.l);
     return 0;
   }
-  c.id = id; c.tipo = tipo;
+  c.id = idAddons; c.tipo = tipo;
   c.cancelado = cancelado; c.ctx = ctx;
   c.progresso = progresso;
   // Filme/serie: os ids do mesmo titulo em outros sites, sob demanda (armids.h).
@@ -3266,7 +3279,7 @@ static int consultar(const char *id, const char *tipo, const char *base, int fio
       char alvo[NV_ADDON_URL_MAX], mine[NV_ADDON_URL_MAX];
       baseNormalizada(base, alvo, sizeof alvo);
       for (i = 0; i < c.nOrigens; i++) {
-        if (!candidatoStream(&c.origens[i], tipo, id)) continue;
+        if (!candidatoStream(&c.origens[i], tipo, idAddons)) continue;
         baseNormalizada(c.origens[i].base, mine, sizeof mine);
         if (!strcmp(mine, alvo)) c.baldes[c.nBaldes++].idx = i;
       }
@@ -3275,7 +3288,7 @@ static int consultar(const char *id, const char *tipo, const char *base, int fio
     // como sempre. Melhor perguntar a mais do que nao perguntar a ninguem.
     if (c.nBaldes == 0)
       for (i = 0; i < c.nOrigens; i++)
-        if (candidatoStream(&c.origens[i], tipo, id)) c.baldes[c.nBaldes++].idx = i;
+        if (candidatoStream(&c.origens[i], tipo, idAddons)) c.baldes[c.nBaldes++].idx = i;
   }
 
   // QUEM FICOU DE FORA, E POR QUE (issue #83).
@@ -3649,6 +3662,7 @@ int addons_consulta_consultar(const AddonsConsulta *snapshot, const char *id, co
   if (!out) return -1;
   *out = NULL;
   if (!snapshot || !id || !*id || !tipo || !*tipo) return -1;
+  if (jfid_e(id)) return -1;   // local library ids are never asked of add-ons here
   ConsultaCapturada c = {0};
   c.snapshot = snapshot; c.id = id; c.tipo = tipo; c.cancelado = cancelado; c.ctx = ctx;
   if (cancelaConsultaCapturada(&c)) return -1;
@@ -3857,7 +3871,10 @@ static void buscarPedido(const char *imdb, const char *tipo, int forcar) {
   if (!imdb || !*imdb) return;
   stream_filtro_tipo(tipo);
   stream_folha_canal(nv_tipo_canal(tipo));
-  if (jfid_e(imdb)) {
+  // An IPTV library title with add-ons installed takes the normal search:
+  // its own copies arrive as an extra origin and the add-ons are asked with
+  // its IMDb id (consultar). Personal servers keep their own path.
+  if (jfid_e(imdb) && !(nAddon && localAceita && localAceita(imdb) && addons_origem_extra_ativa())) {
     // PERSONAL SERVER ITEM. No addon, no source cache, no "where to watch":
     // the target is already the exact movie/episode item on that server.
     if (fioVivo) {

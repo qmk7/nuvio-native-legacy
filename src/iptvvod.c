@@ -33,7 +33,8 @@ static int ehTagQualidade(const char *w) {
   static const char *const tags[] = { "4k", "uhd", "fhd", "hd", "sd", "hevc", "h265", "x265", "h264",
                                       "x264", "2160p", "1080p", "720p", "480p", "multi", "multisub",
                                       "sub", "subs", "dub", "dubbed", "hdr", "hdr10", "dv", "web",
-                                      "webrip", "webdl", "bluray", "remux", "vod", NULL };
+                                      "webrip", "webdl", "bluray", "remux", "vod", "mkv", "mp4", "avi",
+                                      "ts", "m4v", "hdrip", "brrip", "dvdrip", "hdtv", NULL };
   for (int i = 0; tags[i]; i++) if (!strcmp(w, tags[i])) return 1;
   return 0;
 }
@@ -1207,16 +1208,17 @@ static int montarDoEp(Stream *s, const EpFonte *f, const char *nome) {
   return 1;
 }
 typedef struct { char alvo[64]; unsigned pedido; } PedidoFontes;
-static void *fioFontes(void *u) {
-  PedidoFontes p = *(PedidoFontes *)u;
+// The provider copies of one library target (movie or episode). 1 = the
+// target exists (the list may still be empty).
+static int fontesDoAlvo(const char *alvo, Stream **saida, int *nSaida) {
   Stream *l = NULL;
   int n = 0, ok = 0, t = 0, e = 0;
   uint64_t grupo = 0;
   char k = 0;
-  free(u);
-  if (iptvvod_id_ler(p.alvo, NULL, &k, &t, &e)) {
+  *saida = NULL; *nSaida = 0;
+  if (iptvvod_id_ler(alvo, NULL, &k, &t, &e)) {
     Ref r[IPTVVOD_CONTAS_MAX];
-    int nr = copiasDo(p.alvo, k == 'e' ? 's' : 'm', r, IPTVVOD_CONTAS_MAX, &grupo);
+    int nr = copiasDo(alvo, k == 'e' ? 's' : 'm', r, IPTVVOD_CONTAS_MAX, &grupo);
     if (nr && k == 'm') {
       l = calloc((size_t)nr, sizeof *l);
       for (int i = 0; l && i < nr; i++) if (montarDaRef(&l[n], &r[i])) n++;
@@ -1241,6 +1243,16 @@ static void *fioFontes(void *u) {
       ok = l != NULL;
     }
   }
+  if (!n) { free(l); l = NULL; }
+  *saida = l; *nSaida = n;
+  return ok;
+}
+static void *fioFontes(void *u) {
+  PedidoFontes p = *(PedidoFontes *)u;
+  Stream *l = NULL;
+  int n = 0, ok;
+  free(u);
+  ok = fontesDoAlvo(p.alvo, &l, &n);
   pthread_mutex_lock(&travaFontes);
   if (p.pedido == fontesPedido) {
     free(fontesLista);
@@ -1419,6 +1431,17 @@ int iptvvod_origem(const char *id, const char *tipo, int (*cancelado)(void *), v
   Stream *l;
   (void)aviso; (void)avisoU;
   if (lista) *lista = NULL;
+  // A library title searched with the add-ons (iptvvod_id_addons): its own
+  // copies, exactly, without matching anything.
+  if (iptvvod_e_id(id)) {
+    int nl = 0;
+    if (!iptvvod_ativo() || !lista) return 0;
+    if (cancelado && cancelado(ctx)) return -1;
+    fontesDoAlvo(id, lista, &nl);
+    printf("[iptvvod] %d fonte(s) IPTV do proprio titulo da biblioteca\n", nl);
+    fflush(stdout);
+    return nl;
+  }
   if (!iptvvod_ativo() || !idCatalogo(id, imdb, sizeof imdb, &tmdb, &t, &e)) return 0;
   kind = (tipo && (!strcmp(tipo, "series") || !strcmp(tipo, "tv"))) || e > 0 ? 's' : 'm';
   if (imdb[0]) snprintf(chaveId, sizeof chaveId, "%s", imdb); else snprintf(chaveId, sizeof chaveId, "tmdb:%ld", tmdb);
@@ -1737,6 +1760,123 @@ int iptvvod_poster_ids(const char *id, const char *tipo, char *imdb, size_t n, l
   }
   pthread_mutex_unlock(&travaVerif);
   return r;
+}
+
+// ------------------------------------------------- add-on id of a library title
+// QR TIME: the same film opened from the IPTV library also gets the add-ons'
+// sources (Nuvio One shows both together). The add-ons need the title's real
+// IMDb id; the provider's own ids (qv:, stream ids) never leave the app. In
+// order: the TMDB-confirmed id (iptvvod_poster_ids' verification), a home
+// catalogue item with the same title and year, then Cinemeta's search by the
+// TITLE (a public name, not a provider id) with the same gate as the copies:
+// equal normalised title and, when both are known, the year within one.
+// Runs on a search worker (may use the network). 1 = out holds "tt..[:S:E]".
+static int (*catImdbFn)(const char *norm, int ano, char kind, char *imdb, size_t n);
+void iptvvod_definir_imdb_catalogo(int (*fn)(const char *norm, int ano, char kind, char *imdb, size_t n)) { catImdbFn = fn; }
+static char cineBase[160] = "https://v3-cinemeta.strem.io";
+void iptvvod_teste_cinemeta_base(const char *base) { snprintf(cineBase, sizeof cineBase, "%s", base ? base : ""); }
+#define IDADD_MAX 64
+static struct { uint64_t g; char kind; char imdb[16]; } idAdd[IDADD_MAX];
+static int nIdAdd;
+static pthread_mutex_t travaIdAdd = PTHREAD_MUTEX_INITIALIZER;
+
+static int ttValido(const char *s) {
+  size_t i;
+  if (!s || s[0] != 't' || s[1] != 't') return 0;
+  for (i = 2; isdigit((unsigned char)s[i]); i++) {}
+  return i >= 4 && i <= 12 && !s[i];
+}
+// Cinemeta's search: {"metas":[{"imdb_id":"tt..","name":"..","releaseInfo":"1955"},...]}.
+int iptvvod_cinemeta_escolher(const char *json, const char *norm, int ano, char *imdb, size_t n) {
+  const char *p;
+  int achados = 0;
+  char unico[16] = "";
+  if (!json || !norm || !norm[0]) return 0;
+  for (p = js_array(json, NULL, "metas"); p && *p == '{'; ) {
+    const char *f = js_fim(p);
+    char nome[200] = "", nn[128], id[24] = "", rel[24] = "";
+    int a;
+    if (!f) break;
+    js_texto_raiz_em(p, f, "name", nome, sizeof nome);
+    if (!js_texto_raiz_em(p, f, "imdb_id", id, sizeof id) || !id[0]) js_texto_raiz_em(p, f, "id", id, sizeof id);
+    js_texto_raiz_em(p, f, "releaseInfo", rel, sizeof rel);
+    a = atoi(rel);
+    iptvvod_normalizar(nome, nn, sizeof nn);
+    if (ttValido(id) && !strcmp(nn, norm)) {
+      if (ano > 0 && a > 0) {
+        if (a - ano <= 1 && ano - a <= 1) { snprintf(imdb, n, "%s", id); return 1; }
+      } else if (!achados++) snprintf(unico, sizeof unico, "%s", id);
+    }
+    p = js_prox(f);
+  }
+  // No year to compare: only an unambiguous name.
+  if (achados == 1) { snprintf(imdb, n, "%s", unico); return 1; }
+  return 0;
+}
+static int cinemetaBuscar(const char *nome, const char *norm, int ano, char kind, char *imdb, size_t n) {
+  char url[512], q[300];
+  size_t k = 0;
+  char *resp;
+  int r;
+  if (!cineBase[0]) return 0;
+  for (const char *s = nome; *s && k + 4 < sizeof q; s++) {
+    unsigned char c = (unsigned char)*s;
+    if (isalnum(c) || c == '-' || c == '_' || c == '.') q[k++] = (char)c;
+    else k += (size_t)snprintf(q + k, sizeof q - k, "%%%02X", c);
+  }
+  q[k] = 0;
+  snprintf(url, sizeof url, "%s/catalog/%s/top/search=%s.json", cineBase, kind == 's' ? "series" : "movie", q);
+  resp = rede_baixar(url, 8);
+  r = iptvvod_cinemeta_escolher(resp, norm, ano, imdb, n);
+  free(resp);
+  return r;
+}
+int iptvvod_id_addons(const char *id, char *out, size_t tam) {
+  uint64_t g;
+  char k, kind, imdb[16] = "", nome[160] = "", norm[128] = "", gid[64];
+  int t = 0, e = 0, ano = 0, i, achou = 0, conhecido = 0;
+  if (!iptvvod_id_ler(id, &g, &k, &t, &e)) return 0;
+  kind = k == 'e' ? 's' : k;
+  pthread_mutex_lock(&travaIdAdd);
+  for (i = 0; i < nIdAdd; i++) if (idAdd[i].g == g && idAdd[i].kind == kind) { snprintf(imdb, sizeof imdb, "%s", idAdd[i].imdb); conhecido = 1; break; }
+  pthread_mutex_unlock(&travaIdAdd);
+  if (!conhecido) {
+    pthread_mutex_lock(&travaVerif);
+    verifLerLocked();
+    i = verifAchar(g, kind);
+    if (i >= 0 && verifs[i].estado == VER_OK && ttValido(verifs[i].imdb)) { snprintf(imdb, sizeof imdb, "%s", verifs[i].imdb); achou = 1; }
+    pthread_mutex_unlock(&travaVerif);
+    if (!achou) {
+      int gi;
+      char kk;
+      iptvvod_id_montar(gid, sizeof gid, g, kind, 0, 0);
+      pthread_mutex_lock(&trava);
+      if (bibValidaLocked() && (gi = grupoPorId(&bib, gid, &kk)) >= 0 && bib.g[gi].primeira >= 0) {
+        const Copia *c = &bib.c[bib.g[gi].primeira];
+        iptvvod_titulo_limpo(c->nome ? c->nome : "", nome, sizeof nome);
+        snprintf(norm, sizeof norm, "%s", c->norm);
+        ano = c->ano;
+        for (int j = bib.g[gi].primeira; !ano && j >= 0; j = bib.c[j].proximo) ano = bib.c[j].ano;
+      }
+      pthread_mutex_unlock(&trava);
+      if (norm[0]) achou = (catImdbFn && catImdbFn(norm, ano, kind, imdb, sizeof imdb) && ttValido(imdb))
+                        || cinemetaBuscar(nome, norm, ano, kind, imdb, sizeof imdb);
+      if (!achou) imdb[0] = 0;
+    }
+    if (imdb[0]) {   // a miss is asked again next time (network may be back)
+    pthread_mutex_lock(&travaIdAdd);
+    i = nIdAdd < IDADD_MAX ? nIdAdd++ : (int)(g % IDADD_MAX);
+    idAdd[i].g = g; idAdd[i].kind = kind;
+    snprintf(idAdd[i].imdb, sizeof idAdd[i].imdb, "%s", imdb);
+    pthread_mutex_unlock(&travaIdAdd);
+    }
+    printf("[iptvvod] titulo da biblioteca %s id IMDb para os addons\n", imdb[0] ? "com" : "sem");
+    fflush(stdout);
+  }
+  if (!imdb[0]) return 0;
+  if (k == 'e') snprintf(out, tam, "%s:%d:%d", imdb, t, e);
+  else snprintf(out, tam, "%s", imdb);
+  return 1;
 }
 
 int iptvvod_teste_esperar(int ms) {

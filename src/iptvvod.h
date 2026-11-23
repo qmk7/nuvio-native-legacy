@@ -106,6 +106,13 @@ void iptvvod_teste_tmdb_base(const char *base);
 // Posters (posterprov.c): the real IMDb/TMDB ids TMDB confirmed for a movie
 // or series item. Answers from memory; an unverified item is queued for a
 // background check and answers 0 until then (the card keeps its own poster).
+// The add-on id ("tt..", "tt..:S:E") of a library title, so the add-ons'
+// sources join its provider copies; never a provider id. Worker only (may ask
+// Cinemeta by title). 0 = no trustworthy IMDb id.
+int  iptvvod_id_addons(const char *id, char *out, size_t tam);
+void iptvvod_definir_imdb_catalogo(int (*fn)(const char *norm, int ano, char kind, char *imdb, size_t n));
+int  iptvvod_cinemeta_escolher(const char *json, const char *norm, int ano, char *imdb, size_t n);
+void iptvvod_teste_cinemeta_base(const char *base);
 int  iptvvod_poster_ids(const char *id, const char *tipo, char *imdb, size_t n, long *tmdb);
 
 // Tests: wait for the current load (ms). 1 when idle.

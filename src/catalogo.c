@@ -2035,6 +2035,14 @@ int cat_copiar_por_id(const char *id, const char *tipo, CatItem *saida) {
   return melhor >= 0;
 }
 
+int cat_percorrer(int (*f)(const CatItem *c, void *u), void *u) {
+  int i, r = 0;
+  catTravar();
+  for (i = 0; itens && i < n && !r; i++) r = f(&itens[i], u);
+  pthread_mutex_unlock(&pubTrava);
+  return r;
+}
+
 int cat_n_fileiras(void) { return nFils; }
 const CatFileira *cat_fileira(int r) {
   return (r >= 0 && r < nFils) ? &fils[r] : NULL;

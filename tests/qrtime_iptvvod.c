@@ -65,6 +65,11 @@ static int tituloFalso(const char *id, const char *tipo, char *t, size_t n, int 
   if (!strcmp(id, "tt0000777")) { snprintf(t, n, "The Matrix"); *ano = 2009; return 1; }
   return 0;
 }
+static int imdbFalso(const char *norm, int ano, char kind, char *imdb, size_t n) {
+  (void)ano;
+  if (kind == 's' && !strcmp(norm, "local show")) { snprintf(imdb, n, "tt7770001"); return 1; }
+  return 0;
+}
 int main(int argc, char **argv) {
   if (argc < 3) { fprintf(stderr, "usage: %s <data dir> online|offline [base url]\n", argv[0]); return 2; }
   setenv("NUVIO_DADOS", argv[1], 1);
@@ -85,6 +90,18 @@ int main(int argc, char **argv) {
     CONFERE(!strcmp(n, "the matrix"), "normalize: language prefix, year, quality tag");
     iptvvod_normalizar("|FR| Inception HEVC 1080p", n, sizeof n);
     CONFERE(!strcmp(n, "inception"), "normalize: |FR| prefix and codecs");
+    iptvvod_normalizar("EN - Rebel Without a Cause (1955) MKV", n, sizeof n);
+    CONFERE(!strcmp(n, "rebel without a cause"), "normalize: container word (mkv)");
+    { char im[16] = "";
+      const char *cm = "{\"metas\":[{\"imdb_id\":\"tt0000001\",\"name\":\"Rebel Without a Cause\",\"releaseInfo\":\"1990\"},"
+                       "{\"imdb_id\":\"tt0048545\",\"name\":\"Rebel Without a Cause\",\"releaseInfo\":\"1955\"}]}";
+      CONFERE(iptvvod_cinemeta_escolher(cm, "rebel without a cause", 1955, im, sizeof im) && !strcmp(im, "tt0048545"),
+              "cinemeta: same title, the year decides");
+      CONFERE(!iptvvod_cinemeta_escolher(cm, "rebel without a cause", 0, im, sizeof im),
+              "cinemeta: two films with the name and no year: no answer");
+      CONFERE(!iptvvod_cinemeta_escolher(cm, "rebel", 1955, im, sizeof im), "cinemeta: a different title: no answer");
+      CONFERE(!iptvvod_cinemeta_escolher("{\"metas\":[{\"id\":\"qrt:9\",\"name\":\"Rebel\"}]}", "rebel", 0, im, sizeof im),
+              "cinemeta: a non-IMDb id is never taken"); }
     iptvvod_titulo_limpo("EN - The Matrix (1999) 4K", t, sizeof t);
     CONFERE(!strcmp(t, "The Matrix"), "display title");
     iptvvod_titulo_limpo("Room 1408", t, sizeof t);
@@ -259,6 +276,24 @@ int main(int argc, char **argv) {
       { char *f = dados_ler("iptvvod-tmdb.tsv");
         CONFERE(f && strstr(f, "tt0133093") && !strstr(f, "qrt") && !strstr(f, "qv:"), "verified ids cached, provider data not in the file");
         free(f); }
+      // ---- QR TIME: an IPTV title also asks the add-ons, with its IMDb id ----
+      {
+        const CatItem *mx = porTitulo("The Matrix"), *bb = porTitulo("Breaking Bad"), *lf = porTitulo("Local Indie Film"),
+                      *ls = porTitulo("Local Show");
+        char o[64], ep[64];
+        uint64_t g = 0; char k = 0;
+        iptvvod_teste_cinemeta_base("");   // no network here
+        CONFERE(mx && iptvvod_id_addons(mx->imdb, o, sizeof o) && !strcmp(o, "tt0133093"), "library film -> its verified IMDb id for the add-ons");
+        n = mx ? iptvvod_origem(mx->imdb, "movie", NULL, NULL, NULL, NULL, &l) : 0;
+        CONFERE(n == 4, "the library id as an extra origin: its own four copies");
+        free(l); l = NULL;
+        if (bb && iptvvod_id_ler(bb->imdb, &g, &k, NULL, NULL)) iptvvod_id_montar(ep, sizeof ep, g, 'e', 2, 1); else ep[0] = 0;
+        CONFERE(ep[0] && iptvvod_id_addons(ep, o, sizeof o) && !strcmp(o, "tt0903747:2:1"), "library episode -> tt:S:E");
+        CONFERE(lf && !iptvvod_id_addons(lf->imdb, o, sizeof o), "ambiguous film, no catalogue match, no Cinemeta: no id (add-ons not asked)");
+        iptvvod_definir_imdb_catalogo(imdbFalso);
+        CONFERE(ls && iptvvod_id_addons(ls->imdb, o, sizeof o) && !strcmp(o, "tt7770001"), "a home catalogue item with the same title gives the id");
+        iptvvod_definir_imdb_catalogo(NULL);
+      }
     }
   }
 

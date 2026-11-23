@@ -140,6 +140,12 @@ void addons_definir_origem(const char *base);
 typedef void (*OrigemAviso)(void *u, int k, const char *nome, const char *id,
                             int estado,
                             const void *fontes /* const Stream * */, int n);
+// QR TIME: the progress slots (k) the IPTV library and Plex announce their
+// sources in. A source that is not announced is LEFT OUT of the sheet when the
+// add-ons publish progressively (the final merge is not republished), which is
+// why an add-on title showed no IPTV copy on the TV. Plugins use k from 0.
+#define ADDONS_VAGA_IPTV 159
+#define ADDONS_VAGA_PLEX 158
 typedef int (*OrigemExtra)(const char *id, const char *tipo, int (*cancelado)(void *),
                            void *ctx, OrigemAviso aviso, void *avisoU,
                            void *saida /* Stream ** */);
@@ -157,6 +163,11 @@ typedef struct {
 } OrigemPreparoOps;
 void addons_definir_origem_extra_preparo(OrigemExtra f, const OrigemPreparoOps *ops);
 int  addons_origem_extra_ativa(void);
+// QR TIME: a local library id (IPTV "qv:") the add-ons may also be asked
+// about. `aceita` says the id is one; `traduzir` (search worker) gives the
+// real IMDb id to send them, or 0 (then only the extra origins answer). The
+// screen's target stays the local id; the local id never reaches an add-on.
+void addons_definir_traducao_local(int (*aceita)(const char *id), int (*traduzir)(const char *id, char *out, size_t n));
 void addons_buscar(const char *imdb, const char *tipo);
 // Recarregar explicito: descarta a resposta anterior e vai a rede, inclusive
 // quando a lista atual esta vazia ou foi filtrada por falta de debrid.

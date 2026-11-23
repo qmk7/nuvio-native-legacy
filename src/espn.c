@@ -133,6 +133,12 @@ static void lerTime(const char *c, const char *cf, EspTime *t) {
     js_texto_raiz_em(o, of, "shortDisplayName", t->curto, sizeof t->curto);
     js_texto_raiz_em(o, of, "abbreviation", t->abrev, sizeof t->abrev);
     js_texto_raiz_em(o, of, "logo", t->logo, sizeof t->logo);
+    js_texto_raiz_em(o, of, "color", t->cor, sizeof t->cor);
+    js_texto_raiz_em(o, of, "alternateColor", t->cor2, sizeof t->cor2);
+    for (char *q = t->cor; *q; q++) if (!isxdigit((unsigned char)*q)) { t->cor[0] = 0; break; }
+    for (char *q = t->cor2; *q; q++) if (!isxdigit((unsigned char)*q)) { t->cor2[0] = 0; break; }
+    if (strlen(t->cor) != 6) t->cor[0] = 0;
+    if (strlen(t->cor2) != 6) t->cor2[0] = 0;
     if (!t->logo[0]) {   // tennis players: a country flag
       const char *fo, *ff;
       if (objeto(o, of, "flag", &fo, &ff)) js_texto(fo, ff, "href", t->logo, sizeof t->logo);
@@ -140,6 +146,10 @@ static void lerTime(const char *c, const char *cf, EspTime *t) {
     https(t->logo);
   }
   if (!t->curto[0]) copiar(t->curto, sizeof t->curto, t->nome);
+  {
+    const char *r = js_array(c, cf, "records");
+    if (r && *r == '{') { const char *rf = js_fim(r); if (rf) js_texto_raiz_em(r, rf, "summary", t->recorde, sizeof t->recorde); }
+  }
 }
 // One competition (a match) into `e`; 1 when it has two sides.
 static int lerCompeticao(const char *c, const char *cf, EspEvento *e) {

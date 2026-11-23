@@ -6996,5 +6996,6 @@
   T("↓   Entrar na lista", "↓   Enter list"),
   T("↓ até o fim volta a seguir", "↓ で末尾まで行くと追従を再開"),
   T("◀ ▶ avança ou volta 10 s", "◀ ▶ skips 10 s"),
+  T("● AO VIVO", "● LIVE"),
   T("✓ Assistido%s%s", "✓ 視聴済み%s%s"),
   T("✓ Salvo", "✓ Saved"),

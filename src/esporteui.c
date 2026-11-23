@@ -480,6 +480,8 @@ static void ciclarFiltro(int f, int dir) {
   foco = 0; rolagem = 0;
   montar();
 }
+#define GRADE_COLS 2
+static int abaGrade(void) { return aba != ABA_TABELA; }
 void esporteui_evento(const SDL_Event *e) {
   SDL_Keycode k;
   if (tecladoAberto) { teclado_evento(e); return; }
@@ -524,6 +526,14 @@ void esporteui_evento(const SDL_Event *e) {
     return;
   }
   // list
+  if (abaGrade()) {
+    // The card grid: Up/Down move a row, Left/Right a column.
+    int n = nLinhas();
+    if (k == SDLK_UP) { if (foco >= GRADE_COLS) foco -= GRADE_COLS; else zona = aba == ABA_LIGAS ? Z_ABAS : Z_FILTROS; return; }
+    if (k == SDLK_DOWN) { if (foco + GRADE_COLS < n) foco += GRADE_COLS; else if (foco / GRADE_COLS < (n - 1) / GRADE_COLS) foco = n - 1; return; }
+    if (k == SDLK_LEFT) { if (foco % GRADE_COLS) foco--; return; }
+    if (k == SDLK_RIGHT) { if (foco % GRADE_COLS + 1 < GRADE_COLS && foco + 1 < n) foco++; return; }
+  }
   if (k == SDLK_UP) { if (foco > 0) foco--; else zona = aba == ABA_LIGAS ? Z_ABAS : Z_FILTROS; return; }
   if (k == SDLK_DOWN && foco + 1 < nLinhas()) { foco++; return; }
   if (ok && nLinhas()) {
@@ -651,6 +661,140 @@ static void rodape(float y) {
   else snprintf(t, sizeof t, i18n("Dados: ESPN (fonte pública não oficial) · atualizado %s"), h);
   texto(TXT_CAPTION, t, NV_MARGEM_X, y, 0.6f, 200, 202, 210);
 }
+// ---------------------------------------------------------------- the card look
+// QR TIME: the Nuvio One Sports look on our primitives. Dark glass cards with
+// a hairline border; each team on its own band in its colour (ESPN's
+// team.color, darkened for white text), logo, name, record and a big score;
+// a status column on the right (LIVE / final / kick-off, the clock, a thin
+// progress bar); the league's initials on the left. Focus: a white ring and
+// the card 2% bigger. Flat colour and one gradient per band: light on the B5.
+static void corHex(const char *h, float *r, float *g, float *b) {
+  unsigned v = 0;
+  if (!h || strlen(h) != 6 || sscanf(h, "%6x", &v) != 1) { *r = 0.30f; *g = 0.32f; *b = 0.38f; return; }
+  *r = (float)((v >> 16) & 255) / 255.0f; *g = (float)((v >> 8) & 255) / 255.0f; *b = (float)(v & 255) / 255.0f;
+}
+// A team colour dark enough for white text on it (SportsDesign bandColor).
+static void corBanda(const EspTime *t, float *r, float *g, float *b) {
+  float l, k, ir = 0.043f, ig = 0.047f, ib = 0.063f;
+  corHex(t->cor[0] ? t->cor : t->cor2, r, g, b);
+  // A near-white main colour (many clubs): the alternate one reads better.
+  l = 0.2126f * *r + 0.7152f * *g + 0.0722f * *b;
+  if (l > 0.85f && t->cor2[0]) { corHex(t->cor2, r, g, b); l = 0.2126f * *r + 0.7152f * *g + 0.0722f * *b; }
+  k = l > 0.5f ? 0.5f : l > 0.25f ? 0.25f : 0.08f;
+  *r += (ir - *r) * k; *g += (ig - *g) * k; *b += (ib - *b) * k;
+}
+static void siglaLiga(const char *liga, char *d, size_t n) {
+  const char *nome = nomeLiga(liga);
+  size_t k = 0;
+  int palavras = 0;
+  for (const char *p = nome; *p; p++) if ((p == nome || p[-1] == ' ') && *p != ' ') palavras++;
+  if (palavras <= 1 || strlen(nome) <= 4) { snprintf(d, n, "%.4s", nome); return; }
+  for (const char *p = nome; *p && k + 1 < n && k < 4; p++)
+    if ((p == nome || p[-1] == ' ') && isalnum((unsigned char)*p)) d[k++] = (char)toupper((unsigned char)*p);
+  d[k] = 0;
+}
+static void pilula(const char *t, float x, float y, float fr, float fg, float fb, float fa, int tr, int tg, int tb, int dirAlinhado) {
+  TxtLinha l = txt_linha(TXT_ILHA_SEG, t, tr, tg, tb, 255);
+  float w = (float)l.w + 22, h = (float)l.h + 8;
+  if (dirAlinhado) x -= w;
+  gfx_cor((GfxRect){ x, y, w, h }, 0.3f, fr, fg, fb, fa);
+  txt_desenhar_alpha(l, x + 11, y + 4, 1);
+}
+// How far a live match is (soccer minutes, basketball quarters): 0..1, -1 unknown.
+static float progressoJogo(const EspEvento *e) {
+  int m;
+  if (e->estado != ESP_AO_VIVO) return -1;
+  if (strchr(e->relogio, '\'') && (m = atoi(e->relogio)) > 0) return m >= 90 ? 1.0f : (float)m / 90.0f;
+  if ((e->relogio[0] == 'Q' || e->detalhe[0] == 'Q') && isdigit((unsigned char)(e->relogio[0] == 'Q' ? e->relogio[1] : e->detalhe[1])))
+    return (float)((e->relogio[0] == 'Q' ? e->relogio[1] : e->detalhe[1]) - '0') / 4.0f;
+  return -1;
+}
+static void bandaTime(const EspTime *t, const char *liga, float x, float y, float w, float h, int mostraPlacar, int atras) {
+  float r, g, b, lg = h * 0.62f;
+  char nome[96];
+  corBanda(t, &r, &g, &b);
+  gfx_rect((GfxRect){ x, y, w, h }, 0, GFX_VEU_CSS, 0.0f, 2.0f, 1.0f, 0.0f, r, g, b, 0.95f);
+  gfx_cor((GfxRect){ x + 14 + lg * 0.07f, y + (h - lg) * 0.5f + lg * 0.07f, lg * 0.86f, lg * 0.86f }, 0.5f, 1, 1, 1, 0.10f);
+  logo(t->logo, x + 14, y + (h - lg) * 0.5f, lg);
+  snprintf(nome, sizeof nome, "%s%s", esporte_nome_tela(t->curto[0] ? t->curto : t->nome), esporte_segue_time(liga, t->id) ? "  ★" : "");
+  {
+    float nx = x + 14 + lg + 16, nw = w - (nx - x) - (mostraPlacar ? 90 : 16);
+    TxtLinha l = txt_linha_corta(TXT_ILHA_NOME, nome, 255, 255, 255, 255, (int)nw);
+    float ny = y + (h - (float)l.h) * 0.5f - (t->recorde[0] ? 10 : 0);
+    txt_desenhar_alpha(l, nx, ny, atras ? 0.75f : 1);
+    if (t->recorde[0]) texto(TXT_CAPTION2, t->recorde, nx, ny + (float)l.h + 1, 0.6f, 255, 255, 255);
+  }
+  if (mostraPlacar) {
+    TxtLinha l = txt_linha(TXT_TITULO2, t->placar[0] ? t->placar : "0", 255, 255, 255, 255);
+    txt_desenhar_alpha(l, x + w - 18 - (float)l.w, y + (h - (float)l.h) * 0.5f, atras ? 0.5f : 1);
+  }
+}
+static void cartaoJogo(const EspEvento *e, GfxRect r, int f) {
+  const float colL = 92, colS = 210, raio = 14.0f / r.h;
+  float bx, bw, bh, pr;
+  int placar = !(e->estado == ESP_PRE || e->estado == ESP_ADIADO || (!e->casa.placar[0] && !e->fora.placar[0])) && !esporte_esconder_placar();
+  int a = placar ? atoi(e->casa.placar) : 0, b = placar ? atoi(e->fora.placar) : 0;
+  char t[96];
+  EspCanal c[1];
+  if (f) { float dx = r.w * 0.01f, dy = r.h * 0.01f; r = (GfxRect){ r.x - dx, r.y - dy, r.w + 2 * dx, r.h + 2 * dy }; }
+  gfx_cor(r, raio, 0.118f, 0.129f, 0.173f, 0.78f);
+  // League column.
+  gfx_cor((GfxRect){ r.x, r.y, colL, r.h }, raio * r.h / colL > 0.5f ? 0.5f : raio * r.h / colL, 1, 1, 1, 0.03f);
+  gfx_cor((GfxRect){ r.x + colL - 1, r.y, 1, r.h }, 0, 1, 1, 1, 0.08f);
+  siglaLiga(e->liga, t, sizeof t);
+  { TxtLinha l = txt_linha(TXT_ILHA_SECAO, t, 200, 204, 214, 255); txt_desenhar_alpha(l, r.x + (colL - (float)l.w) * 0.5f, r.y + (r.h - (float)l.h) * 0.5f, 0.9f); }
+  // Two bands.
+  bx = r.x + colL; bw = r.w - colL - colS; bh = r.h * 0.5f;
+  bandaTime(&e->casa, e->liga, bx, r.y, bw, bh, placar, placar && a < b);
+  bandaTime(&e->fora, e->liga, bx, r.y + bh, bw, bh, placar, placar && b < a);
+  gfx_cor((GfxRect){ bx, r.y + bh - 0.5f, bw, 1 }, 0, 0, 0, 0, 0.35f);
+  // Status column.
+  {
+    float sx = r.x + r.w - colS, sy = r.y + 22;
+    gfx_cor((GfxRect){ sx, r.y, 1, r.h }, 0, 1, 1, 1, 0.08f);
+    sx += 16;
+    if (e->estado == ESP_AO_VIVO) pilula(i18n("● AO VIVO"), sx, sy, 0.898f, 0.224f, 0.208f, 1, 255, 255, 255, 0);
+    else if (e->estado == ESP_FIM) pilula(i18n("Encerrado"), sx, sy, 1, 1, 1, 0.12f, 255, 255, 255, 0);
+    else if (e->estado == ESP_ADIADO) pilula(i18n("Adiado"), sx, sy, 1, 0.54f, 0.5f, 0.2f, 255, 138, 128, 0);
+    else { horaDe(e->ini, t, sizeof t); pilula(t, sx, sy, 1, 1, 1, 0.10f, 255, 255, 255, 0); }
+    sy += 46;
+    if (e->estado == ESP_FIM || e->estado == ESP_ADIADO) { horaDe(e->ini, t, sizeof t); textoCorta(TXT_CAPTION2, t, sx, sy, colS - 32, 0.6f); sy += 30; }
+    if (e->estado == ESP_AO_VIVO && (e->relogio[0] || e->detalhe[0]) && !esporte_esconder_placar()) {
+      textoCorta(TXT_ILHA_NOME, e->relogio[0] ? e->relogio : e->detalhe, sx, sy, colS - 32, 1);
+      sy += 34;
+    }
+    if ((pr = progressoJogo(e)) >= 0) {
+      gfx_cor((GfxRect){ sx, sy, colS - 40, 5 }, 0.5f, 1, 1, 1, 0.14f);
+      gfx_cor((GfxRect){ sx, sy, (colS - 40) * pr, 5 }, 0.5f, 0.898f, 0.224f, 0.208f, 1);
+      sy += 14;
+    }
+    if (esporte_canais(e->id, c, 1) == 1) {
+      snprintf(t, sizeof t, "📺 %s", c[0].nome);
+      { TxtLinha l = txt_linha_corta(TXT_CAPTION2, t, 200, 204, 214, 255, (int)(colS - 32)); txt_desenhar_alpha(l, sx, r.y + r.h - 18 - (float)l.h, 0.8f); }
+    }
+  }
+  if (f) gfx_anel(r, raio, 3, 1, 1, 1, 1);
+  else gfx_anel(r, raio, 1, 1, 1, 1, 0.2f);
+}
+// A tile for the Leagues / Teams tabs: same frame, one line.
+static void cartaoSimples(const char *logoUrl, const char *txt, const char *sub, int seguido, GfxRect r, int f) {
+  float raio = 14.0f / r.h, x = r.x + 20;
+  if (f) { float dx = r.w * 0.01f, dy = r.h * 0.01f; r = (GfxRect){ r.x - dx, r.y - dy, r.w + 2 * dx, r.h + 2 * dy }; }
+  gfx_cor(r, raio, 0.118f, 0.129f, 0.173f, 0.78f);
+  if (seguido) gfx_cor((GfxRect){ r.x, r.y, 6, r.h }, 0, 0.96f, 0.77f, 0.0f, 1);
+  if (logoUrl) { logo(logoUrl, x, r.y + (r.h - 60) * 0.5f, 60); x += 78; }
+  {
+    TxtLinha l = txt_linha_corta(TXT_ILHA_NOME, txt, 255, 255, 255, 255, (int)(r.w - (x - r.x) - 70));
+    float ty = r.y + (r.h - (float)l.h) * 0.5f - (sub && sub[0] ? 12 : 0);
+    txt_desenhar_alpha(l, x, ty, 1);
+    if (sub && sub[0]) texto(TXT_CAPTION2, sub, x, ty + (float)l.h + 2, 0.6f, 255, 255, 255);
+  }
+  { TxtLinha l = txt_linha(TXT_ILHA_NOME, seguido ? "★" : "☆", 245, 196, 0, 255);
+    txt_desenhar_alpha(l, r.x + r.w - 24 - (float)l.w, r.y + (r.h - (float)l.h) * 0.5f, seguido ? 1 : 0.4f); }
+  if (f) gfx_anel(r, raio, 3, 1, 1, 1, 1);
+  else gfx_anel(r, raio, 1, 1, 1, 1, 0.2f);
+}
+
 void esporteui_desenhar(Uint32 agora) {
   float x = NV_MARGEM_X, y = NV_MARGEM_Y, w = NV_TELA_W - 2 * NV_MARGEM_X;
   char b[200];
@@ -660,15 +804,33 @@ void esporteui_desenhar(Uint32 agora) {
     const EspEvento *e = &atual;
     texto(TXT_CAPTION, nomeLiga(e->liga), x, y, 0.7f, 200, 202, 210);
     y += 50;
-    logo(e->casa.logo, x, y, 120);
-    logo(e->fora.logo, x + w - 120, y, 120);
-    texto(TXT_TITULO2, esporte_nome_tela(e->casa.nome), x + 140, y + 20, 1, 240, 242, 248);
-    { TxtLinha l = txt_linha(TXT_TITULO2, esporte_nome_tela(e->fora.nome), 240, 242, 248, 255); txt_desenhar_alpha(l, x + w - 140 - (float)l.w, y + 20, 1); }
-    placarTexto(e, b, sizeof b);
-    { TxtLinha l = txt_linha(TXT_TITULO1, b, 255, 255, 255, 255); txt_desenhar_alpha(l, x + (w - (float)l.w) * 0.5f, y + 10, 1); }
-    estadoTexto(e, b, sizeof b);
-    { TxtLinha l = txt_linha(TXT_CALLOUT, b, 255, 120, 110, 255); txt_desenhar_alpha(l, x + (w - (float)l.w) * 0.5f, y + 90, e->estado == ESP_AO_VIVO ? 1 : 0.7f); }
-    y += 170;
+    {
+      // The two teams on their colour bands, from each side to the middle.
+      const float hh = 200, raio = 18.0f / hh;
+      float r1, g1, b1, r2, g2, b2;
+      corBanda(&e->casa, &r1, &g1, &b1); corBanda(&e->fora, &r2, &g2, &b2);
+      gfx_cor((GfxRect){ x, y, w, hh }, raio, 0.118f, 0.129f, 0.173f, 0.85f);
+      gfx_rect((GfxRect){ x, y, w * 0.5f, hh }, 0, GFX_VEU_CSS, 0.0f, 2.0f, 1.0f, 0.0f, r1, g1, b1, 0.95f);
+      gfx_rect((GfxRect){ x + w * 0.5f, y, w * 0.5f, hh }, 0, GFX_VEU_CSS, 0.0f, 3.0f, 1.0f, 0.0f, r2, g2, b2, 0.95f);
+      gfx_anel((GfxRect){ x, y, w, hh }, raio, 1, 1, 1, 1, 0.2f);
+      logo(e->casa.logo, x + 30, y + 40, 120);
+      logo(e->fora.logo, x + w - 150, y + 40, 120);
+      { TxtLinha l = txt_linha_corta(TXT_TITULO2, esporte_nome_tela(e->casa.nome), 255, 255, 255, 255, (int)(w * 0.5f - 400));
+        txt_desenhar_alpha(l, x + 170, y + 60, 1); }
+      if (e->casa.recorde[0]) texto(TXT_CAPTION, e->casa.recorde, x + 170, y + 120, 0.65f, 255, 255, 255);
+      { TxtLinha l = txt_linha_corta(TXT_TITULO2, esporte_nome_tela(e->fora.nome), 255, 255, 255, 255, (int)(w * 0.5f - 400));
+        txt_desenhar_alpha(l, x + w - 170 - (float)l.w, y + 60, 1); }
+      if (e->fora.recorde[0]) { TxtLinha l = txt_linha(TXT_CAPTION, e->fora.recorde, 255, 255, 255, 255); txt_desenhar_alpha(l, x + w - 170 - (float)l.w, y + 120, 0.65f); }
+      placarTexto(e, b, sizeof b);
+      { TxtLinha l = txt_linha(TXT_TITULO1, b, 255, 255, 255, 255); txt_desenhar_alpha(l, x + (w - (float)l.w) * 0.5f, y + 36, 1); }
+      estadoTexto(e, b, sizeof b);
+      { TxtLinha l = txt_linha(TXT_ILHA_SEG, b, 255, 255, 255, 255);
+        float pw = (float)l.w + 24, px = x + (w - pw) * 0.5f, py = y + 130;
+        if (e->estado == ESP_AO_VIVO) gfx_cor((GfxRect){ px, py, pw, (float)l.h + 8 }, 0.3f, 0.898f, 0.224f, 0.208f, 1);
+        else gfx_cor((GfxRect){ px, py, pw, (float)l.h + 8 }, 0.3f, 1, 1, 1, 0.12f);
+        txt_desenhar_alpha(l, px + 12, py + 4, 1); }
+      y += hh + 30;
+    }
     if (e->tvPais[0]) {
       char t[512], *it, *sp, lin[300] = "";
       size_t k = 0;
@@ -710,9 +872,11 @@ void esporteui_desenhar(Uint32 agora) {
         int f = i == focoAcao;
         int de = focoAcao > 8 ? focoAcao - 8 : 0;
         if (i < de) continue;
-        if (f) gfx_cor((GfxRect){ x, y - 6, w, 50 }, 0.3f, 1, 1, 1, 0.12f);
-        textoCorta(TXT_BODY, acoes[i].texto, x + 16, y, w - 32, f ? 1 : 0.75f);
-        y += 54;
+        // Pill buttons (Nuvio One's SportsAction): white when focused.
+        gfx_cor((GfxRect){ x, y - 8, w * 0.5f, 54 }, 0.5f, 1, 1, 1, f ? 0.92f : 0.07f);
+        { TxtLinha l = txt_linha_corta(TXT_ILHA_NOME, acoes[i].texto, f ? 16 : 240, f ? 17 : 242, f ? 22 : 248, 255, (int)(w * 0.5f - 56));
+          txt_desenhar_alpha(l, x + 28, y - 8 + (54 - (float)l.h) * 0.5f, f ? 1 : 0.85f); }
+        y += 64;
       }
       {
         int temLigado = 0, temSug = 0;
@@ -790,7 +954,12 @@ void esporteui_desenhar(Uint32 agora) {
         int f = zona == Z_LISTA && i == foco;
         float ry = y + (float)(i - de) * rh;
         const EspPos *p = &tab[i];
-        if (f) gfx_cor((GfxRect){ x - 12, ry - 8, w + 24, rh - 8 }, 0.25f, 1, 1, 1, 0.12f);
+        {
+          GfxRect rr = { x - 12, ry - 4, w + 24, rh - 10 };
+          gfx_cor(rr, 12.0f / rr.h, 0.118f, 0.129f, 0.173f, i % 2 ? 0.55f : 0.78f);
+          if (p->pos >= 1 && p->pos <= 4 && !strcmp(esporteDe(tabLiga), "soccer")) gfx_cor((GfxRect){ rr.x + 8, rr.y + 12, 5, rr.h - 24 }, 0.5f, 0.24f, 0.62f, 1.0f, 1);
+          if (f) gfx_anel(rr, 12.0f / rr.h, 3, 1, 1, 1, 1);
+        }
         snprintf(b, sizeof b, "%d", p->pos);
         texto(TXT_CALLOUT, b, x + 8, ry + 16, 1, 255, 255, 255);
         logo(p->logo, x + 70, ry + 10, 52);
@@ -814,6 +983,27 @@ void esporteui_desenhar(Uint32 agora) {
                            aba == ABA_VIVO ? "Nenhum jogo ao vivo agora." :
                            aba == ABA_MEUS || aba == ABA_FAV ? "Siga times em \"Times\" ou ligas em \"Ligas\" para montar a sua lista." :
                            "Nenhum jogo com estes filtros."), x, y + 20, 0.7f, 240, 242, 248);
+    }
+    if (abaGrade() && n) {
+      // Cards, two per row (Nuvio One's game cards).
+      const float gap = 22, ch = aba == ABA_LIGAS || aba == ABA_TIMES ? 96 : 150;
+      float cw = (w - gap * (GRADE_COLS - 1)) / GRADE_COLS;
+      int linhas = (int)((NV_TELA_H - 100 - y + gap) / (ch + gap)), lf = foco / GRADE_COLS, l0;
+      if (linhas < 1) linhas = 1;
+      l0 = lf >= linhas ? lf - linhas + 1 : 0;
+      for (int i = l0 * GRADE_COLS; i < n && i < (l0 + linhas) * GRADE_COLS; i++) {
+        int f = zona == Z_LISTA && i == foco;
+        GfxRect r = { x + (float)(i % GRADE_COLS) * (cw + gap), y + (float)(i / GRADE_COLS - l0) * (ch + gap), cw, ch };
+        if (aba == ABA_LIGAS) {
+          const EspLiga *ls;
+          espn_ligas(&ls);
+          cartaoSimples(NULL, esporte_liga_tela(ls[i].nome), "", esporte_segue_liga(ls[i].chave), r, f);
+        } else if (aba == ABA_TIMES) {
+          cartaoSimples(timesV[i].logo, esporte_nome_tela(timesV[i].nome), nomeLiga(timesV[i].liga),
+                        esporte_segue_time(timesV[i].liga, timesV[i].id), r, f);
+        } else cartaoJogo(&vista[ord[i]], r, f);
+      }
+      n = 0;
     }
     for (int i = de; i < n && i < de + visiveis; i++) {
       int f = zona == Z_LISTA && i == foco;

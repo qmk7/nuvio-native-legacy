@@ -6996,5 +6996,6 @@
   T("↓   Entrar na lista", "↓   دخول القائمة"),
   T("↓ até o fim volta a seguir", "↓ إلى النهاية يستأنف المتابعة"),
   T("◀ ▶ avança ou volta 10 s", "◀ ▶ تقديم أو ترجيع 10 ث"),
+  T("● AO VIVO", "● مباشر"),
   T("✓ Assistido%s%s", "✓ تمت المشاهدة%s%s"),
   T("✓ Salvo", "✓ محفوظ"),

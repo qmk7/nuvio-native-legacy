@@ -40,6 +40,7 @@ static int progs(const char *canal, time_t de, time_t ate, char (*t)[128], time_
   return 0;
 }
 
+int ajustes_idioma(void) { return 0; }   // test stub: esportenomes.c asks the UI language
 int main(int argc, char **argv) {
   char base[200], j[40];
   time_t quando = 0, agora = time(NULL);
@@ -169,7 +170,7 @@ int main(int argc, char **argv) {
       { "xtream:@00000001:303", "SSC Extra", "Sports" },          // broadcaster SSC, generic programme
       { "xtream:@00000001:304", "Sports 4", "Sports" },           // right title, wrong day
       { "nvm3u:@00000002:x", "EVENT: Al Hilal vs Al Nassr", "Events" }, // event channel name
-      { "xtream:@00000001:306", "KSA Sports", "Sports" },         // Arabic title: no match
+      { "xtream:@00000001:306", "KSA Sports", "Sports" },         // Arabic title: matched by the Arabic names
     };
     const EspEvento *e;
     time_t ko;
@@ -178,13 +179,14 @@ int main(int argc, char **argv) {
     e = achar(&l, "700001");
     ko = e ? e->ini : agora;
     k = e ? esporte_sugerir(e, cs, 6, progs, &ko, s, 8) : 0;
-    CONFERE(k == 3, "suggestions: three channels (a refused one and a wrong-day one left out)");
-    CONFERE(k >= 1 && !strcmp(s[0].canal, "nvm3u:@00000002:x") && s[0].certeza == ESP_PASSA, "event channel named for both teams: showing it");
-    CONFERE(k >= 2 && !strcmp(s[1].canal, "xtream:@00000001:302") && s[1].certeza == ESP_TALVEZ, "one team in the programme: maybe");
-    CONFERE(k >= 3 && !strcmp(s[2].canal, "xtream:@00000001:303") && s[2].certeza == ESP_TALVEZ, "listed broadcaster on air: maybe");
+    CONFERE(k == 4, "suggestions: four channels (a refused one and a wrong-day one left out)");
+    CONFERE(k >= 1 && !strcmp(s[0].canal, "xtream:@00000001:306") && s[0].certeza == ESP_PASSA, "Arabic programme naming both teams: showing it");
+    CONFERE(k >= 2 && !strcmp(s[1].canal, "nvm3u:@00000002:x") && s[1].certeza == ESP_PASSA, "event channel named for both teams: showing it");
+    CONFERE(k >= 3 && !strcmp(s[2].canal, "xtream:@00000001:302") && s[2].certeza == ESP_TALVEZ, "one team in the programme: maybe");
+    CONFERE(k >= 4 && !strcmp(s[3].canal, "xtream:@00000001:303") && s[3].certeza == ESP_TALVEZ, "listed broadcaster on air: maybe");
     esporte_ligar("700001", "xtream:@00000001:301", "SSC 1");   // linking again lifts the refusal
     k = e ? esporte_sugerir(e, cs, 6, progs, &ko, s, 8) : 0;
-    CONFERE(k == 4 && !strcmp(s[0].canal, "xtream:@00000001:301") && s[0].certeza == ESP_PASSA && strstr(s[0].motivo, "Al-Hilal"),
+    CONFERE(k == 5 && !strcmp(s[0].canal, "xtream:@00000001:301") && s[0].certeza == ESP_PASSA && strstr(s[0].motivo, "Al-Hilal"),
             "programme naming both teams: showing it, with the programme as the reason");
   }
   {

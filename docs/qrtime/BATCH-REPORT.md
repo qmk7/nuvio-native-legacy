@@ -46,6 +46,15 @@ account or a host this build environment cannot reach.
 | League standings (W-D-L, GD, points; NBA conferences) | Sport Center › Standings | real ESPN answers (Saudi League, NBA, UCL) |
 | Holy Quran block and "continue the recitation" | Music home | genre-name checks |
 
+## Fixes after the TV test of build cbc36319
+| Problem seen on the TV | Cause | Fix | Verified |
+|---|---|---|---|
+| Trakt card showed a white square | the 261-byte link needs QR version 10; the encoder stopped at 6 | QR versions 7–10 (alignment table, version blocks) | symbols decoded by jsQR |
+| Add-on titles showed no IPTV source | the IPTV copies were found but never announced to the sources sheet, so they were dropped when add-ons publish one by one (Plex had the same gap) | the IPTV library and Plex announce their results like plugins | desktop run: 1 add-on + 2 IPTV sources in the sheet |
+| IPTV titles showed only IPTV | the library id was never translated for add-ons | a verified IMDb id (TMDB match → home catalogue title+year → Cinemeta title search) is sent to the add-ons; the local `qv:` id never leaves the app | unit checks + desktop run: add-on asked with `tt0133093`, no `qv:` in its log |
+| Titles like "Rebel Without a Cause (1955) MKV" did not match | container words were part of the title | `mkv`, `mp4`, `avi`, `ts`, `hdrip`… dropped when matching | unit check |
+| Sport Center lists looked old | — | Nuvio One-style game cards: two per row, each team on its colour band (ESPN team colours), logo, record, big score, status column (LIVE / final / kick-off, clock, progress bar), white focus ring; match page header on colour bands; standings rows as cards | desktop screenshots with live ESPN data (team logos did not load here: ESPN's image host is not reachable from this build environment) |
+
 ## Already in the app before this batch
 - Real quality badge (decoder-reported resolution, DV/HDR10, Atmos, codec).
 - Audio and subtitle choice remembered per series and per profile.
