@@ -26,7 +26,7 @@ on:
   push:
 
 permissions:
-  contents: read
+  contents: write   # publishes each build as a GitHub Release (in-app updates)
 
 jobs:
   ipk:
@@ -61,6 +61,16 @@ jobs:
             if [ -n "${!k}" ]; then echo "$k: set"; else echo "$k: empty (feature off)"; fi
           done
 
+      - name: Version for this build (2.1.<run number>, always newer than the last)
+        run: |
+          set -e
+          VER="2.1.${{ github.run_number }}"
+          sed -i -E '0,/"version": *"[^"]*"/s//"version": "'"$VER"'"/' deploy/app/appinfo.json
+          sed -i -E '0,/(<widget[^>]*|^[[:space:]]*)version="[0-9.]+"/s//\1version="'"$VER"'"/' tools/tizen-config.xml
+          grep -n '"version"' deploy/app/appinfo.json
+          grep -n ' version="' tools/tizen-config.xml | head -2
+          echo "QRT_VER=$VER" >> "$GITHUB_ENV"
+
       - name: Build the .ipk (webOS SDK, pinned and checksummed by the script)
         run: bash tools/qrtime/build-ipk.sh
 
@@ -79,6 +89,23 @@ jobs:
             cp *.ipk ../../out/
           fi
           ls -la ../../out
+
+      # IN-APP UPDATES: the app reads this repository's latest release, takes
+      # the com.qrtime.tv_<version>_arm.ipk asset, checks its sha256 (the
+      # asset's digest) and installs it through the Homebrew Channel. The
+      # owner chose a public release (23/11/2026): the .ipk carries the build
+      # keys and anyone can download it.
+      - name: Publish the release (in-app update)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          IPK=$(ls build/ipk/com.qrtime.tv_*_arm.ipk | head -1)
+          test -f "$IPK"
+          git log -1 --format=%B | grep -vE '^(Co-Authored-By|Claude-Session):' | sed 's/ *\[ipk\]//' > notes.txt
+          printf '\n\n## Notes\nInstall: Settings > About and help > Update now (or the .ipk with webOS Dev Manager).\n' >> notes.txt
+          gh release create "v$QRT_VER" "$IPK" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "QR TIME $QRT_VER" --notes-file notes.txt --latest
 
       - uses: actions/upload-artifact@v4
         with:
