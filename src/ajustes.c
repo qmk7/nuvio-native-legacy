@@ -10762,7 +10762,7 @@ static void desenhaGrupo(int item, float y, float f, float dx, float aPag) {
 // codigo. Com o simbolo a camera abre a pagina direto. Mesmo cuidado da tela
 // de login (login.c): NEAREST, fundo claro com zona de silencio.
 static GLuint texQrVin;
-static char   qrVinDe[256];
+static char   qrVinDe[400];   // QR TIME: the Trakt PKCE link is ~260 bytes
 
 static void qrVinTex(const char *texto) {
   Qr q; int lado, x, y; unsigned char *px;

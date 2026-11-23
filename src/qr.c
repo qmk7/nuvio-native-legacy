@@ -7,19 +7,30 @@
 // correcao POR BLOCO, e numero de blocos. Numeros da ISO 18004; a versao 6 e a
 // unica destas que se divide em dois blocos, e e por isso que o entrelacamento
 // abaixo e generico em vez de assumir bloco unico.
-static const struct { int total, ecPorBloco, blocos; } VER[7] = {
+// QR TIME: up to version 10 (ISO 18004 table 9, level L). Version 10 has
+// blocks of two lengths (68 and 69 data codewords): the longer ones come
+// last, which is what the interleaving below does with `resto`.
+#define QR_VER_MAX 10
+static const struct { int total, ecPorBloco, blocos; } VER[QR_VER_MAX + 1] = {
   { 0,   0,  0 },
   { 26,  7,  1 },
   { 44, 10,  1 },
   { 70, 15,  1 },
   { 100,20,  1 },
   { 134,26,  1 },
-  { 172,18,  2 }
+  { 172,18,  2 },
+  { 196,20,  2 },
+  { 242,24,  2 },
+  { 292,30,  2 },
+  { 346,18,  4 }
 };
 
-// Centro do unico padrao de alinhamento de cada versao (o outro centro e
-// sempre 6, e as tres combinacoes com ele caem em cima dos localizadores).
-static const int ALINHA[7] = { 0, 0, 18, 22, 26, 30, 34 };
+// Centros dos padroes de alinhamento (ISO 18004 anexo E). Todas as
+// combinacoes entram, menos as tres que caem nos localizadores.
+static const int ALINHA[QR_VER_MAX + 1][3] = {
+  { 0 }, { 0 }, { 6, 18 }, { 6, 22 }, { 6, 26 }, { 6, 30 }, { 6, 34 },
+  { 6, 22, 38 }, { 6, 24, 42 }, { 6, 26, 46 }, { 6, 28, 50 }
+};
 
 // --------------------------------------------------------------- GF(256)
 
@@ -121,7 +132,27 @@ static void padroes(Qr *q, int versao) {
     por(q, i, 6, !(i & 1)); marcar(q, i, 6);
     por(q, 6, i, !(i & 1)); marcar(q, 6, i);
   }
-  if (versao >= 2) alinhamento(q, ALINHA[versao], ALINHA[versao]);
+  if (versao >= 2) {
+    int na = versao >= 7 ? 3 : 2, a, b;
+    for (a = 0; a < na; a++)
+      for (b = 0; b < na; b++) {
+        int cx = ALINHA[versao][a], cy = ALINHA[versao][b];
+        if ((a == 0 && b == 0) || (a == 0 && b == na - 1) || (a == na - 1 && b == 0)) continue;   // finders
+        alinhamento(q, cx, cy);
+      }
+  }
+  // Versao 7+: o bloco de VERSAO (6 bits + BCH(18,6), gerador 0x1F25), duas
+  // copias de 6x3 junto aos localizadores de cima-direita e baixo-esquerda.
+  if (versao >= 7) {
+    unsigned v = (unsigned)versao, r = v << 12;
+    for (i = 17; i >= 12; i--) if (r & (1u << i)) r ^= 0x1F25u << (i - 12);
+    v = (v << 12) | r;
+    for (i = 0; i < 18; i++) {
+      int bit = (v >> i) & 1, a = n - 11 + i % 3, b = i / 3;
+      por(q, a, b, bit); marcar(q, a, b);
+      por(q, b, a, bit); marcar(q, b, a);
+    }
+  }
 
   por(q, 8, n - 8, 1); marcar(q, 8, n - 8);   // modulo escuro fixo
 
@@ -241,7 +272,7 @@ static void escreverFormato(Qr *q, int m) {
 // --------------------------------------------------------------- geracao
 
 int qr_gerar(Qr *q, const char *texto) {
-  unsigned char bits[200], blocos[172], saida[172];
+  unsigned char bits[400], blocos[400], saida[400];
   int nTexto, versao, nDados, i, j, b;
   int nBits = 0;
 
@@ -252,11 +283,11 @@ int qr_gerar(Qr *q, const char *texto) {
 
   // Menor versao que cabe. O cabecalho do modo byte custa 12 bits (4 de modo +
   // 8 de contagem), o que da 1,5 byte — por isso a conta usa bits e nao bytes.
-  for (versao = 1; versao <= 6; versao++) {
+  for (versao = 1; versao <= QR_VER_MAX; versao++) {
     nDados = VER[versao].total - VER[versao].ecPorBloco * VER[versao].blocos;
-    if (4 + 8 + nTexto * 8 <= nDados * 8) break;
+    if (4 + (versao >= 10 ? 16 : 8) + nTexto * 8 <= nDados * 8) break;
   }
-  if (versao > 6) return 0;
+  if (versao > QR_VER_MAX) return 0;
   nDados = VER[versao].total - VER[versao].ecPorBloco * VER[versao].blocos;
 
   // --- fluxo de bits
@@ -267,7 +298,7 @@ int qr_gerar(Qr *q, const char *texto) {
         if (((valor) >> k) & 1) bits[nBits >> 3] |= (unsigned char)(0x80 >> (nBits & 7)); \
         nBits++; }
     POR_BITS(4, 4);            // modo byte
-    POR_BITS(nTexto, 8);       // contagem (8 bits ate a versao 9)
+    POR_BITS(nTexto, versao >= 10 ? 16 : 8);   // contagem: 8 bits ate a versao 9, 16 depois
     for (i = 0; i < nTexto; i++) { POR_BITS((unsigned char)texto[i], 8); }
     // Terminador de ate 4 zeros e alinhamento ao byte; depois o enchimento
     // alternado da norma.

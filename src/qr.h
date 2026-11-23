@@ -20,15 +20,15 @@
 #ifndef NV_QR_H
 #define NV_QR_H
 
-#define QR_MAX_LADO 41   // versao 6: 17 + 4*6
+#define QR_MAX_LADO 57   // versao 10: 17 + 4*10 (QR TIME: the Trakt PKCE link needs ~260 bytes)
 
 typedef struct {
   int lado;                                  // 0 quando nao coube
   unsigned char m[QR_MAX_LADO * QR_MAX_LADO];// 1 = modulo escuro
 } Qr;
 
-// Codifica `texto`. Devolve 1 em sucesso; 0 quando o texto nao cabe na versao 6
-// (mais de 134 bytes) ou e vazio.
+// Codifica `texto`. Devolve 1 em sucesso; 0 quando o texto nao cabe na versao 10
+// (mais de 271 bytes) ou e vazio.
 int qr_gerar(Qr *q, const char *texto);
 
 static inline int qr_modulo(const Qr *q, int x, int y) {
