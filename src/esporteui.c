@@ -43,42 +43,69 @@ static int juntar(const EspEvento *e, void *u) {
   if (c->n < EV_MAX) c->v[c->n++] = *e;
   return 1;
 }
-static void *fio(void *u) {
-  (void)u;
-  EspEvento *v = malloc(sizeof(EspEvento) * EV_MAX);
-  LigaEstado est[ESPN_LIGAS_MAX];
-  int ne = 0;
+// One league on its own thread (all leagues at once: on the TV each answer
+// waits ~0.4 s on the network, one after another that was seconds).
+typedef struct { char liga[32]; int d0, d1; EspEvento *v; int n; time_t quando; int falhou, r; } Uma;
+static int juntarUma(const EspEvento *e, void *u) {
+  Uma *x = u;
+  if (x->n < EV_MAX) x->v[x->n++] = *e;
+  return 1;
+}
+static void *fioUma(void *u) {
+  Uma *x = u;
+  x->r = espn_buscar_dias(x->liga, time(NULL), x->d0, x->d1, juntarUma, x, &x->quando, &x->falhou);
+  return NULL;
+}
+// Asks every wanted league for days d0..d1 in parallel and publishes the
+// merge. 1 = published.
+static int passada(int d0, int d1) {
   const EspLiga *ls;
-  int nl = espn_ligas(&ls);
+  int nl = espn_ligas(&ls), nq = 0, ne = 0;
   char tl[64][32];
   int nt = esporte_times_seguidos(tl, NULL, NULL, 64);
+  Uma *q = calloc(ESPN_LIGAS_MAX, sizeof *q);
+  pthread_t th[ESPN_LIGAS_MAX];
+  int vivo[ESPN_LIGAS_MAX] = {0};
+  EspEvento *v = malloc(sizeof(EspEvento) * EV_MAX);
+  LigaEstado est[ESPN_LIGAS_MAX];
   Coleta c = { v, 0 };
-  time_t agora = time(NULL);
-  if (!v) goto fim;
-  for (int i = 0; i < nl && ne < ESPN_LIGAS_MAX; i++) {
+  Uint32 t0 = SDL_GetTicks();
+  if (!q || !v) { free(q); free(v); return 0; }
+  for (int i = 0; i < nl && nq < ESPN_LIGAS_MAX; i++) {
     int quer = esporte_segue_liga(ls[i].chave);
     for (int k = 0; k < nt && !quer; k++) quer = !strcmp(tl[k], ls[i].chave);   // a followed team's league
     if (!quer) continue;
-    memset(&est[ne], 0, sizeof est[ne]);
-    snprintf(est[ne].liga, sizeof est[ne].liga, "%s", ls[i].chave);
-    {
-      int antes = c.n;
-      int r = espn_buscar(ls[i].chave, agora, juntar, &c, &est[ne].quando, &est[ne].falhou);
-      est[ne].n = r < 0 ? 0 : c.n - antes;
-      if (r < 0) est[ne].falhou = 1;
-    }
-    ne++;
+    snprintf(q[nq].liga, sizeof q[nq].liga, "%s", ls[i].chave);
+    q[nq].d0 = d0; q[nq].d1 = d1;
+    if ((q[nq].v = malloc(sizeof(EspEvento) * EV_MAX)) != NULL) vivo[nq] = pthread_create(&th[nq], NULL, fioUma, &q[nq]) == 0;
+    nq++;
   }
+  for (int i = 0; i < nq; i++) {
+    if (vivo[i]) pthread_join(th[i], NULL);
+    memset(&est[ne], 0, sizeof est[ne]);
+    snprintf(est[ne].liga, sizeof est[ne].liga, "%s", q[i].liga);
+    est[ne].quando = q[i].quando; est[ne].falhou = !vivo[i] || q[i].r < 0 || q[i].falhou;
+    for (int k = 0; k < q[i].n; k++) juntar(&q[i].v[k], &c);
+    est[ne].n = q[i].n;
+    ne++;
+    free(q[i].v);
+  }
+  free(q);
   pthread_mutex_lock(&trava);
   free(evs);
-  evs = v; nEvs = c.n; v = NULL;
+  evs = v; nEvs = c.n;
   memcpy(estados, est, sizeof est[0] * (size_t)ne); nEstados = ne;
   revisao++;
   pthread_mutex_unlock(&trava);
-  printf("[esporte] %d evento(s) de %d liga(s)\n", c.n, ne);
+  printf("[esporte] %d evento(s) de %d liga(s) (dias %d..%d) em %u ms\n", c.n, ne, d0, d1, (unsigned)(SDL_GetTicks() - t0));
   fflush(stdout);
-fim:
-  free(v);
+  return 1;
+}
+static void *fio(void *u) {
+  (void)u;
+  // Today first (what the page opens on), then the whole two weeks.
+  passada(-1, 1);
+  passada(-7, 7);
   pthread_mutex_lock(&trava);
   fioVivo = 0; carregando = 0;
   pthread_mutex_unlock(&trava);
@@ -197,6 +224,7 @@ static int cmpMeus(const void *a, const void *b) {
   if (px != py) return px - py;
   return px == 2 ? (x->ini < y->ini) - (x->ini > y->ini) : (x->ini > y->ini) - (x->ini < y->ini);
 }
+static void montarGrade(void);
 static void montar(void) {
   time_t agora = time(NULL);
   pthread_mutex_lock(&trava);
@@ -227,7 +255,7 @@ static void montar(void) {
     }
     if (ok) ord[nOrd++] = i;
   }
-  qsort(ord, (size_t)nOrd, sizeof *ord, aba == ABA_FIM ? cmpIniDesc : aba == ABA_MEUS ? cmpMeus : cmpIni);
+  qsort(ord, (size_t)nOrd, sizeof *ord, aba == ABA_FIM ? cmpIniDesc : aba == ABA_MEUS || aba == ABA_TODOS || aba == ABA_FAV ? cmpMeus : cmpIni);
   // Teams seen in the data (Teams tab).
   nTimesV = 0;
   for (int i = 0; i < nVista; i++) for (int s = 0; s < 2; s++) {
@@ -243,6 +271,54 @@ static void montar(void) {
       nTimesV++;
     }
   }
+  montarGrade();
+}
+// ---- the card grid with section headers (Nuvio One's SectionHeader) ----
+// Visual rows: a header ("● AO VIVO", "Hoje", "Amanhã", a date, "Encerrados")
+// or up to GRADE_COLS cards; a new header always starts a new row.
+#define GRADE_COLS 2
+#define VL_MAX (EV_MAX + 64)
+typedef struct { short hdr; short n; int c[GRADE_COLS]; char t[80]; } VLinha;
+static VLinha vl[VL_MAX];
+static int nVl;
+static int abaGrade(void) { return aba != ABA_TABELA; }
+static void rotuloGrupo(const EspEvento *e, char *d, size_t n) {
+  if (e->estado == ESP_AO_VIVO) { snprintf(d, n, "%s", i18n("● AO VIVO")); return; }
+  if (e->estado == ESP_FIM && aba != ABA_FIM) { snprintf(d, n, "%s", i18n("Encerrados")); return; }
+  {
+    int dd = diaDe(e->ini);
+    if (dd == 0) snprintf(d, n, "%s", i18n("Hoje"));
+    else if (dd == 1) snprintf(d, n, "%s", i18n("Amanhã"));
+    else if (dd == -1) snprintf(d, n, "%s", i18n("Ontem"));
+    else { struct tm m; time_t t = e->ini; localtime_r(&t, &m); snprintf(d, n, "%02d/%02d", m.tm_mday, m.tm_mon + 1); }
+  }
+}
+static int nLinhas(void);
+static void montarGrade(void) {
+  char atual[80] = "", g[80];
+  int n = nLinhas(), jogos = aba != ABA_LIGAS && aba != ABA_TIMES && aba != ABA_TABELA, hdrIdx = -1, cont = 0;
+  nVl = 0;
+  if (!abaGrade()) return;
+  for (int i = 0; i < n && nVl < VL_MAX - 1; i++) {
+    if (jogos) {
+      rotuloGrupo(&vista[ord[i]], g, sizeof g);
+      if (strcmp(g, atual)) {
+        if (hdrIdx >= 0) snprintf(vl[hdrIdx].t + strlen(vl[hdrIdx].t), sizeof vl[hdrIdx].t - strlen(vl[hdrIdx].t), "\t%d", cont);
+        snprintf(atual, sizeof atual, "%s", g);
+        hdrIdx = nVl; cont = 0;
+        memset(&vl[nVl], 0, sizeof vl[0]); vl[nVl].hdr = 1; snprintf(vl[nVl].t, sizeof vl[nVl].t, "%s", g); nVl++;
+      }
+      cont++;
+    }
+    if (!nVl || vl[nVl - 1].hdr || vl[nVl - 1].n == GRADE_COLS) { memset(&vl[nVl], 0, sizeof vl[0]); nVl++; }
+    vl[nVl - 1].c[vl[nVl - 1].n++] = i;
+  }
+  if (hdrIdx >= 0) snprintf(vl[hdrIdx].t + strlen(vl[hdrIdx].t), sizeof vl[hdrIdx].t - strlen(vl[hdrIdx].t), "\t%d", cont);
+}
+// The visual row holding card `i` and its column. -1 = none.
+static int linhaDe(int i, int *col) {
+  for (int r = 0; r < nVl; r++) if (!vl[r].hdr) for (int k = 0; k < vl[r].n; k++) if (vl[r].c[k] == i) { if (col) *col = k; return r; }
+  return -1;
 }
 static int nLinhas(void) {
   const EspLiga *ls;
@@ -480,8 +556,6 @@ static void ciclarFiltro(int f, int dir) {
   foco = 0; rolagem = 0;
   montar();
 }
-#define GRADE_COLS 2
-static int abaGrade(void) { return aba != ABA_TABELA; }
 void esporteui_evento(const SDL_Event *e) {
   SDL_Keycode k;
   if (tecladoAberto) { teclado_evento(e); return; }
@@ -529,10 +603,17 @@ void esporteui_evento(const SDL_Event *e) {
   if (abaGrade()) {
     // The card grid: Up/Down move a row, Left/Right a column.
     int n = nLinhas();
-    if (k == SDLK_UP) { if (foco >= GRADE_COLS) foco -= GRADE_COLS; else zona = aba == ABA_LIGAS ? Z_ABAS : Z_FILTROS; return; }
-    if (k == SDLK_DOWN) { if (foco + GRADE_COLS < n) foco += GRADE_COLS; else if (foco / GRADE_COLS < (n - 1) / GRADE_COLS) foco = n - 1; return; }
-    if (k == SDLK_LEFT) { if (foco % GRADE_COLS) foco--; return; }
-    if (k == SDLK_RIGHT) { if (foco % GRADE_COLS + 1 < GRADE_COLS && foco + 1 < n) foco++; return; }
+    int col = 0, r = linhaDe(foco, &col);
+    (void)n;
+    if (k == SDLK_UP || k == SDLK_DOWN) {
+      int d = k == SDLK_UP ? -1 : 1, r2 = r;
+      do r2 += d; while (r2 >= 0 && r2 < nVl && vl[r2].hdr);
+      if (r2 >= 0 && r2 < nVl) foco = vl[r2].c[col < vl[r2].n ? col : vl[r2].n - 1];
+      else if (k == SDLK_UP) zona = aba == ABA_LIGAS ? Z_ABAS : Z_FILTROS;
+      return;
+    }
+    if (k == SDLK_LEFT) { if (r >= 0 && col > 0) foco = vl[r].c[col - 1]; return; }
+    if (k == SDLK_RIGHT) { if (r >= 0 && col + 1 < vl[r].n) foco = vl[r].c[col + 1]; return; }
   }
   if (k == SDLK_UP) { if (foco > 0) foco--; else zona = aba == ABA_LIGAS ? Z_ABAS : Z_FILTROS; return; }
   if (k == SDLK_DOWN && foco + 1 < nLinhas()) { foco++; return; }
@@ -705,8 +786,17 @@ static float progressoJogo(const EspEvento *e) {
   int m;
   if (e->estado != ESP_AO_VIVO) return -1;
   if (strchr(e->relogio, '\'') && (m = atoi(e->relogio)) > 0) return m >= 90 ? 1.0f : (float)m / 90.0f;
-  if ((e->relogio[0] == 'Q' || e->detalhe[0] == 'Q') && isdigit((unsigned char)(e->relogio[0] == 'Q' ? e->relogio[1] : e->detalhe[1])))
-    return (float)((e->relogio[0] == 'Q' ? e->relogio[1] : e->detalhe[1]) - '0') / 4.0f;
+  // Basketball: "5:51 - 3rd", "Halftime": the quarter, and how far into it.
+  {
+    const char *q = strstr(e->detalhe, " - ");
+    int per = q && isdigit((unsigned char)q[3]) ? q[3] - '0' : 0, mm = 0, ss = 0;
+    if (strstr(e->detalhe, "Halftime")) return 0.5f;
+    if (per >= 1 && per <= 4) {
+      float dentro = sscanf(e->relogio, "%d:%d", &mm, &ss) == 2 ? 1.0f - (float)(mm * 60 + ss) / 720.0f : 0.5f;
+      if (dentro < 0) dentro = 0;
+      return ((float)(per - 1) + dentro) / 4.0f;
+    }
+  }
   return -1;
 }
 static void bandaTime(const EspTime *t, const char *liga, float x, float y, float w, float h, int mostraPlacar, int atras) {
@@ -741,8 +831,15 @@ static void cartaoJogo(const EspEvento *e, GfxRect r, int f) {
   // League column.
   gfx_cor((GfxRect){ r.x, r.y, colL, r.h }, raio * r.h / colL > 0.5f ? 0.5f : raio * r.h / colL, 1, 1, 1, 0.03f);
   gfx_cor((GfxRect){ r.x + colL - 1, r.y, 1, r.h }, 0, 1, 1, 1, 0.08f);
-  siglaLiga(e->liga, t, sizeof t);
-  { TxtLinha l = txt_linha(TXT_ILHA_SECAO, t, 200, 204, 214, 255); txt_desenhar_alpha(l, r.x + (colL - (float)l.w) * 0.5f, r.y + (r.h - (float)l.h) * 0.5f, 0.9f); }
+  {
+    char lg[200];
+    GLuint tx = espn_liga_logo(e->liga, lg, sizeof lg) ? tex_obter(lg) : 0;
+    if (tx) gfx_textura((GfxRect){ r.x + (colL - 56) * 0.5f, r.y + (r.h - 56) * 0.5f, 56, 56 }, tx);
+    else {
+      siglaLiga(e->liga, t, sizeof t);
+      { TxtLinha l = txt_linha(TXT_ILHA_SECAO, t, 200, 204, 214, 255); txt_desenhar_alpha(l, r.x + (colL - (float)l.w) * 0.5f, r.y + (r.h - (float)l.h) * 0.5f, 0.9f); }
+    }
+  }
   // Two bands.
   bx = r.x + colL; bw = r.w - colL - colS; bh = r.h * 0.5f;
   bandaTime(&e->casa, e->liga, bx, r.y, bw, bh, placar, placar && a < b);
@@ -759,8 +856,17 @@ static void cartaoJogo(const EspEvento *e, GfxRect r, int f) {
     else { horaDe(e->ini, t, sizeof t); pilula(t, sx, sy, 1, 1, 1, 0.10f, 255, 255, 255, 0); }
     sy += 46;
     if (e->estado == ESP_FIM || e->estado == ESP_ADIADO) { horaDe(e->ini, t, sizeof t); textoCorta(TXT_CAPTION2, t, sx, sy, colS - 32, 0.6f); sy += 30; }
+    if (e->estado == ESP_PRE) {
+      long falta = (long)(e->ini - time(NULL));
+      if (falta > 0 && falta < 6 * 3600) {
+        if (falta < 3600) snprintf(t, sizeof t, i18n("em %d min"), (int)(falta / 60) + 1);
+        else snprintf(t, sizeof t, i18n("em %d h %02d"), (int)(falta / 3600), (int)(falta % 3600 / 60));
+        textoCorta(TXT_ILHA_NOME, t, sx, sy, colS - 32, 0.9f);
+        sy += 34;
+      }
+    }
     if (e->estado == ESP_AO_VIVO && (e->relogio[0] || e->detalhe[0]) && !esporte_esconder_placar()) {
-      textoCorta(TXT_ILHA_NOME, e->relogio[0] ? e->relogio : e->detalhe, sx, sy, colS - 32, 1);
+      textoCorta(TXT_ILHA_NOME, e->detalhe[0] ? e->detalhe : e->relogio, sx, sy, colS - 32, 1);
       sy += 34;
     }
     if ((pr = progressoJogo(e)) >= 0) {
@@ -896,13 +1002,17 @@ void esporteui_desenhar(Uint32 agora) {
   {
     float tx = x;
     for (int i = 0; i < ABA_N; i++) {
-      TxtLinha l = txt_linha(TXT_CALLOUT, i18n(ABAS[i]), 240, 242, 248, 255);
+      // Nuvio One's FilterIcon: the chosen one white, the rest dark glass with
+      // a hairline; focus is the white ring.
+      int sel = i == aba, f = zona == Z_ABAS && i == aba;
+      TxtLinha l = txt_linha(TXT_ILHA_NOME, i18n(ABAS[i]), sel ? 11 : 240, sel ? 12 : 242, sel ? 16 : 248, 255);
       float lw = (float)l.w + 40;
-      int f = zona == Z_ABAS && i == aba;
-      gfx_cor((GfxRect){ tx, y, lw, 52 }, 0.5f, 1, 1, 1, i == aba ? (f ? 0.9f : 0.18f) : 0.06f);
-      if (f) { TxtLinha d = txt_linha(TXT_CALLOUT, i18n(ABAS[i]), 20, 20, 24, 255); txt_desenhar_alpha(d, tx + 20, y + 10, 1); }
-      else txt_desenhar_alpha(l, tx + 20, y + 10, i == aba ? 1 : 0.7f);
-      tx += lw + 12;
+      GfxRect rr = { tx, y, lw, 52 };
+      if (sel) gfx_cor(rr, 0.5f, 1, 1, 1, 1);
+      else { gfx_cor(rr, 0.5f, 0.118f, 0.129f, 0.173f, 0.78f); gfx_anel(rr, 0.5f, 1, 1, 1, 1, 0.2f); }
+      if (f) gfx_anel_fora(rr, 0.5f, 3, 3, 1, 1, 1, 1);
+      txt_desenhar_alpha(l, tx + 20, y + (52 - (float)l.h) * 0.5f, sel || f ? 1 : 0.85f);
+      tx += lw + 10;
     }
     y += 72;
   }
@@ -922,11 +1032,13 @@ void esporteui_desenhar(Uint32 agora) {
     else snprintf(fv[F_DIA], sizeof fv[0], i18n(fDia > 0 ? "Em %d dias" : "Há %d dias"), fDia > 0 ? fDia : -fDia);
     snprintf(fv[F_PLACAR], sizeof fv[0], "%s", i18n(esporte_esconder_placar() ? "Placares ocultos" : "Placares visíveis"));
     for (int i = 0; i < F_N; i++) {
-      TxtLinha l = txt_linha(TXT_CAPTION, fv[i], 240, 242, 248, 255);
+      TxtLinha l = txt_linha(TXT_ILHA_SEG, fv[i], 201, 204, 214, 255);
       float lw = (float)l.w + 32;
       int f = zona == Z_FILTROS && i == filtroFoco;
-      gfx_cor((GfxRect){ tx, y, lw, 44 }, 0.5f, 1, 1, 1, f ? 0.3f : 0.08f);
-      txt_desenhar_alpha(l, tx + 16, y + 9, f ? 1 : 0.75f);
+      GfxRect rr = { tx, y, lw, 42 };
+      gfx_cor(rr, 0.5f, 1, 1, 1, f ? 0.16f : 0.05f);
+      if (f) gfx_anel_fora(rr, 0.5f, 3, 3, 1, 1, 1, 1);
+      txt_desenhar_alpha(l, tx + 16, y + (42 - (float)l.h) * 0.5f, f ? 1 : 0.85f);
       tx += lw + 10;
     }
     y += 64;
@@ -985,23 +1097,50 @@ void esporteui_desenhar(Uint32 agora) {
                            "Nenhum jogo com estes filtros."), x, y + 20, 0.7f, 240, 242, 248);
     }
     if (abaGrade() && n) {
-      // Cards, two per row (Nuvio One's game cards).
-      const float gap = 22, ch = aba == ABA_LIGAS || aba == ABA_TIMES ? 96 : 150;
-      float cw = (w - gap * (GRADE_COLS - 1)) / GRADE_COLS;
-      int linhas = (int)((NV_TELA_H - 100 - y + gap) / (ch + gap)), lf = foco / GRADE_COLS, l0;
-      if (linhas < 1) linhas = 1;
-      l0 = lf >= linhas ? lf - linhas + 1 : 0;
-      for (int i = l0 * GRADE_COLS; i < n && i < (l0 + linhas) * GRADE_COLS; i++) {
-        int f = zona == Z_LISTA && i == foco;
-        GfxRect r = { x + (float)(i % GRADE_COLS) * (cw + gap), y + (float)(i / GRADE_COLS - l0) * (ch + gap), cw, ch };
-        if (aba == ABA_LIGAS) {
-          const EspLiga *ls;
-          espn_ligas(&ls);
-          cartaoSimples(NULL, esporte_liga_tela(ls[i].nome), "", esporte_segue_liga(ls[i].chave), r, f);
-        } else if (aba == ABA_TIMES) {
-          cartaoSimples(timesV[i].logo, esporte_nome_tela(timesV[i].nome), nomeLiga(timesV[i].liga),
-                        esporte_segue_time(timesV[i].liga, timesV[i].id), r, f);
-        } else cartaoJogo(&vista[ord[i]], r, f);
+      // Cards, two per row, under section headers (Nuvio One's GameList).
+      const float gap = 22, ch = aba == ABA_LIGAS || aba == ABA_TIMES ? 96 : 150, hh = 54;
+      float cw = (w - gap * (GRADE_COLS - 1)) / GRADE_COLS, alto = NV_TELA_H - 100 - y, acima = 0, yy;
+      int rf = linhaDe(foco, NULL), r0 = 0;
+      if (rf < 0) rf = 0;
+      // First row so the focused one is fully visible (its header too).
+      for (int r = rf; r >= 0; r--) {
+        float h = vl[r].hdr ? hh : ch + gap;
+        if (acima + h > alto) break;
+        acima += h; r0 = r;
+      }
+      if (r0 > 0 && vl[r0 - 1].hdr && acima + hh <= alto) r0--;
+      yy = y;
+      for (int r = r0; r < nVl && yy < NV_TELA_H - 100; r++) {
+        if (vl[r].hdr) {
+          char t[80], *tab;
+          int cnt = 0, vivo;
+          snprintf(t, sizeof t, "%s", vl[r].t);
+          if ((tab = strchr(t, '\t')) != NULL) { cnt = atoi(tab + 1); *tab = 0; }
+          vivo = !strncmp(vl[r].t, i18n("● AO VIVO"), strlen(i18n("● AO VIVO")));
+          texto(TXT_ILHA_SECAO, t, x + 4, yy + 14, 1, vivo ? 255 : 201, vivo ? 96 : 204, vivo ? 86 : 214);
+          if (cnt) {
+            char c[32];
+            snprintf(c, sizeof c, i18n(cnt == 1 ? "%d jogo" : "%d jogos"), cnt);
+            { TxtLinha l = txt_linha(TXT_CAPTION2, c, 139, 144, 160, 255); txt_desenhar_alpha(l, x + w - (float)l.w - 4, yy + 18, 1); }
+          }
+          gfx_cor((GfxRect){ x, yy + hh - 8, w, 1 }, 0, 1, 1, 1, 0.08f);
+          yy += hh;
+          continue;
+        }
+        for (int k = 0; k < vl[r].n; k++) {
+          int i = vl[r].c[k], f = zona == Z_LISTA && i == foco;
+          GfxRect rc = { x + (float)k * (cw + gap), yy, cw, ch };
+          if (aba == ABA_LIGAS) {
+            const EspLiga *ls;
+            char lg[200];
+            espn_ligas(&ls);
+            cartaoSimples(espn_liga_logo(ls[i].chave, lg, sizeof lg) ? lg : NULL, esporte_liga_tela(ls[i].nome), "", esporte_segue_liga(ls[i].chave), rc, f);
+          } else if (aba == ABA_TIMES) {
+            cartaoSimples(timesV[i].logo, esporte_nome_tela(timesV[i].nome), nomeLiga(timesV[i].liga),
+                          esporte_segue_time(timesV[i].liga, timesV[i].id), rc, f);
+          } else cartaoJogo(&vista[ord[i]], rc, f);
+        }
+        yy += ch + gap;
       }
       n = 0;
     }

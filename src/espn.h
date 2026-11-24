@@ -71,6 +71,11 @@ void espn_definir_base(const char *base);
 // cache time); *falhou = 1 when the network did not give a valid answer.
 int espn_buscar(const char *liga, time_t agora, int (*cb)(const EspEvento *e, void *u), void *u,
                 time_t *quando, int *falhou);
+// The same for days d0..d1 around today (each day fetched and cached alone).
+int espn_buscar_dias(const char *liga, time_t agora, int d0, int d1, int (*cb)(const EspEvento *e, void *u), void *u,
+                     time_t *quando, int *falhou);
+// The league's logo URL as ESPN's last answer gave it. 1 = known.
+int espn_liga_logo(const char *liga, char *url, size_t n);
 // ---- league standings (QR TIME) ----
 typedef struct { char grupo[48], id[16], nome[64], curto[40], logo[256]; int pos, jogos, v, e, d, saldo, pts; } EspPos;
 int espn_tabela_parse(const char *json, EspPos *out, int max);   // rows by group then position; -1 not standings

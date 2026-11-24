@@ -3,6 +3,7 @@
 #include "js.h"
 #include "rede.h"
 #include <ctype.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -208,6 +209,41 @@ static void lerStatus(const char *ev, const char *evf, EspEvento *e) {
     e->estado = ESP_ADIADO;
 }
 
+// QR TIME: the league's own logo, from the scoreboard's "leagues"[0].logos
+// (the "500-dark" one, made for dark backgrounds, when ESPN has it).
+static pthread_mutex_t travaLogo = PTHREAD_MUTEX_INITIALIZER;
+static struct { char liga[32], url[200]; } logos[ESPN_LIGAS_MAX];
+static int nLogos;
+static void anotarLogo(const char *raiz, const char *liga) {
+  const char *l = js_array(raiz, NULL, "leagues"), *lf, *p;
+  char url[200] = "", u[200];
+  if (!l || *l != '{' || !(lf = js_fim(l))) return;
+  for (p = js_array(l, lf, "logos"); p && *p == '{'; ) {
+    const char *f = js_fim(p);
+    if (!f) break;
+    u[0] = 0;
+    js_texto_raiz_em(p, f, "href", u, sizeof u);
+    if (!strncmp(u, "https://", 8) && (!url[0] || strstr(u, "dark"))) snprintf(url, sizeof url, "%s", u);
+    p = js_prox(f);
+  }
+  if (!url[0]) return;
+  pthread_mutex_lock(&travaLogo);
+  {
+    int i;
+    for (i = 0; i < nLogos && strcmp(logos[i].liga, liga); i++) {}
+    if (i == nLogos && nLogos < ESPN_LIGAS_MAX) nLogos++;
+    if (i < nLogos) { snprintf(logos[i].liga, sizeof logos[i].liga, "%s", liga); snprintf(logos[i].url, sizeof logos[i].url, "%s", url); }
+  }
+  pthread_mutex_unlock(&travaLogo);
+}
+int espn_liga_logo(const char *liga, char *url, size_t n) {
+  int r = 0;
+  url[0] = 0;
+  pthread_mutex_lock(&travaLogo);
+  for (int i = 0; i < nLogos; i++) if (!strcmp(logos[i].liga, liga)) { snprintf(url, n, "%s", logos[i].url); r = 1; break; }
+  pthread_mutex_unlock(&travaLogo);
+  return r;
+}
 int espn_parse(const char *json, const char *liga, int (*cb)(const EspEvento *, void *), void *u) {
   const char *p, *raiz;
   int n = 0;
@@ -215,6 +251,7 @@ int espn_parse(const char *json, const char *liga, int (*cb)(const EspEvento *, 
   raiz = json;
   while (*raiz && (unsigned char)*raiz <= ' ') raiz++;
   if (*raiz != '{' || !strstr(raiz, "\"events\"")) return -1;
+  if (liga) anotarLogo(raiz, liga);
   p = js_array(raiz, NULL, "events");
   while (p && *p == '{') {
     const char *f = js_fim(p);
@@ -293,53 +330,73 @@ static int naJanela(const EspEvento *e, void *u) {
   j->n++;
   return j->cb ? j->cb(e, j->u) : 1;
 }
-int espn_buscar(const char *liga, time_t agora, int (*cb)(const EspEvento *, void *), void *u,
-                time_t *quando, int *falhou) {
-  char url[400], meses[2][8], nome[112];
-  int nm, algum = 0, total = 0;
+// QR TIME: DAY BY DAY, like Nuvio One (SportsFeeds.scoreboardDayRaw). A
+// month of the NBA is 4.5 MB of JSON (measured 2026-11-24), parsed on the
+// TV's CPU; one day is ~150 KB. Each day is cached on its own
+// ("esporte-<league>-<YYYYMMDD>.json", "<epoch>\n<body>") and asked again
+// only when stale: the days around today every 90 s, later days every 6 h,
+// past days once a day. ESPN days are US Eastern days (UTC-5 here).
+static void diaChave(time_t t, char *d, size_t n) {
+  struct tm m;
+  t -= 5 * 3600;
+  gmtime_r(&t, &m);
+  snprintf(d, n, "%04d%02d%02d", m.tm_year + 1900, m.tm_mon + 1, m.tm_mday);
+}
+static long validade(int d) { return d >= -1 && d <= 1 ? 90 : d > 1 ? 6 * 3600 : 24 * 3600; }
+// The same match comes once even when two days' answers both carry it.
+typedef struct { Janela *j; char vistos[400][24]; int nv; } Unico;
+static int umaVez(const EspEvento *e, void *u) {
+  Unico *x = u;
+  for (int i = 0; i < x->nv; i++) if (!strcmp(x->vistos[i], e->id)) return 1;
+  if (x->nv < 400) snprintf(x->vistos[x->nv++], sizeof x->vistos[0], "%s", e->id);
+  return naJanela(e, x->j);
+}
+int espn_buscar_dias(const char *liga, time_t agora, int d0, int d1, int (*cb)(const EspEvento *, void *), void *u,
+                     time_t *quando, int *falhou) {
+  char url[400], dia[12], nome[112];
+  int algum = 0;
   Janela jan = { cb, u, agora - 7 * 86400, agora + 8 * 86400, 0 };
+  Unico *un;
+  static const char *const cab[] = {   // the same browser identity Nuvio One sends
+    "User-Agent: Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", NULL };
   if (quando) *quando = 0;
   if (falhou) *falhou = 0;
-  if (!espn_liga(liga)) return -1;
-  nm = espn_meses(agora, meses);
-  for (int k = 0; k < nm; k++) {
-    char *corpo;
-    snprintf(url, sizeof url, "%s/%s/scoreboard?dates=%s&limit=1000", base, liga, meses[k]);
-    // The same browser identity Nuvio One sends (SportsFeeds.kt).
-    { static const char *const cab[] = {
-        "User-Agent: Mozilla/5.0 (Linux; Android 12; TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36", NULL };
-      corpo = rede_baixar_com(url, 15, cab); }
-    arquivo(liga, meses[k], nome, sizeof nome);
-    if (corpo && espn_parse(corpo, liga, NULL, NULL) >= 0) {
-      // A good answer replaces this month's cache: "<epoch>\n<body>".
-      size_t len = strlen(corpo);
-      char *t = malloc(len + 32);
-      if (t) { snprintf(t, len + 32, "%lld\n%s", (long long)agora, corpo); dados_gravar_leve(nome, t); free(t); }
-      if (quando && (!*quando || agora < *quando)) *quando = agora;
-      espn_parse(corpo, liga, naJanela, &jan);
-      algum = 1;
-      free(corpo);
-      continue;
-    }
-    free(corpo);
-    if (falhou) *falhou = 1;
-    printf("[esporte] %s %s: o provedor nao respondeu um placar valido; usando a copia salva\n", liga, meses[k]);
-    fflush(stdout);
-    {
-      char *c = dados_ler(nome), *body;
-      if (!c) continue;
-      body = strchr(c, '\n');
-      if (body && espn_parse(body + 1, liga, NULL, NULL) >= 0) {
-        time_t q = (time_t)atoll(c);
-        if (quando && (!*quando || q < *quando)) *quando = q;   // the oldest data shown
-        espn_parse(body + 1, liga, naJanela, &jan);
+  if (!espn_liga(liga) || !(un = calloc(1, sizeof *un))) return -1;
+  un->j = &jan;
+  for (int d = d0; d <= d1; d++) {
+    char *c, *corpo = NULL, *body = NULL;
+    time_t q = 0;
+    diaChave(agora + (time_t)d * 86400, dia, sizeof dia);
+    arquivo(liga, dia, nome, sizeof nome);
+    if ((c = dados_ler(nome)) != NULL && (body = strchr(c, '\n')) != NULL) { q = (time_t)atoll(c); body++; }
+    if (!body || agora - q > validade(d) || q > agora) {
+      snprintf(url, sizeof url, "%s/%s/scoreboard?dates=%s&limit=1000", base, liga, dia);
+      corpo = rede_baixar_com(url, 15, cab);
+      if (corpo && espn_parse(corpo, liga, umaVez, un) >= 0) {
+        size_t len = strlen(corpo);
+        char *t = malloc(len + 32);
+        if (t) { snprintf(t, len + 32, "%lld\n%s", (long long)agora, corpo); dados_gravar_leve(nome, t); free(t); }
+        if (quando && (!*quando || agora < *quando)) *quando = agora;
         algum = 1;
+        free(corpo); free(c);
+        continue;
       }
-      free(c);
+      free(corpo);
+      if (falhou) *falhou = 1;
+      if (body) { printf("[esporte] %s %s: sem resposta valida; usando a copia salva\n", liga, dia); fflush(stdout); }
     }
+    if (body && espn_parse(body, liga, umaVez, un) >= 0) {
+      if (quando && (!*quando || q < *quando)) *quando = q;   // the oldest data shown
+      algum = 1;
+    }
+    free(c);
   }
-  total = jan.n;
-  return algum ? total : -1;
+  free(un);
+  return algum ? jan.n : -1;
+}
+int espn_buscar(const char *liga, time_t agora, int (*cb)(const EspEvento *, void *), void *u,
+                time_t *quando, int *falhou) {
+  return espn_buscar_dias(liga, agora, -7, 7, cb, u, quando, falhou);
 }
 
 // ---------------------------------------------------------------- standings (QR TIME)
