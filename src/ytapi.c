@@ -178,12 +178,28 @@ static void lerChaveValor(const char *t, const char *k, char *d, size_t n) {
     p = f ? f + 1 : NULL;
   }
 }
+// Built-in YouTube keys (the owner's Google project, from the build's
+// secrets): used while nothing is saved on this TV.
+#ifndef NV_YT_API_KEY
+#define NV_YT_API_KEY ""
+#endif
+#ifndef NV_YT_CLIENT_ID
+#define NV_YT_CLIENT_ID ""
+#endif
+#ifndef NV_YT_CLIENT_SECRET
+#define NV_YT_CLIENT_SECRET ""
+#endif
 static void carregarLocked(void) {
   char *t = dados_ler("youtube.txt"), nome[48], v[32];
   lerChaveValor(t ? t : "", "chave", chave, sizeof chave);
   lerChaveValor(t ? t : "", "cliente", clienteId, sizeof clienteId);
   lerChaveValor(t ? t : "", "segredo", clienteSegredo, sizeof clienteSegredo);
   free(t);
+  if (!chave[0]) snprintf(chave, sizeof chave, "%s", NV_YT_API_KEY);
+  if (!clienteId[0] && !clienteSegredo[0]) {
+    snprintf(clienteId, sizeof clienteId, "%s", NV_YT_CLIENT_ID);
+    snprintf(clienteSegredo, sizeof clienteSegredo, "%s", NV_YT_CLIENT_SECRET);
+  }
   arquivoConta(nome, sizeof nome);
   t = dados_ler(nome);
   lerChaveValor(t ? t : "", "renovar", renovar, sizeof renovar);

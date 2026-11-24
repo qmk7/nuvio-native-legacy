@@ -43,6 +43,11 @@ TRS=$(valor TRAKT_CLIENT_SECRET)
 SMK=$(valor SIMKL_CLIENT_ID)
 SMA=$(valor SIMKL_APP_NAME)
 TMD=$(valor TMDB_API_KEY)
+# YouTube (ytapi.c): the owner's own Google project, built in so nothing is
+# typed on the TV; what is saved on the TV (youtube.txt) still wins.
+YTK=$(valor YOUTUBE_API_KEY)
+YTC=$(valor YOUTUBE_CLIENT_ID)
+YTS=$(valor YOUTUBE_CLIENT_SECRET)
 # Seekr exige a chave de cada pessoa nos Ajustes; nunca embutir a do pacote.
 SKR=""
 # Servico de recomendacoes entre amigos (servidor/recomendacoes). VAZIO E UM
@@ -117,11 +122,14 @@ if [ "$1" = "--env-file" ]; then
     printf 'NV_SEEKR_API_KEY=%s\n' "$SKR"
     printf 'NV_REC_URL=%s\n' "$REC"
     printf 'NV_DISCORD_CLIENT_ID=%s\n' "$DSC"
+    printf 'NV_YT_API_KEY=%s\n' "$YTK"
+    printf 'NV_YT_CLIENT_ID=%s\n' "$YTC"
+    printf 'NV_YT_CLIENT_SECRET=%s\n' "$YTS"
     printf 'NV_VERSAO=%s\n' "$VER"
   } > "$2"
   chmod 600 "$2"
   exit 0
 fi
 
-printf -- '-DNV_SUPABASE_URL=\\"%s\\" -DNV_SUPABASE_ANON_KEY=\\"%s\\" -DNV_TV_LOGIN_BASE=\\"%s\\" -DNV_TRAKT_CLIENT_ID=\\"%s\\" -DNV_TRAKT_CLIENT_SECRET=\\"%s\\" -DNV_SIMKL_CLIENT_ID=\\"%s\\" -DNV_SIMKL_APP=\\"%s\\" -DNV_TMDB_API_KEY=\\"%s\\" -DNV_SEEKR_API_KEY=\\"%s\\" -DNV_REC_URL=\\"%s\\" -DNV_DISCORD_CLIENT_ID=\\"%s\\" -DNV_VERSAO=\\"%s\\"' \
-  "$URL" "$KEY" "$TVB" "$TRK" "$TRS" "$SMK" "$SMA" "$TMD" "$SKR" "$REC" "$DSC" "$VER"
+printf -- '-DNV_SUPABASE_URL=\\"%s\\" -DNV_SUPABASE_ANON_KEY=\\"%s\\" -DNV_TV_LOGIN_BASE=\\"%s\\" -DNV_TRAKT_CLIENT_ID=\\"%s\\" -DNV_TRAKT_CLIENT_SECRET=\\"%s\\" -DNV_SIMKL_CLIENT_ID=\\"%s\\" -DNV_SIMKL_APP=\\"%s\\" -DNV_TMDB_API_KEY=\\"%s\\" -DNV_SEEKR_API_KEY=\\"%s\\" -DNV_REC_URL=\\"%s\\" -DNV_DISCORD_CLIENT_ID=\\"%s\\" -DNV_YT_API_KEY=\\"%s\\" -DNV_YT_CLIENT_ID=\\"%s\\" -DNV_YT_CLIENT_SECRET=\\"%s\\" -DNV_VERSAO=\\"%s\\"' \
+  "$URL" "$KEY" "$TVB" "$TRK" "$TRS" "$SMK" "$SMA" "$TMD" "$SKR" "$REC" "$DSC" "$YTK" "$YTC" "$YTS" "$VER"
