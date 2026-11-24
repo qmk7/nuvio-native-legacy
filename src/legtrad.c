@@ -16,8 +16,13 @@
 #include <string.h>
 
 #define LOTE 50
+// Built-in DeepL key (the build's secret DEEPL_API_KEY); a key saved on the TV wins.
+#ifndef NV_DEEPL_KEY
+#define NV_DEEPL_KEY ""
+#endif
 
-int legtrad_tem_chave(void) { char *t = dados_ler("deepl.txt"); int r = t && t[0] > ' '; free(t); return r; }
+
+int legtrad_tem_chave(void) { char *t = dados_ler_ou("deepl.txt", NV_DEEPL_KEY); int r = t && t[0] > ' '; free(t); return r; }
 int legtrad_definir_chave(const char *k) {
   if (!k || !k[0]) return dados_apagar("deepl.txt"), 1;
   for (const char *p = k; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == ':')) return 0;
@@ -94,7 +99,7 @@ static char *srtPronto;
 typedef struct { LegendaCue *c; int n; } Trabalho;
 static void *fio(void *arg) {
   Trabalho *w = arg;
-  char nome[64], *chave = dados_ler("deepl.txt"), *cache, cab[200];
+  char nome[64], *chave = dados_ler_ou("deepl.txt", NV_DEEPL_KEY), *cache, cab[200];
   const char *cabs[3] = { "Content-Type: application/x-www-form-urlencoded", NULL, NULL };
   int r = LT_OK;
   snprintf(nome, sizeof nome, "legenda-ar-%08lx.srt", hashCues(w->c, w->n));

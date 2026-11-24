@@ -48,6 +48,10 @@ TMD=$(valor TMDB_API_KEY)
 YTK=$(valor YOUTUBE_API_KEY)
 YTC=$(valor YOUTUBE_CLIENT_ID)
 YTS=$(valor YOUTUBE_CLIENT_SECRET)
+# Personal services built in the same way (optional): DeepL, AudD, Fanart.tv.
+DPL=$(valor DEEPL_API_KEY)
+ADD=$(valor AUDD_API_TOKEN)
+FNT=$(valor FANART_API_KEY)
 # Seekr exige a chave de cada pessoa nos Ajustes; nunca embutir a do pacote.
 SKR=""
 # Servico de recomendacoes entre amigos (servidor/recomendacoes). VAZIO E UM
@@ -125,11 +129,14 @@ if [ "$1" = "--env-file" ]; then
     printf 'NV_YT_API_KEY=%s\n' "$YTK"
     printf 'NV_YT_CLIENT_ID=%s\n' "$YTC"
     printf 'NV_YT_CLIENT_SECRET=%s\n' "$YTS"
+    printf 'NV_DEEPL_KEY=%s\n' "$DPL"
+    printf 'NV_AUDD_TOKEN=%s\n' "$ADD"
+    printf 'NV_FANART_KEY=%s\n' "$FNT"
     printf 'NV_VERSAO=%s\n' "$VER"
   } > "$2"
   chmod 600 "$2"
   exit 0
 fi
 
-printf -- '-DNV_SUPABASE_URL=\\"%s\\" -DNV_SUPABASE_ANON_KEY=\\"%s\\" -DNV_TV_LOGIN_BASE=\\"%s\\" -DNV_TRAKT_CLIENT_ID=\\"%s\\" -DNV_TRAKT_CLIENT_SECRET=\\"%s\\" -DNV_SIMKL_CLIENT_ID=\\"%s\\" -DNV_SIMKL_APP=\\"%s\\" -DNV_TMDB_API_KEY=\\"%s\\" -DNV_SEEKR_API_KEY=\\"%s\\" -DNV_REC_URL=\\"%s\\" -DNV_DISCORD_CLIENT_ID=\\"%s\\" -DNV_YT_API_KEY=\\"%s\\" -DNV_YT_CLIENT_ID=\\"%s\\" -DNV_YT_CLIENT_SECRET=\\"%s\\" -DNV_VERSAO=\\"%s\\"' \
-  "$URL" "$KEY" "$TVB" "$TRK" "$TRS" "$SMK" "$SMA" "$TMD" "$SKR" "$REC" "$DSC" "$YTK" "$YTC" "$YTS" "$VER"
+printf -- '-DNV_SUPABASE_URL=\\"%s\\" -DNV_SUPABASE_ANON_KEY=\\"%s\\" -DNV_TV_LOGIN_BASE=\\"%s\\" -DNV_TRAKT_CLIENT_ID=\\"%s\\" -DNV_TRAKT_CLIENT_SECRET=\\"%s\\" -DNV_SIMKL_CLIENT_ID=\\"%s\\" -DNV_SIMKL_APP=\\"%s\\" -DNV_TMDB_API_KEY=\\"%s\\" -DNV_SEEKR_API_KEY=\\"%s\\" -DNV_REC_URL=\\"%s\\" -DNV_DISCORD_CLIENT_ID=\\"%s\\" -DNV_YT_API_KEY=\\"%s\\" -DNV_YT_CLIENT_ID=\\"%s\\" -DNV_YT_CLIENT_SECRET=\\"%s\\" -DNV_DEEPL_KEY=\\"%s\\" -DNV_AUDD_TOKEN=\\"%s\\" -DNV_FANART_KEY=\\"%s\\" -DNV_VERSAO=\\"%s\\"' \
+  "$URL" "$KEY" "$TVB" "$TRK" "$TRS" "$SMK" "$SMA" "$TMD" "$SKR" "$REC" "$DSC" "$YTK" "$YTC" "$YTS" "$DPL" "$ADD" "$FNT" "$VER"

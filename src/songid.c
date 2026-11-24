@@ -16,7 +16,11 @@
 static char base[200] = "https://api.audd.io/";
 void songid_definir_base(const char *u) { snprintf(base, sizeof base, "%s", u && u[0] ? u : "https://api.audd.io/"); }
 
-int songid_tem_chave(void) { char *t = dados_ler("audd.txt"); int r = t && t[0] && t[0] != '\n'; free(t); return r; }
+// Built-in AudD token (the build's secret AUDD_API_TOKEN); one saved on the TV wins.
+#ifndef NV_AUDD_TOKEN
+#define NV_AUDD_TOKEN ""
+#endif
+int songid_tem_chave(void) { char *t = dados_ler_ou("audd.txt", NV_AUDD_TOKEN); int r = t && t[0] && t[0] != '\n'; free(t); return r; }
 int songid_definir_chave(const char *tok) {
   if (!tok || !tok[0]) return dados_apagar("audd.txt"), 1;
   for (const char *p = tok; *p; p++) if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z') || (*p >= '0' && *p <= '9') || *p == '-' || *p == '_')) return 0;
@@ -382,7 +386,7 @@ static char *b64url(const unsigned char *p, size_t n) {
   return o;
 }
 int songid_reconhecer(const char *url, double seg, SidMusica *out) {
-  char *tok = dados_ler("audd.txt"), *b64, *corpo, *r, cod[16];
+  char *tok = dados_ler_ou("audd.txt", NV_AUDD_TOKEN), *b64, *corpo, *r, cod[16];
   const char *cabs[2] = { "Content-Type: application/x-www-form-urlencoded", NULL };
   unsigned char *a;
   size_t n;

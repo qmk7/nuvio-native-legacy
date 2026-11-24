@@ -184,7 +184,7 @@ ctr_run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 > /tmp/arm-flags
   for k in NV_SUPABASE_URL NV_SUPABASE_ANON_KEY NV_TV_LOGIN_BASE NV_TRAKT_CLIENT_ID \
            NV_TRAKT_CLIENT_SECRET NV_SIMKL_CLIENT_ID NV_SIMKL_APP NV_TMDB_API_KEY NV_SEEKR_API_KEY \
-           NV_REC_URL NV_DISCORD_CLIENT_ID NV_YT_API_KEY NV_YT_CLIENT_ID NV_YT_CLIENT_SECRET NV_VERSAO; do
+           NV_REC_URL NV_DISCORD_CLIENT_ID NV_YT_API_KEY NV_YT_CLIENT_ID NV_YT_CLIENT_SECRET NV_DEEPL_KEY NV_AUDD_TOKEN NV_FANART_KEY NV_VERSAO; do
     v=${!k}
     v=$(printf "%s" "$v" | sed "s/[\\\\\"]/\\\\&/g")
     printf "%s\n" "\"-D$k=\\\"$v\\\"\""
@@ -214,6 +214,9 @@ ctr_run --rm --platform "$BUILD_PLATFORM" --env-file "$ENVF" \
     -DNV_YT_API_KEY="\"${NV_YT_API_KEY:-}\"" \
     -DNV_YT_CLIENT_ID="\"${NV_YT_CLIENT_ID:-}\"" \
     -DNV_YT_CLIENT_SECRET="\"${NV_YT_CLIENT_SECRET:-}\"" \
+    -DNV_DEEPL_KEY="\"${NV_DEEPL_KEY:-}\"" \
+    -DNV_AUDD_TOKEN="\"${NV_AUDD_TOKEN:-}\"" \
+    -DNV_FANART_KEY="\"${NV_FANART_KEY:-}\"" \
     -DNV_VERSAO="\"$NV_VERSAO\"" \
     -I$SR/usr/include -I$SR/usr/include/SDL2 \
     $RUST_LIBS -lSDL2 -lSDL2_image -lSDL2_ttf -lGLESv2 -lEGL $P2P_LIBS -ldl -lpthread -lz -lm $ASS_LIBS $DTS_LIBS $DV7_LIBS \

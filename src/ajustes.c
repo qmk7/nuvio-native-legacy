@@ -4177,12 +4177,15 @@ static int limita(int op, int v) {
 // aparelho, como o portal IPTV), nunca no ajustes.txt nem na conta, e so
 // aparece mascarada. Quem usa e artereserva.c (fonte "fanart.tv" do destaque).
 static char fanartChave[64];
+#ifndef NV_FANART_KEY
+#define NV_FANART_KEY ""
+#endif
 static void fanartAplicar(void) {
   arte_fonte_chave_fanart(fanartChave);
   artehero_fanart_disponivel(fanartChave[0] != 0);
 }
 static void fanartCarregar(void) {
-  char *t = dados_ler("fanart.txt");
+  char *t = dados_ler_ou("fanart.txt", NV_FANART_KEY);   // built-in: the build's FANART_API_KEY
   size_t i, k = 0;
   fanartChave[0] = 0;
   // So hexadecimal: e o formato da chave pessoal, e assim uma linha torta no

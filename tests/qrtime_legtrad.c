@@ -7,6 +7,7 @@
 #include <string.h>
 char *rede_postar_st(const char *u, int s, const char *const *c, const char *b, int *st) { (void)u; (void)s; (void)c; (void)b; *st = 0; return NULL; }
 char *dados_ler(const char *n) { (void)n; return NULL; }
+char *dados_ler_ou(const char *n, const char *p) { (void)n; (void)p; return NULL; }
 int dados_gravar(const char *n, const char *c) { (void)n; (void)c; return 1; }
 int dados_apagar(const char *n) { (void)n; return 1; }
 int legenda_copiar_cues(LegendaCue **s) { *s = NULL; return 0; }

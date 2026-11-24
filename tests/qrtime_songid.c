@@ -28,6 +28,7 @@ char *rede_baixar_trecho_st(const char *url, int s, long long ini, long long fim
 }
 char *rede_postar_st(const char *u, int s, const char *const *c, const char *b, int *st) { (void)u; (void)s; (void)c; (void)b; *st = 0; return NULL; }
 char *dados_ler(const char *n) { (void)n; return NULL; }
+char *dados_ler_ou(const char *n, const char *p) { (void)n; (void)p; return NULL; }
 int dados_gravar(const char *n, const char *c) { (void)n; (void)c; return 1; }
 int dados_apagar(const char *n) { (void)n; return 1; }
 

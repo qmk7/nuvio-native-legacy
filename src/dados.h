@@ -43,6 +43,9 @@ int dados_e_secreto(const char *nome);
 
 // Le `nome` inteiro para um buffer novo terminado em NUL (free pelo chamador).
 char *dados_ler(const char *nome);
+// QR TIME: dados_ler, or a malloc'd copy of `padrao` (a key built into the
+// package from the build's secrets) when the file is missing or empty.
+char *dados_ler_ou(const char *nome, const char *padrao);
 
 int dados_apagar(const char *nome);
 

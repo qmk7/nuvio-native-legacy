@@ -790,3 +790,10 @@ int dados_persistente(void) {
 }
 
 #include "espaco.inc"
+
+char *dados_ler_ou(const char *nome, const char *padrao) {
+  char *t = dados_ler(nome);
+  if (t && t[0] > ' ') return t;
+  free(t);
+  return padrao && padrao[0] ? strdup(padrao) : NULL;
+}
