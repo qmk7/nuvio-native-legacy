@@ -887,4 +887,10 @@ void ajustes_perfil_padrao(void);
 int ajustes_shot_valor(const char *chave, int v);   // capturas: opcao pela chave
 #endif
 
+// QR TIME remote settings (ajremoto.c). Walk the settings screen: tipo 0 a
+// section, 1 a block label, 2 an editable option (`op`), -1 skip. 0 = end.
+int ajustes_remoto_item(int i, int *tipo, const char **titulo, int *op);
+int ajustes_remoto_editavel(int op);
+const char *ajustes_remoto_valor(int op);   // the value as the TV shows it
+int ajustes_remoto_mudar(int op, int dir);  // like Left (-1) / Right (+1); UI thread
 #endif

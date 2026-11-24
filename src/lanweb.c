@@ -51,6 +51,9 @@ void lanweb_liberar(LwPedido *p) { (void)p; }
 void lanweb_parar(void) {}
 int  lanweb_porta(void) { return 0; }
 const char *lanweb_teste_token(const char *a) { (void)a; return ""; }
+int  lanweb_registrar_token(const char *a, const char *h, size_t m, const char *t) { (void)a; (void)h; (void)m; (void)t; return 0; }
+int  lanweb_gerar_token(char *d, size_t n) { (void)d; (void)n; return 0; }
+void lanweb_porta_preferida(int p) { (void)p; }
 #else
 
 #include <arpa/inet.h>
@@ -95,6 +98,8 @@ static int filaIni, filaN;
 
 int lanweb_disponivel(void) { return 1; }
 int lanweb_porta(void) { return porta; }
+static int portaPreferida;
+void lanweb_porta_preferida(int p) { portaPreferida = p > 1024 && p < 65536 ? p : 0; }
 
 // ---------------------------------------------------------------- network bits
 static int privado(in_addr_t a) {
@@ -373,8 +378,15 @@ static int subir(void) {
   if (ouvir < 0) { lanweb_parar(); return 0; }
   setsockopt(ouvir, SOL_SOCKET, SO_REUSEADDR, &um, sizeof um);
   memset(&a, 0, sizeof a);
-  a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY); a.sin_port = 0;
-  if (bind(ouvir, (struct sockaddr *)&a, sizeof a) || listen(ouvir, 8) || getsockname(ouvir, (struct sockaddr *)&a, &tam)) {
+  a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY); a.sin_port = htons((unsigned short)portaPreferida);
+  // A fixed port keeps bookmarked links (the settings page) working across
+  // restarts; taken, any free port.
+  if (portaPreferida && bind(ouvir, (struct sockaddr *)&a, sizeof a)) { a.sin_port = 0; }
+  else if (portaPreferida) goto ligada;
+  if (bind(ouvir, (struct sockaddr *)&a, sizeof a)) goto falhou;
+ligada:
+  if (listen(ouvir, 8) || getsockname(ouvir, (struct sockaddr *)&a, &tam)) {
+  falhou:
     printf("[lanweb] servidor nao subiu (errno %d)\n", errno);
     lanweb_parar();
     return 0;
@@ -431,6 +443,18 @@ void lanweb_remover(const char *app) {
   if ((a = acharApp(app)) != NULL) { free(a->html); free(a->estado); free(a->arq); memset(a, 0, sizeof *a); }
   pthread_mutex_unlock(&trava);
 }
+int lanweb_registrar_token(const char *app, const char *html, size_t maxCorpo, const char *token) {
+  App *a;
+  size_t n = token ? strlen(token) : 0;
+  if (n != LW_TOKEN_N) return 0;
+  for (size_t i = 0; i < n; i++) if (!((token[i] >= 'a' && token[i] <= 'z') || (token[i] >= '2' && token[i] <= '9'))) return 0;
+  if (!lanweb_registrar(app, html, maxCorpo)) return 0;
+  pthread_mutex_lock(&trava);
+  if ((a = acharApp(app)) != NULL) snprintf(a->token, sizeof a->token, "%s", token);
+  pthread_mutex_unlock(&trava);
+  return a != NULL;
+}
+int lanweb_gerar_token(char *dst, size_t n) { return n > LW_TOKEN_N && gerarToken(dst); }
 void lanweb_renovar(const char *app) {
   App *a;
   pthread_mutex_lock(&trava);

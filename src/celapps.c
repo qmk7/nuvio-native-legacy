@@ -18,12 +18,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "ajremoto.h"
 
 int ajustes_idioma(void);
 
-static const char *const APP[CA_N] = { "controle", "musica", "festa", "backup", "foto", "casa" };
+static const char *const APP[CA_N] = { "controle", "musica", "festa", "backup", "foto", "casa", "ajustes" };
 static const char *const NOME[CA_N] = { "Controle pelo celular", "Configurar música pelo celular", "Modo festa",
-                                        "Backup e restauração", "Foto do perfil", "Campainha EZVIZ" };
+                                        "Backup e restauração", "Foto do perfil", "Campainha EZVIZ",
+                                        "Ajustes da TV pelo celular" };
 static const char *const DESC[CA_N] = {
   "Setas, OK, voltar e play no celular. Digite no celular para buscar na TV ou preencher o campo aberto.",
   "Navidrome, WebDAV, Last.fm e playlists do Spotify, digitados no celular.",
@@ -31,15 +33,19 @@ static const char *const DESC[CA_N] = {
   "Guarda num arquivo protegido por senha o que a conta não sincroniza, e restaura.",
   "Escolha uma foto no celular para o perfil atual.",
   "AppKey e Secret do EZVIZ: a TV avisa quando tocam a campainha.",
+  "Todos os ajustes da TV no celular ou no computador, num link fixo que você pode salvar.",
 };
-static const char *const ICONE[CA_N] = { "aj_gamepad-2", "aj_music", "aj_party-popper", "aj_hard-drive", "aj_image", "aj_door-open" };
+static const char *const ICONE[CA_N] = { "aj_gamepad-2", "aj_music", "aj_party-popper", "aj_hard-drive", "aj_image", "aj_door-open", "aj_sliders-horizontal" };
 static CelAppDef defs[CA_N];
 
 const char *celapps_nome(int a) { return a >= 0 && a < CA_N ? NOME[a] : ""; }
 const char *celapps_desc(int a) { return a >= 0 && a < CA_N ? DESC[a] : ""; }
 const char *celapps_icone(int a) { return a >= 0 && a < CA_N ? ICONE[a] : "aj_smartphone"; }
 const char *celapps_url(int a) { return a >= 0 && a < CA_N ? lanweb_url(APP[a]) : ""; }
-void celapps_renovar(int a) { if (a >= 0 && a < CA_N) lanweb_renovar(APP[a]); }
+void celapps_renovar(int a) {
+  if (a == CA_AJUSTES) ajremoto_renovar();   // the kept token changes too
+  else if (a >= 0 && a < CA_N) lanweb_renovar(APP[a]);
+}
 void celapps_definir(int a, const CelAppDef *d) { if (a >= 0 && a < CA_N && d) defs[a] = *d; }
 
 // ---------------------------------------------------------------- page skeleton
@@ -235,18 +241,21 @@ static void iniciarDefs(void) {
   static int feito;
   if (feito) return;
   feito = 1;
+  lanweb_porta_preferida(8098);   // every page, so bookmarked links survive restarts
   if (!defs[CA_CONTROLE].montar) defs[CA_CONTROLE] = (CelAppDef){ paginaControle, pedidoControle, NULL, 2048 };
   if (!defs[CA_MUSICA].montar) defs[CA_MUSICA] = (CelAppDef){ paginaMusica, pedidoMusica, NULL, 4096 };
   if (!defs[CA_FESTA].montar) mcfesta_iniciar();
   if (!defs[CA_BACKUP].montar) qrbackup_iniciar();
   if (!defs[CA_FOTO].montar) perfilfoto_iniciar();
   if (!defs[CA_CASA].montar) ezviz_iniciar();
+  if (!defs[CA_AJUSTES].montar) ajremoto_iniciar();
 }
 int celapps_abrir(int a) {
   char *h;
   int ok;
   iniciarDefs();
   if (a < 0 || a >= CA_N || !defs[a].montar) return 0;
+  if (a == CA_AJUSTES) return ajremoto_abrir();
   h = defs[a].montar();
   if (!h) return 0;
   ok = lanweb_registrar(APP[a], h, defs[a].maxCorpo);

@@ -42,6 +42,11 @@ int  lanweb_registrar(const char *app, const char *html, size_t maxCorpo);
 void lanweb_remover(const char *app);
 const char *lanweb_url(const char *app);       // "http://ip:port/<token>/" or ""
 void lanweb_renovar(const char *app);          // new token: old links stop
+// QR TIME: a page whose token is kept by the caller (bookmarkable link), and
+// a fixed port to try first (set before the first page). 1 = ok.
+int  lanweb_registrar_token(const char *app, const char *html, size_t maxCorpo, const char *token);
+int  lanweb_gerar_token(char *dst, size_t n);  // dst > 12 bytes
+void lanweb_porta_preferida(int porta);
 // JSON served at <token>/estado (and the page polls it).
 void lanweb_publicar(const char *app, const char *json);
 // A file served at <token>/arquivo (backup download). Copied.

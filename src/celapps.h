@@ -10,13 +10,15 @@
 //   CA_BACKUP    encrypted backup of what the account does not sync, and
 //                restore (qrbackup.c)
 //   CA_FOTO      a real photo for the current profile (perfilfoto.c)
+//   CA_AJUSTES   every setting of the TV, at a link that stays the same
+//                (ajremoto.c)
 #ifndef QRT_CELAPPS_H
 #define QRT_CELAPPS_H
 #include <SDL2/SDL.h>
 #include <stddef.h>
 #include "lanweb.h"
 
-enum { CA_CONTROLE, CA_MUSICA, CA_FESTA, CA_BACKUP, CA_FOTO, CA_CASA, CA_N };
+enum { CA_CONTROLE, CA_MUSICA, CA_FESTA, CA_BACKUP, CA_FOTO, CA_CASA, CA_AJUSTES, CA_N };
 
 int  celapps_abrir(int app);            // page up; 1 ok (0 = no home network)
 const char *celapps_url(int app);       // "" while closed

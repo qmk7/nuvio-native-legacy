@@ -11571,3 +11571,40 @@ int ajustes_rapido_cor_definir(int i) {
   ajOrigemDireto = AJLOG_AJUSTES;
   return r;
 }
+
+// ---------------------------------------------------------------- remote settings
+// QR TIME: the phone / computer page (ajremoto.c) walks the same screen, in the
+// same order, and changes a value exactly like the remote's Left/Right
+// (mudarValorDireto), with the safe-mode journal (riscoNotar) so a risky
+// change made from the phone can be undone at the next start like one made on
+// the TV. Actions and read-only rows stay on the TV (they open TV screens).
+int ajustes_remoto_item(int i, int *tipo, const char **titulo, int *op) {
+  const Item *it;
+  if (i < 0 || i >= AJ_N_TELA) return 0;
+  it = &TELA[i];
+  *op = -1; *titulo = NULL; *tipo = -1;
+  if (it->tipo == IT_SEC) { *tipo = 0; *titulo = i18n(it->titulo); }
+  else if (it->tipo == IT_ROT || it->tipo == IT_GRP) { *tipo = 1; *titulo = i18n(it->titulo); }
+  else if (it->tipo == IT_OPC && ajustes_remoto_editavel(it->op)) { *tipo = 2; *op = it->op; *titulo = i18n(OPCOES[it->op].rotulo); }
+  return 1;
+}
+int ajustes_remoto_editavel(int op) {
+  if (op < 0 || op >= AJ_N || edPerfil || !ajOpcaoDisponivel(op)) return 0;
+  return OPCOES[op].tipo == OP_ESCOLHA || OPCOES[op].tipo == OP_NUMERO;
+}
+const char *ajustes_remoto_valor(int op) {
+  const char *t;
+  if (!ajustes_remoto_editavel(op)) return "";
+  t = textoValor(op);
+  return t ? t : "";
+}
+int ajustes_remoto_mudar(int op, int dir) {
+  int antes;
+  if (!ajustes_remoto_editavel(op) || !dir) return 0;
+  antes = riscoDe(op) ? riscoAtual(op) : 0;
+  mudarValorDireto(op, dir > 0 ? 1 : -1);
+  riscoNotar(op, antes);
+  printf("[ajustes] remoto: opcao %d mudada pelo celular\n", op);
+  fflush(stdout);
+  return 1;
+}
