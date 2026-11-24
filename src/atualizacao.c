@@ -1004,6 +1004,12 @@ void atualizacao_verificar(void) {
 #ifdef NV_DTS_DEBUG
   return; /* Debug IPKs are installed explicitly, outside production updates. */
 #endif
+#ifdef NV_LINUX_DESKTOP
+  // QR TIME: the desktop build is the test harness. Since releases are
+  // published for in-app updates, a real "new version" card would cover every
+  // end-to-end run; it checks only when asked (QRT_ATUALIZACAO=1).
+  { const char *q = getenv("QRT_ATUALIZACAO"); if (!q || q[0] != '1') return; }
+#endif
   static long ultChamada;
   long rel = (long)time(NULL);
   int vence;

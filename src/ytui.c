@@ -17,6 +17,7 @@
 
 #define PAG_MAX 200      // items kept per list (pages of 25 appended)
 #define SUB_MAX 5        // channel / playlist pages stacked over a tab
+#define YT_COLS 4        // videos per row of the grid
 
 // ---------------------------------------------------------------- lists
 enum { P_ALTA, P_BUSCA, P_INSC, P_PLAYLISTS, P_PLAYLIST, P_CANAL };
@@ -341,8 +342,11 @@ void ytui_evento(const SDL_Event *e) {
     zona = Z_ABAS;
     return;
   }
-  if (k == SDLK_UP) { if (pg->foco > 0) pg->foco--; else if (!nSub) zona = Z_ABAS; return; }
-  if (k == SDLK_DOWN && pg->foco + 1 < pg->n) { pg->foco++; return; }
+  // The grid: Up/Down a row, Left/Right a column.
+  if (k == SDLK_UP) { if (pg->foco >= YT_COLS) pg->foco -= YT_COLS; else if (!nSub) zona = Z_ABAS; return; }
+  if (k == SDLK_DOWN) { if (pg->foco + YT_COLS < pg->n) pg->foco += YT_COLS; else if (pg->foco / YT_COLS < (pg->n - 1) / YT_COLS) pg->foco = pg->n - 1; return; }
+  if (k == SDLK_LEFT) { if (pg->foco % YT_COLS) pg->foco--; return; }
+  if (k == SDLK_RIGHT) { if (pg->foco % YT_COLS + 1 < YT_COLS && pg->foco + 1 < pg->n) pg->foco++; return; }
   if (ok) {
     if (pg->n) escolher(&pg->itens[pg->foco]);
     else if (pg->tipo == P_BUSCA && !nSub) abrirBusca();
@@ -415,7 +419,7 @@ void ytui_atualizar(float dt, Uint32 agora) {
   }
   pg = atual();
   // The next page when the focus nears the end.
-  if (pg && zona == Z_LISTA && pg->prox[0] && !pg->carregando && pg->foco + 4 >= pg->n && pg->n < PAG_MAX) pedir(pg, 1);
+  if (pg && zona == Z_LISTA && pg->prox[0] && !pg->carregando && pg->foco + 2 * YT_COLS >= pg->n && pg->n < PAG_MAX) pedir(pg, 1);
 }
 
 // ---------------------------------------------------------------- drawing
@@ -534,6 +538,53 @@ static void desenharConta(float x, float y, float w, Uint32 agora) {
                        "As chaves ficam só neste aparelho e nunca vão para o registro do app."),
                   200, 202, 210, x, y, w, 36, 0.7f, 5);
 }
+// ---- YouTube TV-style grid (QR TIME): four big 16:9 thumbnails per row,
+// the duration (or LIVE) on the picture, title on two lines under it, the
+// channel and views below; channels are a round avatar. Focus: white ring.
+static void thumb169(const YtItem *it, char *d, size_t n) {
+  // The 16:9 "mqdefault" frame of a video (the API's larger ones are 4:3
+  // with black bars); other items keep the API's own picture.
+  if (it->tipo == YT_VIDEO && it->id[0]) snprintf(d, n, "https://i.ytimg.com/vi/%s/mqdefault.jpg", it->id);
+  else snprintf(d, n, "%s", it->thumb);
+}
+static void cartaoYt(const YtItem *it, float x, float y, float w, int f) {
+  float h = w * 9.0f / 16.0f, raio = 12.0f / h;
+  char url[300], b[300];
+  GLuint tx;
+  if (f) { gfx_anel_fora((GfxRect){ x, y, w, h }, raio, 4, 4, 1, 1, 1, 1); }
+  if (it->tipo == YT_CANAL) {
+    float a = h * 0.86f;
+    gfx_cor((GfxRect){ x, y, w, h }, raio, 1, 1, 1, f ? 0.10f : 0.05f);
+    tx = it->thumb[0] ? tex_obter_larg(it->thumb, a) : 0;
+    if (tx) gfx_textura((GfxRect){ x + (w - a) * 0.5f, y + (h - a) * 0.5f, a, a }, tx);
+    gfx_anel((GfxRect){ x + (w - a) * 0.5f, y + (h - a) * 0.5f, a, a }, 0.5f, 3, 0.055f, 0.058f, 0.068f, 1);   // round crop edge
+  } else {
+    thumb169(it, url, sizeof url);
+    tx = url[0] ? tex_obter_larg(url, w) : 0;
+    if (tx) gfx_textura((GfxRect){ x, y, w, h }, tx);
+    else gfx_cor((GfxRect){ x, y, w, h }, raio, 1, 1, 1, 0.08f);
+    gfx_anel((GfxRect){ x, y, w, h }, raio, 6, 0.055f, 0.058f, 0.068f, 1);   // rounded corners over the picture
+    // Badge: duration / LIVE / the playlist's count.
+    b[0] = 0;
+    if (it->tipo == YT_PLAYLIST) snprintf(b, sizeof b, "▶ %d", it->itens);
+    else if (!strcmp(it->duracao, "AO VIVO")) snprintf(b, sizeof b, "%s", i18n("AO VIVO"));
+    else snprintf(b, sizeof b, "%s", it->duracao);
+    if (b[0]) {
+      int vivo = !strcmp(it->duracao, "AO VIVO");
+      TxtLinha l = txt_linha(TXT_ILHA_SEG, b, 255, 255, 255, 255);
+      float bw = (float)l.w + 16, bh = (float)l.h + 6, bx = x + w - bw - 10, by = y + h - bh - 10;
+      gfx_cor((GfxRect){ bx, by, bw, bh }, 0.25f, vivo ? 0.8f : 0, vivo ? 0.07f : 0, vivo ? 0.07f : 0, vivo ? 1 : 0.8f);
+      txt_desenhar_alpha(l, bx + 8, by + 3, 1);
+    }
+  }
+  // Title (two lines), then channel · views · age.
+  y += h + 14;
+  y += txt_bloco_corta(TXT_ILHA_NOME, it->titulo, 240, 242, 248, x, y, w, 30, f ? 1 : 0.9f, 2) + 4;
+  // The duration is already on the picture: channel · views · date only.
+  { YtItem m = *it; m.duracao[0] = 0; meta(&m, b, sizeof b); }
+  { TxtLinha l = txt_linha_corta(TXT_CAPTION2, b, 170, 174, 186, 255, (int)w); txt_desenhar_alpha(l, x, y, 1); }
+}
+
 void ytui_desenhar(Uint32 agora) {
   float x = NV_MARGEM_X, y = NV_MARGEM_Y, w = NV_TELA_W - 2 * NV_MARGEM_X;
   Pagina *pg = atual();
@@ -544,18 +595,23 @@ void ytui_desenhar(Uint32 agora) {
     if (teclado_aberto()) teclado_desenhar(agora);
     return;
   }
-  texto(TXT_TITULO2, "YouTube", x, y, 1);
+  // The red play mark + "YouTube", then the tabs as pills (the chosen one white).
+  gfx_cor((GfxRect){ x, y + 8, 64, 44 }, 0.3f, 1.0f, 0.0f, 0.0f, 1);
+  { TxtLinha l = txt_linha(TXT_CALLOUT, "▶", 255, 255, 255, 255); txt_desenhar_alpha(l, x + 32 - (float)l.w * 0.5f, y + 30 - (float)l.h * 0.5f, 1); }
+  texto(TXT_TITULO2, "YouTube", x + 82, y, 1);
   y += 80;
   {
     float tx = x;
     for (int i = 0; i < ABA_N; i++) {
-      TxtLinha l = txt_linha(TXT_CALLOUT, i18n(ABAS[i]), 240, 242, 248, 255);
+      int sel = i == aba, f = zona == Z_ABAS && i == aba;
+      TxtLinha l = txt_linha(TXT_ILHA_NOME, i18n(ABAS[i]), sel ? 11 : 240, sel ? 12 : 242, sel ? 16 : 248, 255);
       float lw = (float)l.w + 40;
-      int f = zona == Z_ABAS && i == aba;
-      gfx_cor((GfxRect){ tx, y, lw, 52 }, 0.5f, 1, 1, 1, i == aba ? (f ? 0.9f : 0.18f) : 0.06f);
-      if (f) { TxtLinha d = txt_linha(TXT_CALLOUT, i18n(ABAS[i]), 20, 20, 24, 255); txt_desenhar_alpha(d, tx + 20, y + 10, 1); }
-      else txt_desenhar_alpha(l, tx + 20, y + 10, i == aba ? 1 : 0.7f);
-      tx += lw + 12;
+      GfxRect rr = { tx, y, lw, 52 };
+      if (sel) gfx_cor(rr, 0.5f, 1, 1, 1, 1);
+      else { gfx_cor(rr, 0.5f, 0.118f, 0.129f, 0.173f, 0.78f); gfx_anel(rr, 0.5f, 1, 1, 1, 1, 0.2f); }
+      if (f) gfx_anel_fora(rr, 0.5f, 3, 3, 1, 1, 1, 1);
+      txt_desenhar_alpha(l, tx + 20, y + (52 - (float)l.h) * 0.5f, sel || f ? 1 : 0.85f);
+      tx += lw + 10;
     }
     y += 80;
   }
@@ -564,10 +620,11 @@ void ytui_desenhar(Uint32 agora) {
   if (nSub) { corta(TXT_CALLOUT, pg->titulo, x, y, w, 0.9f); y += 52; }
   else if (pg->tipo == P_BUSCA && pg->arg[0]) { snprintf(b, sizeof b, "%s \"%s\"", i18n("Resultados para"), pg->arg); corta(TXT_CALLOUT, b, x, y, w, 0.9f); y += 52; }
   {
-    float rh = 168, area = NV_TELA_H - 70 - y;
-    int vis = (int)(area / rh), de;
-    if (vis < 1) vis = 1;
-    de = pg->foco >= vis ? pg->foco - vis + 1 : 0;
+    const float gap = 28;
+    float cw = (w - gap * (YT_COLS - 1)) / YT_COLS, rh = cw * 9.0f / 16.0f + 14 + 64 + 30 + gap, area = NV_TELA_H - 70 - y;
+    int linhas = (int)(area / rh), lf = pg->foco / YT_COLS, l0;
+    if (linhas < 1) linhas = 1;
+    l0 = lf >= linhas ? lf - linhas + 1 : 0;
     if (!pg->n) {
       const char *m = pg->carregando ? "Carregando…" :
                       pg->erro ? mensagemErro(pg->erro, pg->tipo) :
@@ -575,16 +632,8 @@ void ytui_desenhar(Uint32 agora) {
                       !pg->pedido ? "" : "Nada por aqui.";
       if (m[0]) txt_bloco_corta(TXT_BODY, i18n(m), 240, 242, 248, x, y + 20, w, 40, 0.75f, 3);
     }
-    for (int i = de; i < pg->n && i < de + vis; i++) {
-      const YtItem *it = &pg->itens[i];
-      int f = zona == Z_LISTA && i == pg->foco;
-      float ry = y + (float)(i - de) * rh;
-      if (f) gfx_cor((GfxRect){ x - 12, ry - 8, w + 24, rh - 8 }, 0.25f, 1, 1, 1, 0.12f);
-      miniatura(it->thumb, x, ry, it->tipo == YT_CANAL ? 144 : 256, 144);
-      corta(TXT_BODY, it->titulo, x + 284, ry + 20, w - 300, f ? 1 : 0.88f);
-      meta(it, b, sizeof b);
-      corta(TXT_CAPTION, b, x + 284, ry + 74, w - 300, 0.65f);
-    }
+    for (int i = l0 * YT_COLS; i < pg->n && i < (l0 + linhas) * YT_COLS; i++)
+      cartaoYt(&pg->itens[i], x + (float)(i % YT_COLS) * (cw + gap), y + (float)(i / YT_COLS - l0) * rh, cw, zona == Z_LISTA && i == pg->foco);
     if (pg->n && pg->carregando) texto(TXT_CAPTION, i18n("Carregando mais…"), x, NV_TELA_H - 56, 0.6f);
     else if (pg->n && pg->erro) corta(TXT_CAPTION, i18n(mensagemErro(pg->erro, pg->tipo)), x, NV_TELA_H - 56, w, 0.7f);
   }
