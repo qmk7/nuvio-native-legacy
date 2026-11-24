@@ -1,0 +1,88 @@
+# QR TIME for Alexa — the Home Assistant half (a "package").
+# Copy to /config/packages/qrtime_alexa.yaml and make sure configuration.yaml has:
+#   homeassistant:
+#     packages: !include_dir_named packages
+# Then fill these in secrets.yaml (never in this file). The link is the one
+# shown in Settings > Accounts > Phone > "TV settings from the phone":
+#   qrtime_link_tocar:  "http://192.168.x.x:8098/<code>/tocar"
+#   qrtime_link_tecla:  "http://192.168.x.x:8098/<code>/tecla"
+#   qrtime_tv_mac:      "AA:BB:CC:DD:EE:FF"       # TV: Settings > General > About this TV
+#   qrtime_webhook_id:  "<a long random string>"  # the same one ends the Lambda's HA_WEBHOOK_URL
+# and change media_player.lg_webos_tv below to your TV's entity id if it differs.
+#
+# What it does: the Alexa skill posts {"acao": "tocar", "q": "Inception"} to
+# the webhook; the TV is woken (Wake-on-LAN) when off, QR TIME is opened, and
+# the title is asked to play. "ligar"/"desligar" turn the TV on/off, "tecla"
+# presses play/pause or back.
+
+rest_command:
+  qrtime_tocar:
+    url: !secret qrtime_link_tocar
+    method: POST
+    content_type: "application/x-www-form-urlencoded"
+    payload: "q={{ q | urlencode }}&tipo={{ tipo | default('') | urlencode }}"
+    timeout: 10
+  qrtime_tecla:
+    url: !secret qrtime_link_tecla
+    method: POST
+    content_type: "application/x-www-form-urlencoded"
+    payload: "k={{ k | urlencode }}"
+    timeout: 10
+
+script:
+  qrtime_acordar_e_abrir:
+    alias: "QR TIME: wake the TV and open QR TIME"
+    mode: queued
+    sequence:
+      - if:
+          - condition: state
+            entity_id: media_player.lg_webos_tv
+            state: "off"
+        then:
+          - action: wake_on_lan.send_magic_packet
+            data:
+              mac: !secret qrtime_tv_mac
+          - wait_template: "{{ not is_state('media_player.lg_webos_tv', 'off') }}"
+            timeout: "00:00:30"
+            continue_on_timeout: true
+          - delay: "00:00:04"
+      - action: media_player.select_source
+        target:
+          entity_id: media_player.lg_webos_tv
+        data:
+          source: "QR TIME"
+      - delay: "00:00:06"   # the app's start; already open, it just comes to the front
+
+automation:
+  - alias: "QR TIME: Alexa"
+    id: qrtime_alexa_webhook
+    mode: queued
+    trigger:
+      - trigger: webhook
+        webhook_id: !secret qrtime_webhook_id
+        allowed_methods: [POST]
+        local_only: false   # Alexa reaches it through the Tailscale Funnel address
+    action:
+      - variables:
+          acao: "{{ trigger.json.acao | default('') }}"
+      - choose:
+          - conditions: "{{ acao == 'tocar' }}"
+            sequence:
+              - action: script.qrtime_acordar_e_abrir
+              - action: rest_command.qrtime_tocar
+                data:
+                  q: "{{ trigger.json.q | default('') }}"
+                  tipo: "{{ trigger.json.tipo | default('') }}"
+          - conditions: "{{ acao == 'ligar' }}"
+            sequence:
+              - action: script.qrtime_acordar_e_abrir
+          - conditions: "{{ acao == 'desligar' }}"
+            sequence:
+              - action: media_player.turn_off
+                target:
+                  entity_id: media_player.lg_webos_tv
+          - conditions: "{{ acao == 'tecla' }}"
+            sequence:
+              - action: rest_command.qrtime_tecla
+                data:
+                  k: "{{ trigger.json.k | default('') }}"
