@@ -11,6 +11,7 @@
 // start of the app. Home network only: lanweb answers LAN addresses only.
 #include "ajremoto.h"
 #include "ajustes.h"
+#include "casaha.h"
 #include "celapps.h"
 #include "dados.h"
 #include "idioma.h"
@@ -116,7 +117,17 @@ static char *pagina(void) {
   }
 }
 static void pedido(const LwPedido *p) {
-  char o[16], d[8];
+  char o[16], d[8], q[200], t[16];
+  // Home Assistant / Alexa: play a title by name (or tt id), or press a key.
+  if (!strcmp(p->rota, "tocar")) {
+    lanweb_campo(p->corpo, "tipo", t, sizeof t);
+    if (lanweb_campo(p->corpo, "q", q, sizeof q) && q[0]) casaha_tocar(t, q);
+    return;
+  }
+  if (!strcmp(p->rota, "tecla")) {
+    if (lanweb_campo(p->corpo, "k", t, sizeof t)) celapps_injetar_tecla(t);
+    return;
+  }
   if (!strcmp(p->rota, "mudar") && lanweb_campo(p->corpo, "op", o, sizeof o) && lanweb_campo(p->corpo, "d", d, sizeof d)) {
     int op = atoi(o), ok = 0;
     for (int i = 0; i < nOps; i++) if (ops[i] == op) ok = 1;   // only rows the page shows
@@ -130,7 +141,7 @@ static int ligar(void) {
   int ok;
   if (!h) return 0;
   if (!token[0] && !lerToken() && !novoToken()) { free(h); return 0; }
-  ok = lanweb_registrar_token("ajustes", h, 512, token);
+  ok = lanweb_registrar_token("ajustes", h, 1024, token);
   free(h);
   if (ok) publicar();
   printf("[ajremoto] pagina de ajustes %s\n", ok ? "no ar" : "sem rede local");

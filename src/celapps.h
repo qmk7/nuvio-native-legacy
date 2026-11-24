@@ -35,6 +35,7 @@ char *celapps_pagina(const char *titulo, const char *corpo, const char *js);
 // Key names from the phone remote ("up", "ok", "back", "play"...), queued
 // here and taken by main.c each frame (the injected-keys path). 1 = one taken.
 int  celapps_tecla_remota(char *dst, size_t n);
+int  celapps_injetar_tecla(const char *k);   // queue one of those keys (Home Assistant)
 
 // Handlers the other phone features register (festa, backup, foto).
 typedef struct {

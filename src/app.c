@@ -204,6 +204,8 @@ void video_tpk_cdn_arquivo(const char *url, int usenet, int item, int file);
 // setas. Chegar em South Park pela busca com o teclado da tela sao dezenas de
 // teclas; aqui e uma linha.
 static char abrirTeste[64];
+static char haTocar[24];      // Home Assistant: play this title when its page is open
+static Uint32 haDesde;
 void app_abrir_titulo(const char *imdb) {
   snprintf(abrirTeste, sizeof abrirTeste, "%s", imdb ? imdb : "");
 }
@@ -851,6 +853,7 @@ static int iniciarPoliticaFonte(int preferida, int manual) {
   return fonteFalha != NULL;
 }
 #include "catalogo.h"
+#include "casaha.h"
 #include "gfx.h"
 #include "catalogo.h"
 #include "layout.h"
@@ -5608,6 +5611,18 @@ void app_atualizar(float dt, Uint32 agora) {
       if (k >= 0) abrirPorIndice(k); else desc_pedir_titulo(alvo);
     }
   }
+  // QR TIME: "play this film" from Home Assistant / Alexa (casaha.c). An open
+  // title page gives way; the new page opens below like any other and plays
+  // once it is this title's page. A playing video is not interrupted: the
+  // request waits until it is closed.
+  if (!player_aberto()) {
+    char ha[24];
+    if (casaha_pegar(ha, sizeof ha)) {
+      snprintf(haTocar, sizeof haTocar, "%s", ha); haDesde = SDL_GetTicks();
+      if (detail_aberto()) detail_fechar_seco();
+      app_abrir_titulo(ha);
+    }
+  }
   if (!detail_aberto() && !player_aberto()) {
     const char *alvo = spainel_pediu_abrir();
     if (!alvo) alvo = recomenda_pediu_abrir();   // mesmo contrato, outra origem
@@ -5644,6 +5659,15 @@ void app_atualizar(float dt, Uint32 agora) {
       int k = cat_indice_por_imdb(alvo);
       if (k >= 0) abrirPorIndice(k); else desc_pedir_titulo(alvo);
     }
+  }
+  if (haTocar[0]) {
+    const CatItem *ci = detail_aberto() ? cat_item(detail_indice()) : NULL;
+    size_t nh = strlen(haTocar);
+    if (ci && !strncmp(ci->imdb, haTocar, nh) && (!ci->imdb[nh] || ci->imdb[nh] == ':')) {
+      detail_pedir_reproduzir();
+      printf("[casa] titulo aberto, reproduzindo\n"); fflush(stdout);
+      haTocar[0] = 0;
+    } else if (SDL_GetTicks() - haDesde > 30000u) haTocar[0] = 0;   // never found: give up quietly
   }
 
   // O PERFIL DO AMIGO (amigoperfil.c): OK num rosto da fileira de amigos ou

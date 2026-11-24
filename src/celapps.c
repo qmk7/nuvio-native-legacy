@@ -115,6 +115,12 @@ static char *paginaControle(void) {
     "document.getElementById('busca').onclick=function(){txt('busca')};"
     "document.getElementById('campo').onclick=function(){txt('campo')};");
 }
+// Home Assistant (ajremoto.c "tecla" route): the same keys as the phone remote.
+int celapps_injetar_tecla(const char *k) {
+  static const char *const OK[] = { "up", "down", "left", "right", "ok", "back", "play", NULL };
+  for (int i = 0; k && OK[i]; i++) if (!strcmp(k, OK[i])) { teclaRemota(k); return 1; }
+  return 0;
+}
 static void pedidoControle(const LwPedido *p) {
   char k[16], t[512], modo[16];
   static const char *const OK[] = { "up", "down", "left", "right", "ok", "back", "play", NULL };
