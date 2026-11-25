@@ -75,6 +75,9 @@ static unsigned geracao;
 static int festaLig, lrclibLig = 1;
 
 static Pagina *topo(void) { return nPilha ? &pilha[nPilha - 1] : NULL; }
+static float maRol;   // Music Assistant pages: scroll
+static int ehMa(const Pagina *pg);
+static void maNavegar(Pagina *pg, SDL_Keycode k);
 static Linha *novaLinha(Pagina *pg) {
   if (!pg->v) pg->v = calloc(PAG_MAX, sizeof *pg->v);
   if (!pg->v || pg->n >= PAG_MAX) return NULL;
@@ -632,6 +635,7 @@ static void empilhar(int tipo, const char *arg, const char *t) {
   pg->n = 0;
   pg->foco = 0; pg->pedido = 0; pg->carregando = 0; pg->erro = MC_OK; pg->mais = 0; pg->offset = 0;
   pg->gen = ++geracao;
+  maRol = 0;
   snprintf(pg->arg, sizeof pg->arg, "%s", arg ? arg : "");
   snprintf(pg->titulo, sizeof pg->titulo, "%s", t ? t : "");
   carregar(pg);
@@ -1349,6 +1353,7 @@ void mcui_evento(const SDL_Event *e) {
     zona = Z_MENU;
     return;
   }
+  if (ehMa(pg) && pg->n && (k == SDLK_LEFT || k == SDLK_RIGHT || k == SDLK_UP || k == SDLK_DOWN)) { maNavegar(pg, k); return; }
   if (k == SDLK_LEFT) { zona = Z_MENU; return; }
   if (k == SDLK_UP) { int f = pg->foco; pg->foco--; ajustarFoco(pg, -1); if (pg->foco == f && f <= 0) zona = Z_MENU; return; }
   if (k == SDLK_DOWN) {
@@ -1508,6 +1513,135 @@ void mcui_atualizar(float dt, Uint32 agora) {
 // ---------------------------------------------------------------- drawing
 static void texto(TxtEstilo s, const char *t, float x, float y, float a) { TxtLinha l = txt_linha(s, t, 240, 242, 248, 255); txt_desenhar_alpha(l, x, y, a); }
 static void corta(TxtEstilo s, const char *t, float x, float y, float w, float a) { TxtLinha l = txt_linha_corta(s, t, 240, 242, 248, 255, w); txt_desenhar_alpha(l, x, y, a); }
+
+// ---------------------------------------------------------------- Music Assistant pages
+// Not a list: the actions are pills along the top, the music is a grid of
+// cover cards (like the streaming apps), section titles between. Arrow keys
+// move on the grid by position; the layout of the last frame drives them.
+#define MA_COLS 6
+typedef struct { float x, y, w, h; } MaR;
+static MaR maR[PAG_MAX];
+static int ehMa(const Pagina *pg) { return pg && pg->tipo >= P_MA; }
+static int maFocavel(const Linha *l) { return !pulavel(l); }
+static float maLayout(const Pagina *pg, float x, float w) {
+  float gap = 26, cw = (w - gap * (MA_COLS - 1)) / MA_COLS, cx = x, y = 0, alt = 0;
+  int col = 0, tipoLinha = -1;   // 0 pills, 1 cards
+  for (int i = 0; i < pg->n && i < PAG_MAX; i++) {
+    const Linha *l = &pg->v[i];
+    if (l->tipo == L_TITULO || l->tipo == L_INFO) {
+      if (tipoLinha >= 0) y += alt + (l->tipo == L_TITULO ? 30 : 16);
+      maR[i] = (MaR){ x, y, w, l->tipo == L_TITULO ? 44 : 60 };
+      y += maR[i].h + 12; alt = 0; tipoLinha = -1; cx = x; col = 0;
+      continue;
+    }
+    if (l->tipo == L_MA) {
+      if (tipoLinha != 1 || col == MA_COLS) { if (tipoLinha >= 0) y += alt + gap; col = 0; }
+      tipoLinha = 1;
+      maR[i] = (MaR){ x + (float)col * (cw + gap), y, cw, cw + 92 };
+      alt = cw + 92; col++;
+      continue;
+    }
+    {
+      TxtLinha t = txt_linha(TXT_CALLOUT, l->t1, 255, 255, 255, 255);
+      float pw = (float)t.w + 64;
+      if (pw > w) pw = w;
+      if (tipoLinha != 0 || cx + pw > x + w) { if (tipoLinha >= 0) y += alt + 16; cx = x; }
+      tipoLinha = 0;
+      maR[i] = (MaR){ cx, y, pw, 64 };
+      cx += pw + 16; alt = 64;
+    }
+  }
+  return y + alt;
+}
+static void maNavegar(Pagina *pg, SDL_Keycode k) {
+  const MaR *c = &maR[pg->foco];
+  int melhor = -1;
+  float md = 1e9f, cxm = c->x + c->w * 0.5f;
+  if (k == SDLK_LEFT || k == SDLK_RIGHT) {
+    int d = k == SDLK_RIGHT ? 1 : -1, j = pg->foco + d;
+    if (j >= 0 && j < pg->n && maFocavel(&pg->v[j]) && maR[j].y == c->y) pg->foco = j;
+    else if (k == SDLK_LEFT) zona = Z_MENU;
+    return;
+  }
+  // Up / down: the nearest focusable item on the next line in that direction.
+  {
+    float alvoY = k == SDLK_DOWN ? 1e9f : -1e9f;
+    for (int i = 0; i < pg->n; i++) {
+      if (!maFocavel(&pg->v[i])) continue;
+      if (k == SDLK_DOWN ? (maR[i].y > c->y && maR[i].y < alvoY) : (maR[i].y < c->y && maR[i].y > alvoY)) alvoY = maR[i].y;
+    }
+    for (int i = 0; i < pg->n; i++) {
+      float d;
+      if (!maFocavel(&pg->v[i]) || maR[i].y != alvoY) continue;
+      d = (maR[i].x + maR[i].w * 0.5f) - cxm; if (d < 0) d = -d;
+      if (d < md) { md = d; melhor = i; }
+    }
+  }
+  if (melhor >= 0) pg->foco = melhor;
+  else if (k == SDLK_UP) zona = Z_MENU;
+  else if (mcp_estado() != MCP_PARADO) { zonaAntesTocando = Z_LISTA; zona = Z_TOCANDO; }
+}
+static void maCartao(const Linha *l, float x, float y, float w, int f) {
+  int redondo = !strcmp(l->f.genero, "artist");
+  float raio = redondo ? 0.5f : 12.0f / w;
+  GLuint tx = l->thumb[0] ? tex_obter_larg(l->thumb, w) : 0;
+  if (f) gfx_anel_fora((GfxRect){ x, y, w, w }, raio, 4, 4, 1, 1, 1, 1);
+  if (tx) gfx_textura((GfxRect){ x, y, w, w }, tx);
+  else {
+    gfx_cor((GfxRect){ x, y, w, w }, raio, 0.16f, 0.17f, 0.21f, 1);
+    { TxtLinha n = txt_linha(TXT_TITULO2, "♪", 200, 204, 214, 255); txt_desenhar_alpha(n, x + (w - (float)n.w) * 0.5f, y + (w - (float)n.h) * 0.5f, 0.5f); }
+  }
+  gfx_anel((GfxRect){ x, y, w, w }, raio, 6, 0.055f, 0.058f, 0.068f, 1);   // rounded edge over the picture
+  if (f && !redondo) {   // play mark
+    float b = 56, bx = x + w - b - 12, by = y + w - b - 12;
+    gfx_cor((GfxRect){ bx, by, b, b }, 0.5f, 0.11f, 0.73f, 0.33f, 1);
+    { TxtLinha p = txt_linha(TXT_CALLOUT, "▶", 255, 255, 255, 255); txt_desenhar_alpha(p, bx + (b - (float)p.w) * 0.5f + 2, by + (b - (float)p.h) * 0.5f, 1); }
+  }
+  y += w + 12;
+  y += txt_bloco_corta(TXT_ILHA_NOME, l->t1, 240, 242, 248, x, y, w, 30, f ? 1 : 0.9f, 2) + 2;
+  { TxtLinha t = txt_linha_corta(TXT_CAPTION2, l->t2, 170, 174, 186, 255, (int)w); txt_desenhar_alpha(t, x, y, 1); }
+}
+static void maPilula(const Linha *l, float x, float y, float w, float h, int f) {
+  int destaque = l->acao == A_MA_ALTOS || l->acao == A_MA_TOCAR_PAI;
+  if (f) gfx_cor((GfxRect){ x, y, w, h }, 0.5f, 1, 1, 1, 1);
+  else if (destaque) gfx_cor((GfxRect){ x, y, w, h }, 0.5f, 0.11f, 0.73f, 0.33f, 0.9f);
+  else gfx_cor((GfxRect){ x, y, w, h }, 0.5f, 1, 1, 1, 0.09f);
+  { TxtLinha t = txt_linha_corta(TXT_CALLOUT, l->t1, f ? 18 : 245, f ? 18 : 246, f ? 22 : 250, 255, (int)(w - 48));
+    txt_desenhar_alpha(t, x + 32, y + (h - (float)t.h) * 0.5f, 1); }
+}
+static void maDesenhar(Pagina *pg, float x, float y0, float w, float base) {
+  float topo = y0 + 96, alto, alvo;
+  corta(TXT_TITULO2, pg->titulo, x, y0, w, 1);
+  if (!pg->n) {
+    const char *m = pg->carregando ? "Carregando…" : pg->erro ? (pg->erro == MC_ERRO_LOGIN ? "O Music Assistant recusou o token. Confira pelo celular." :
+                    "Sem conexão com o Music Assistant. Pressione OK para tentar de novo.") : "Nada por aqui.";
+    txt_bloco_corta(TXT_BODY, i18n(m), 240, 242, 248, x, topo + 10, w, 44, 0.75f, 3);
+    return;
+  }
+  alto = maLayout(pg, x, w);
+  // Keep the focused item on screen, gliding.
+  if (pg->foco >= 0 && pg->foco < pg->n) {
+    const MaR *c = &maR[pg->foco];
+    alvo = maRol;
+    if (c->y - alvo < 0) alvo = c->y - 40;
+    if (c->y + c->h - alvo > base - topo) alvo = c->y + c->h - (base - topo) + 20;
+    if (alvo < 0) alvo = 0;
+    if (alvo > alto) alvo = alto;
+    maRol += (alvo - maRol) * 0.25f;
+    if (maRol - alvo < 1 && alvo - maRol < 1) maRol = alvo;
+  }
+  for (int i = 0; i < pg->n && i < PAG_MAX; i++) {
+    const Linha *l = &pg->v[i];
+    float ry = topo + maR[i].y - maRol;
+    int f = zona == Z_LISTA && i == pg->foco;
+    if (ry + maR[i].h < topo - 10 || ry > base) continue;
+    if (l->tipo == L_TITULO) texto(TXT_CALLOUT, l->t1, maR[i].x, ry + 8, 0.6f);
+    else if (l->tipo == L_INFO) txt_bloco_corta(TXT_CAPTION, l->t1, 200, 202, 210, maR[i].x, ry, maR[i].w, 32, 0.75f, 2);
+    else if (l->tipo == L_MA) maCartao(l, maR[i].x, ry, maR[i].w, f);
+    else maPilula(l, maR[i].x, ry, maR[i].w, maR[i].h, f);
+  }
+  if (pg->carregando) texto(TXT_CAPTION, i18n("Carregando…"), x + w - 200, y0 + 20, 0.6f);
+}
 static void capa(const char *id, const char *c, float x, float y, float s) {
   char url[1200];
   GLuint tx = 0;
@@ -1660,6 +1794,7 @@ void mcui_desenhar(Uint32 agora) {
     { TxtLinha l = txt_linha_corta(TXT_CALLOUT, i18n(SECOES[i]), foco ? 20 : 240, foco ? 20 : 242, foco ? 24 : 248, 255, menuW - 30); txt_desenhar_alpha(l, mx + 8, sy + 6, i == secao ? 1 : 0.7f); }
   }
   if (zona == Z_FORM) { desenharForm(x, y0, w); if (teclado_aberto()) teclado_desenhar(agora); barraMini(NV_TELA_H - 90); return; }
+  if (ehMa(pg)) { maDesenhar(pg, x, y0, w, base); goto depoisLista; }
   if (pg) {
     float y = y0, rh = 96;
     int vis, de;
@@ -1704,6 +1839,7 @@ void mcui_desenhar(Uint32 agora) {
     if (zona == Z_LISTA && pg->n && (pg->v[pg->foco].tipo == L_FAIXA || pg->v[pg->foco].tipo == L_ALBUM))
       texto(TXT_CAPTION, i18n("OK toca · → mais opções"), x + w - 300, y0 + 16, 0.5f);
   }
+depoisLista:;
   if (zona == Z_ACOES) {
     float ax = NV_TELA_W - 620, ay = 180, aw = 560;
     gfx_cor((GfxRect){ ax - 24, ay - 24, aw + 48, 80 + (float)nAcoes * 64 }, 0.3f, 0.12f, 0.125f, 0.14f, 0.98f);
