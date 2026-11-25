@@ -86,9 +86,19 @@ int main(void) {
     memset(&a, 0, sizeof a); a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY);
     setsockopt(dono, SOL_SOCKET, SO_REUSEADDR, &um, sizeof um);
     if (!bind(dono, (struct sockaddr *)&a, sizeof a) && !listen(dono, 1) && !getsockname(dono, (struct sockaddr *)&a, &t)) pref = ntohs(a.sin_port);
+    int extra[3] = { -1, -1, -1 };
+    for (int i = 1; i <= 3 && pref; i++) {   // the three spares (p + 10000 * i) taken too
+      struct sockaddr_in b;
+      if (pref + i * 10000 >= 65536) continue;
+      extra[i - 1] = socket(AF_INET, SOCK_STREAM, 0);
+      setsockopt(extra[i - 1], SOL_SOCKET, SO_REUSEADDR, &um, sizeof um);
+      memset(&b, 0, sizeof b); b.sin_family = AF_INET; b.sin_addr.s_addr = htonl(INADDR_ANY); b.sin_port = htons((unsigned short)(pref + i * 10000));
+      if (bind(extra[i - 1], (struct sockaddr *)&b, sizeof b) || listen(extra[i - 1], 1)) { close(extra[i - 1]); extra[i - 1] = -1; }
+    }
     lanweb_porta_preferida(pref);
-    CONFERE(pref && lanweb_registrar("ajustes", "<html>settings</html>", 64) && lanweb_porta() != pref, "fixed port taken: up on a stand-in port");
+    CONFERE(pref && lanweb_registrar("ajustes", "<html>settings</html>", 64) && lanweb_porta() != pref, "fixed ports taken: up on a stand-in port");
     antes = lanweb_porta();
+    for (int i = 0; i < 3; i++) if (extra[i] >= 0) close(extra[i]);
     close(dono);
     for (int i = 0; i < 60 && lanweb_porta() != pref; i++) usleep(100000);
     snprintf(u, sizeof u, ":%d/", pref);

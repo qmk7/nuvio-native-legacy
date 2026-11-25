@@ -101,6 +101,23 @@ int lanweb_disponivel(void) { return 1; }
 int lanweb_porta(void) { return porta; }
 static int portaPreferida;
 void lanweb_porta_preferida(int p) { portaPreferida = p > 1024 && p < 65536 ? p : 0; }
+// The fixed port and three spares (p, p+10000, p+20000, p+30000): something
+// on the TV can keep the first one; Home Assistant tries the four in order.
+#define LW_FIXAS 4
+static int portaFixa(int i) { int p = portaPreferida + i * 10000; return portaPreferida && p < 65536 ? p : 0; }
+static int ehFixa(int p) { for (int i = 0; i < LW_FIXAS; i++) if (p && p == portaFixa(i)) return 1; return 0; }
+static int ligarFixa(int s, int *qual) {
+  struct sockaddr_in a;
+  memset(&a, 0, sizeof a);
+  a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY);
+  for (int i = 0; i < LW_FIXAS; i++) {
+    if (!portaFixa(i)) continue;
+    a.sin_port = htons((unsigned short)portaFixa(i));
+    if (!bind(s, (struct sockaddr *)&a, sizeof a)) { *qual = portaFixa(i); return 1; }
+    printf("[lanweb] porta %d ocupada (errno %d)\n", portaFixa(i), errno);
+  }
+  return 0;
+}
 
 // ---------------------------------------------------------------- network bits
 static int privado(in_addr_t a) {
@@ -336,15 +353,12 @@ static void atender(int c, const char *cli) {
 // still closing): keep trying it, and once it is ours serve it too and show
 // it in the links, so Home Assistant and bookmarks find the TV again.
 static int abrirPreferida(void) {
-  struct sockaddr_in a;
-  int um = 1, s;
-  if (!portaPreferida || porta == portaPreferida || ouvir2 >= 0) return 0;
+  int um = 1, s, nova = 0;
+  if (!portaPreferida || ehFixa(porta) || ouvir2 >= 0) return 0;
   s = socket(AF_INET, SOCK_STREAM, 0);
   if (s < 0) return 0;
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &um, sizeof um);
-  memset(&a, 0, sizeof a);
-  a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY); a.sin_port = htons((unsigned short)portaPreferida);
-  if (bind(s, (struct sockaddr *)&a, sizeof a) || listen(s, 8)) { close(s); return 0; }
+  if (!ligarFixa(s, &nova) || listen(s, 8)) { close(s); return 0; }
   ouvir2 = s;
   pthread_mutex_lock(&trava);
   {
@@ -355,13 +369,13 @@ static int abrirPreferida(void) {
     snprintf(hostAntigo, sizeof hostAntigo, "%s", hostLan);
     snprintf(localAntigo, sizeof localAntigo, "%s", hostLocal);
     snprintf(origemAntiga, sizeof origemAntiga, "%s", origem);
-    porta = portaPreferida;
+    porta = nova;
     snprintf(hostLan, sizeof hostLan, "%.47s:%d", ip, porta);
     snprintf(hostLocal, sizeof hostLocal, "127.0.0.1:%d", porta);
     snprintf(origem, sizeof origem, "http://%s", hostLan);
   }
   pthread_mutex_unlock(&trava);
-  printf("[lanweb] porta fixa %d livre de novo: links voltam para ela\n", portaPreferida);
+  printf("[lanweb] porta fixa %d livre: links voltam para ela\n", nova);
   fflush(stdout);
   return 1;
 }
@@ -372,7 +386,7 @@ static void *servir(void *arg) {
   while (noAr) {
     struct pollfd p[3];
     int r, np = 2, qual = -1;
-    if (portaPreferida && porta != portaPreferida && time(NULL) - ultimaTentativa >= 3) {
+    if (portaPreferida && !ehFixa(porta) && time(NULL) - ultimaTentativa >= 3) {
       ultimaTentativa = time(NULL);
       abrirPreferida();
     }
@@ -423,14 +437,10 @@ static int subir(void) {
   if (ouvir < 0) { lanweb_parar(); return 0; }
   setsockopt(ouvir, SOL_SOCKET, SO_REUSEADDR, &um, sizeof um);
   memset(&a, 0, sizeof a);
-  a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY); a.sin_port = htons((unsigned short)portaPreferida);
+  a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY); a.sin_port = 0;
   // A fixed port keeps bookmarked links (the settings page) working across
-  // restarts; taken, any free port.
-  if (portaPreferida && bind(ouvir, (struct sockaddr *)&a, sizeof a)) {
-    printf("[lanweb] porta %d ocupada (errno %d): outra por enquanto, tentando de novo\n", portaPreferida, errno);
-    a.sin_port = 0;
-  }
-  else if (portaPreferida) goto ligada;
+  // restarts; all four taken, any free port for now (servir keeps trying).
+  { int q = 0; if (portaPreferida && ligarFixa(ouvir, &q)) goto ligada; }
   if (bind(ouvir, (struct sockaddr *)&a, sizeof a)) goto falhou;
 ligada:
   if (listen(ouvir, 8) || getsockname(ouvir, (struct sockaddr *)&a, &tam)) {
