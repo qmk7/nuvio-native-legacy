@@ -57,3 +57,4 @@ Owner chose: Alexa's own shopping list synced into QR-Yummy (skill with list per
 ItemsCreated -> read the item via the List Management API -> add to the Household 'shop' list in Arabic (Claude translates)
 -> delete it from Alexa's list). "add cucumber to my shopping list" works without the skill name. Verify list events under Alexa+ first.
 Also keep "ask my kitchen ..." for recipes / week plan.
+TV side (casaha q2 + normalizar) built but not released: ship with the next [ipk].
