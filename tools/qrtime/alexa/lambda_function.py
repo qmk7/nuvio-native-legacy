@@ -208,7 +208,7 @@ ESQUEMA = {
     "properties": {
         "busca": {"type": "string", "description": "What to search on YouTube Music: artist, song, album, playlist or a mood turned into a concrete search."},
         "tipo": {"type": "string", "enum": ["track", "artist", "album", "playlist", "any"]},
-        "onde": {"type": "string", "enum": ["soundbar", "kitchen", "bedroom", "google", "casa"]},
+        "onde": {"type": "string", "description": "Where: the room or speaker name the person said (e.g. bedroom, kitchen, soundbar), 'all' for every speaker, '' when none was said."},
         "radio": {"type": "boolean", "description": "Keep playing similar music after it."},
         "volume": {"type": "integer", "description": "0-100 when a loudness was asked for, else -1."},
         "resposta": {"type": "string", "description": "A short spoken confirmation, same language as the request."},
@@ -218,9 +218,9 @@ ESQUEMA = {
 }
 SISTEMA = (
     "You turn a music request spoken to Alexa into a YouTube Music search for Music Assistant. "
-    "Speakers: 'soundbar' (living room soundbar, the default), 'kitchen' (the Google Home Mini), "
-    "'bedroom' (the Harman Kardon speaker), 'google' (kitchen and bedroom together), "
-    "'casa' (all speakers / everywhere / whole house / party). "
+    "For 'onde' copy the room or speaker the person named, in English, lower case (\"in the bedroom\" -> bedroom, "
+    "\"المطبخ\" -> kitchen, \"on the soundbar\" -> soundbar); 'all' for everywhere / whole house / all speakers / party; "
+    "'' when no place was said. Home Assistant matches it to the speakers' current rooms and names. "
     "Turn moods and descriptions into a concrete search (\"something calm to sleep\" -> a calm sleep playlist; "
     "\"the song from Titanic\" -> My Heart Will Go On Celine Dion). Arabic artists keep their usual Latin spelling. "
     "radio is true unless one exact song was asked for. volume: 'quiet/low' about 20, 'loud' about 70, else -1."
@@ -292,12 +292,14 @@ def _skill(event):
         onde = ONDE_POR_INTENT[nome]
         d = _entender(q, onde)
         if d:
+            lugar = (d.get("onde") or "").strip().lower()
+            d["onde"] = "casa" if lugar in ("all", "everywhere") else (lugar or onde)
             msg = {"acao": "musica", "onde": d["onde"], "q": d["busca"], "radio": d["radio"]}
             if d["tipo"] != "any":
                 msg["tipo"] = d["tipo"]
             if 0 <= d["volume"] <= 100:
                 msg["volume"] = d["volume"]
-            fala = d.get("resposta") or "Playing %s on %s." % (d["busca"], FALA_ONDE[d["onde"]])
+            fala = d.get("resposta") or "Playing %s." % d["busca"]
         else:
             msg = {"acao": "musica", "onde": onde, "q": q}
             fala = "Playing %s on %s." % (q, FALA_ONDE[onde])
