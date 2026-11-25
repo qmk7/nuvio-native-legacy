@@ -8,6 +8,12 @@ forwards what is asked to Home Assistant at home:
   "Alexa, open YouTube on TV"          -> Alexa.Launcher (any app on the TV)
   "Alexa, volume up / mute the TV"     -> Alexa.StepSpeaker
 
+MUSIC (optional, once Music Assistant runs in Home Assistant): each entry of
+MUSIC_DEVICES ("Soundbar=soundbar,All speakers=casa") becomes one more Alexa
+device; "Alexa, play Fairuz on Soundbar" posts {"acao": "musica",
+"onde": "soundbar", "q": "Fairuz"} and Home Assistant plays it from YouTube
+Music on the speakers it maps "soundbar" to.
+
 Home Assistant (tools/qrtime/alexa/qrtime_alexa.yaml) wakes the TV
 (Wake-on-LAN), opens QR TIME and asks it to play the title through the
 settings page's fixed link (POST <link>/tocar). Nothing is stored here.
@@ -74,13 +80,42 @@ def _erro(directive, tipo="ENDPOINT_UNREACHABLE", msg="Home Assistant did not an
     }
 
 
+MUSICA = "qrtime-musica-"
+
+
+def _musicas():
+    """[(alexa name, key)] from MUSIC_DEVICES="Soundbar=soundbar,All speakers=casa"."""
+    r = []
+    for par in os.environ.get("MUSIC_DEVICES", "").split(","):
+        nome, _, chave = par.partition("=")
+        nome, chave = nome.strip(), "".join(c for c in chave.strip().lower() if c.isalnum())
+        if nome and chave:
+            r.append((nome, chave))
+    return r
+
+
 def _discovery(directive):
     nome = os.environ.get("DEVICE_NAME", "TV")
     cap = lambda iface, **kw: dict({"type": "AlexaInterface", "interface": iface, "version": "3"}, **kw)
+    musica = [{
+        "endpointId": MUSICA + chave,
+        "manufacturerName": "QR TIME",
+        "friendlyName": n,
+        "description": "Music from YouTube Music through Home Assistant",
+        "displayCategories": ["SPEAKER"],
+        "capabilities": [
+            cap("Alexa"),
+            cap("Alexa.PowerController", properties={"supported": [{"name": "powerState"}], "retrievable": False}),
+            cap("Alexa.RemoteVideoPlayer", configuration={"operations": ["SearchAndPlay"]}),
+            cap("Alexa.PlaybackController", supportedOperations=["Play", "Pause", "Stop", "Next", "Previous"]),
+            cap("Alexa.StepSpeaker"),
+            cap("Alexa.EndpointHealth", properties={"supported": [{"name": "connectivity"}], "retrievable": False}),
+        ],
+    } for n, chave in _musicas()]
     return {
         "event": {
             "header": _hdr("Alexa.Discovery", "Discover.Response"),
-            "payload": {"endpoints": [{
+            "payload": {"endpoints": musica + [{
                 "endpointId": ENDPOINT_ID,
                 "manufacturerName": "QR TIME",
                 "friendlyName": nome,
@@ -113,6 +148,38 @@ def _titulo(payload):
     return "", ""
 
 
+def _musica(d, ns, name, onde):
+    """A music device: everything goes to Home Assistant with where to play."""
+    pl = d.get("payload") or {}
+    msg = None
+    if ns == "Alexa.RemoteVideoPlayer":
+        q, tipo = _titulo(pl)
+        if not q:
+            return _erro(d, "INVALID_VALUE", "No title")
+        msg = {"acao": "musica", "onde": onde, "q": q}
+    elif ns == "Alexa.PlaybackController":
+        k = {"Play": "play", "Pause": "pause", "Stop": "stop", "Next": "next", "Previous": "previous"}.get(name)
+        msg = k and {"acao": "musica_tecla", "onde": onde, "k": k}
+    elif ns == "Alexa.StepSpeaker" and name == "AdjustVolume":
+        msg = {"acao": "musica_volume", "onde": onde, "passos": int(pl.get("volumeSteps") or 0)}
+    elif ns == "Alexa.StepSpeaker" and name == "SetMute":
+        msg = {"acao": "musica_tecla", "onde": onde, "k": "pause" if pl.get("mute") else "play"}
+    elif ns == "Alexa.PowerController":
+        msg = {"acao": "musica_tecla", "onde": onde, "k": "play" if name == "TurnOn" else "stop"}
+    elif ns == "Alexa" and name == "ReportState":
+        r = _ok(d)
+        r["event"]["header"]["name"] = "StateReport"
+        return r
+    if not msg:
+        return _erro(d, "INVALID_DIRECTIVE", "Not supported")
+    if not _ha(msg):
+        return _erro(d)
+    if ns == "Alexa.PowerController":
+        return _ok(d, [{"namespace": "Alexa.PowerController", "name": "powerState", "value": "ON" if name == "TurnOn" else "OFF",
+                        "timeOfSample": _now(), "uncertaintyInMilliseconds": 500}])
+    return _ok(d)
+
+
 def lambda_handler(event, context):
     d = event.get("directive", {})
     ns, name = d.get("header", {}).get("namespace"), d.get("header", {}).get("name")
@@ -121,6 +188,9 @@ def lambda_handler(event, context):
         return _discovery(d)
     if ns == "Alexa.Authorization" and name == "AcceptGrant":
         return {"event": {"header": _hdr("Alexa.Authorization", "AcceptGrant.Response"), "payload": {}}}
+    ep = d.get("endpoint", {}).get("endpointId", "")
+    if ep.startswith(MUSICA):
+        return _musica(d, ns, name, ep[len(MUSICA):])
     if ns == "Alexa.PowerController":
         on = name == "TurnOn"
         if not _ha({"acao": "ligar" if on else "desligar"}):
