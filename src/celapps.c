@@ -19,6 +19,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ajremoto.h"
+#include "massist.h"
+#include <pthread.h>
 
 int ajustes_idioma(void);
 
@@ -157,8 +159,10 @@ static char *paginaMusica(void) {
     "<input id=\"scs\" type=\"password\" autocomplete=\"off\"><label>%s</label><input id=\"sp\" inputmode=\"url\" placeholder=\"https://open.spotify.com/playlist/...\">"
     "<button id=\"spb\">%s</button>"
     "<h2>AudD</h2><label>API token</label><input id=\"aud\" type=\"password\" autocomplete=\"off\"><button class=\"s\" id=\"audb\">%s</button>"
+    "<h2>Music Assistant</h2><label>%s</label><input id=\"mau\" inputmode=\"url\" placeholder=\"http://192.168.1.10:8095\">"
+    "<label>Token</label><input id=\"mat\" type=\"password\" autocomplete=\"off\"><button id=\"mab\">%s</button>"
     "<div id=\"msg\" class=\"msg\"></div>",
-    a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[6], a[9], a[10], a[11], a[6]);
+    a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7], a[8], a[6], a[9], a[10], a[11], a[6], a[3], a[6]);
   return celapps_pagina("Configurar música pelo celular", corpo,
     "function v(i){return document.getElementById(i).value.trim()}"
     "document.getElementById('fonte').onclick=function(){post('fonte',{tipo:v('tipo'),nome:v('nome'),url:v('url'),usuario:v('usr'),senha:v('pw')})"
@@ -167,11 +171,39 @@ static char *paginaMusica(void) {
     "document.getElementById('ls').value=''})};"
     "document.getElementById('spb').onclick=function(){post('spotify',{url:v('sp'),id:v('sci'),segredo:v('scs')}).then(function(){msg('\\u2713');"
     "document.getElementById('scs').value=''})};"
+    "document.getElementById('mab').onclick=function(){msg('\\u2026');post('massist',{url:v('mau'),token:v('mat')}).then(function(){"
+    "document.getElementById('mat').value=''})};"
     "document.getElementById('audb').onclick=function(){post('audd',{token:v('aud')}).then(function(){msg('\\u2713');document.getElementById('aud').value=''})};"
     "setInterval(function(){estado(function(e){if(e.msg)msg(e.msg)})},2000);");
 }
+// Music Assistant: save, then try the address and token on a worker (the
+// answer shows on the phone page and on the TV).
+static void *testarMassist(void *u) {
+  char d[96] = "", j[200];
+  int e = massist_testar(d, sizeof d);
+  (void)u;
+  if (e == MA_OK) snprintf(j, sizeof j, "{\"msg\":\"\\u2713 %s\"}", d);
+  else snprintf(j, sizeof j, "{\"msg\":\"\\u2716 %s\"}", e == MA_TOKEN ? "Token" : e == MA_REDE ? "URL" : "Music Assistant");
+  lanweb_publicar("musica", j);
+  printf("[celapps] music assistant: %s\n", e == MA_OK ? "ok" : "falhou");
+  fflush(stdout);
+  return NULL;
+}
 static void pedidoMusica(const LwPedido *p) {
   char tipo[8], url[384];
+  if (!strcmp(p->rota, "massist")) {
+    char tok[1024];
+    pthread_t t;
+    lanweb_campo(p->corpo, "url", url, sizeof url);
+    lanweb_campo(p->corpo, "token", tok, sizeof tok);
+    if (!url[0] || !tok[0]) { lanweb_publicar("musica", "{\"msg\":\"\\u2716 URL / Token\"}"); memset(tok, 0, sizeof tok); return; }
+    if (massist_gravar(url, tok)) {
+      ilha_avisar("celmusica", ILHA_OK, "aj_music", "Music Assistant", 3000, 0);
+      if (!pthread_create(&t, NULL, testarMassist, NULL)) pthread_detach(t);
+    }
+    memset(tok, 0, sizeof tok);
+    return;
+  }
   if (!strcmp(p->rota, "fonte")) {
     McFonte f;
     memset(&f, 0, sizeof f);
