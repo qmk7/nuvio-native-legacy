@@ -43,3 +43,9 @@ Also picked: 50 "who sings this?" (Music Assistant now-playing of any speaker sp
 Also picked (all): 51 live channel by voice (Xtream), 52 latest episode, 53 random episode, 54 trailer,
 55 search by actor / genre on screen, 56 something short (< 25 min), 57 "what is it about" (spoiler-free),
 58 "is it worth watching" (IMDb / RT), 59 next season / episode date (Trakt), 60 YouTube by voice (official app, search / video).
+
+## QR-Yummy (cooking app) + Alexa
+qmk7/QR-Yummy: PWA on Cloudflare Workers. Personal recipes live only on the phone; "family books" are on the server
+(Durable Object FamilyBook, SQLite, /api/family/<secret id>), and the worker already calls Claude (/api/ask, recipe-ai.js).
+Plan: an Alexa custom skill whose HTTPS endpoint is the Worker itself (/api/alexa, no Lambda), reading a family book:
+"ask my kitchen how to make kabsa", "next step", timers, "what can I cook with...". Recipes to use by voice go in a family book.
