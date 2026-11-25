@@ -34,6 +34,7 @@
 #include "convidado.h"
 #include "nuvem.h"
 #include "perfis.h"
+#include "casaha.h"
 #include "progresso.h"
 #include "iptvvod.h"
 #include "catalogo.h"
@@ -227,7 +228,7 @@ static int haNoCatalogo(const CatItem *c, void *u) {
   if (!c->imdb[0] || (strcmp(c->tipo, "movie") && strcmp(c->tipo, "series"))) return 0;
   if (!strcmp(b->tipo, "serie") && strcmp(c->tipo, "series")) return 0;
   if (!strcmp(b->tipo, "filme") && strcmp(c->tipo, "movie")) return 0;
-  iptvvod_normalizar(c->titulo, nn, sizeof nn);
+  casaha_normalizar(c->titulo, nn, sizeof nn);
   if (strcmp(nn, b->nq)) return 0;
   snprintf(b->id, sizeof b->id, "%s", c->imdb);
   return 1;
@@ -237,7 +238,7 @@ static int haDaConta(const char *q, const char *tipo, char *id, size_t n) {
   ProgRegistro *r;
   CatItem *c;
   int k, achou = 0;
-  iptvvod_normalizar(q, nq, sizeof nq);
+  casaha_normalizar(q, nq, sizeof nq);
   if (!nq[0]) return 0;
   if (haEhContinuar(nq)) {
     ProgRegistro um;
@@ -256,7 +257,7 @@ static int haDaConta(const char *q, const char *tipo, char *id, size_t n) {
       if (!strcmp(tipo, "serie") && strcmp(r[i].tipo, "series")) continue;
       if (!strcmp(tipo, "filme") && strcmp(r[i].tipo, "movie")) continue;
       if (!cat_copiar_por_id(r[i].contentId, r[i].tipo, c)) continue;
-      iptvvod_normalizar(c->titulo, nn, sizeof nn);
+      casaha_normalizar(c->titulo, nn, sizeof nn);
       if (!strcmp(nn, nq)) { snprintf(id, n, "%s", r[i].contentId); achou = 1; }
     }
   }

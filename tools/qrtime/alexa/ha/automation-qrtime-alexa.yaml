@@ -112,7 +112,7 @@ actions:
   - variables:
       rota: "{{ 'tocar' if acao == 'tocar' else 'tecla' }}"
       corpo: >-
-        {% if acao == 'tocar' %}q={{ trigger.json.q | default('') | urlencode }}&tipo={{ trigger.json.tipo | default('') }}{% else %}k={{ {'pause': 'play', 'stop': 'back'}.get(k, k) }}{% endif %}
+        {% if acao == 'tocar' %}q={{ trigger.json.q | default('') | urlencode }}&tipo={{ trigger.json.tipo | default('') }}&q2={{ trigger.json.q2 | default('') | urlencode }}{% else %}k={{ {'pause': 'play', 'stop': 'back'}.get(k, k) }}{% endif %}
   - if:
       - condition: template
         value_template: "{{ acao == 'tocar' and state_attr(tv, 'source') != 'QR TIME' }}"

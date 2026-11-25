@@ -30,5 +30,16 @@ int main(void) {
     CONFERE(casaha_entre_tipos(im, is, "Inception", id, sizeof id) && !strcmp(id, "tt1375666"), "only the film is exact: the film");
     CONFERE(casaha_entre_tipos(NULL, fs, "Friends", id, sizeof id) && !strcmp(id, "tt0108778"), "shows only (Alexa said a season or episode)");
   }
+  {
+    char a[128], b[128], c2[128];
+    casaha_normalizar("Bab El Hara", a, sizeof a);
+    casaha_normalizar("Bab Al-Hara", b, sizeof b);
+    casaha_normalizar("bab al harah", c2, sizeof c2);
+    CONFERE(!strcmp(a, b) && !strcmp(b, c2), "Bab El Hara = Bab Al-Hara = bab al harah");
+    casaha_normalizar("The Godfather", a, sizeof a); casaha_normalizar("Godfather", b, sizeof b);
+    CONFERE(!strcmp(a, b), "\"the\" ignored");
+    const char *jb = "{\"metas\":[{\"imdb_id\":\"tt0499545\",\"name\":\"Bab Al-Hara\",\"imdbRating\":\"7.9\"}]}";
+    CONFERE(casaha_entre_tipos(NULL, jb, "Bab El Hara", id, sizeof id) && !strcmp(id, "tt0499545"), "English spelling finds the Arabic series");
+  }
   return falhas ? 1 : 0;
 }

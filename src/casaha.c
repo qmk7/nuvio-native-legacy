@@ -30,6 +30,35 @@ static int ehTt(const char *s) {
   for (i = 2; isdigit((unsigned char)s[i]); i++) {}
   return i >= 4 && i <= 12 && !s[i];
 }
+// The title folded so Arabic names spelled in English meet: "Bab El Hara",
+// "Bab Al-Hara" and "bab al hara" are the same; "the" goes, el/il/al are one,
+// ou/oo -> u, ee -> i, q -> k, doubled letters single, a final h dropped.
+void casaha_normalizar(const char *t, char *d, size_t n) {
+  char a[160], *w, *sv = NULL;
+  size_t k = 0;
+  iptvvod_normalizar(t, a, sizeof a);
+  for (char *x = a; *x; x++) if (*x == '-' || *x == '\'' || *x == '`') *x = ' ';
+  if (n) d[0] = 0;
+  for (w = strtok_r(a, " ", &sv); w; w = strtok_r(NULL, " ", &sv)) {
+    char b[80];
+    size_t m = 0;
+    if (!strcmp(w, "the")) continue;
+    if (!strcmp(w, "el") || !strcmp(w, "il") || !strcmp(w, "al")) w = "al";
+    else if ((!strncmp(w, "el", 2) || !strncmp(w, "il", 2)) && strlen(w) > 4 && (unsigned char)w[2] < 0x80) { w[0] = 'a'; }
+    for (size_t i = 0; w[i] && m + 2 < sizeof b; i++) {
+      char c = w[i];
+      if ((c == 'o' && w[i + 1] == 'u') || (c == 'o' && w[i + 1] == 'o')) { c = 'u'; i++; }
+      else if (c == 'e' && w[i + 1] == 'e') { c = 'i'; i++; }
+      else if (c == 'q') c = 'k';
+      if (m && b[m - 1] == c && (unsigned char)c < 0x80) continue;
+      b[m++] = c;
+    }
+    if (m > 2 && b[m - 1] == 'h' && (unsigned char)b[m - 2] < 0x80) m--;
+    b[m] = 0;
+    k += (size_t)snprintf(d + k, k < n ? n - k : 0, "%s%s", k ? " " : "", b);
+    if (k >= n) break;
+  }
+}
 // Best Cinemeta answer for `q`: the first whose normalised name is exactly
 // the query, else the first one (Cinemeta ranks by popularity). 1 = found;
 // *exato says which, *nota is that title's IMDb rating (0 unknown).
@@ -38,7 +67,7 @@ static int escolher(const char *json, const char *q, char *imdb, size_t n, int *
   double notaPrimeiro = 0;
   const char *p;
   *exato = 0; *nota = 0;
-  iptvvod_normalizar(q, nq, sizeof nq);
+  casaha_normalizar(q, nq, sizeof nq);
   for (p = js_array(json ? json : "", NULL, "metas"); p && *p == '{'; ) {
     const char *f = js_fim(p);
     char nome[200] = "", nn[128], id[24] = "", r[16] = "";
@@ -47,7 +76,7 @@ static int escolher(const char *json, const char *q, char *imdb, size_t n, int *
     if (!js_texto_raiz_em(p, f, "imdb_id", id, sizeof id) || !id[0]) js_texto_raiz_em(p, f, "id", id, sizeof id);
     js_texto_raiz_em(p, f, "imdbRating", r, sizeof r);
     if (ehTt(id)) {
-      iptvvod_normalizar(nome, nn, sizeof nn);
+      casaha_normalizar(nome, nn, sizeof nn);
       if (!strcmp(nn, nq)) { snprintf(imdb, n, "%s", id); *exato = 1; *nota = atof(r); return 1; }
       if (!primeiro[0]) { snprintf(primeiro, sizeof primeiro, "%s", id); notaPrimeiro = atof(r); }
     }
@@ -79,7 +108,7 @@ int casaha_entre_tipos(const char *jFilme, const char *jSerie, const char *q, ch
 }
 static int (*local)(const char *q, const char *tipo, char *id, size_t n);
 void casaha_definir_local(int (*f)(const char *q, const char *tipo, char *id, size_t n)) { local = f; }
-typedef struct { char q[200]; char tipo[16]; } Pedido;
+typedef struct { char q[200], q2[200]; char tipo[16]; } Pedido;
 static char *baixar(const char *tipo, const char *q) {
   char url[600], e[400];
   size_t k = 0;
@@ -97,10 +126,14 @@ static void *fio(void *u) {
   char id[24] = "";
   int ok = 0;
   if (ehTt(p->q)) { snprintf(id, sizeof id, "%s", p->q); ok = 1; }
-  else {
-    char *jf = strcmp(p->tipo, "serie") ? baixar("movie", p->q) : NULL;
-    char *js = strcmp(p->tipo, "filme") ? baixar("series", p->q) : NULL;
-    ok = casaha_entre_tipos(jf, js, p->q, id, sizeof id);
+  // The name as said, then the other name (the Arabic one Claude gave, or the English one).
+  for (int v = 0; !ok && v < 2; v++) {
+    const char *q = v ? p->q2 : p->q;
+    char *jf, *js;
+    if (!q[0]) continue;
+    jf = strcmp(p->tipo, "serie") ? baixar("movie", q) : NULL;
+    js = strcmp(p->tipo, "filme") ? baixar("series", q) : NULL;
+    ok = casaha_entre_tipos(jf, js, q, id, sizeof id);
     free(jf); free(js);
   }
   printf("[casa] pedido de reproducao: %s\n", ok ? id : "titulo nao encontrado");
@@ -112,14 +145,15 @@ static void *fio(void *u) {
   free(p);
   return NULL;
 }
-int casaha_tocar(const char *tipo, const char *q) {
+int casaha_tocar(const char *tipo, const char *q) { return casaha_tocar_alt(tipo, q, NULL); }
+int casaha_tocar_alt(const char *tipo, const char *q, const char *q2) {
   Pedido *p;
   pthread_t t;
   if (!q || !q[0]) return 0;
   // What the person has (Continue watching, what they watched, their home
   // rows) comes first: "play Friends" means THEIR Friends, at their episode.
   { char id[64];
-    if (local && local(q, tipo ? tipo : "", id, sizeof id)) {
+    if (local && (local(q, tipo ? tipo : "", id, sizeof id) || (q2 && q2[0] && local(q2, tipo ? tipo : "", id, sizeof id)))) {
       pthread_mutex_lock(&trava);
       snprintf(pronto, sizeof pronto, "%s", id);
       pthread_mutex_unlock(&trava);
@@ -132,6 +166,7 @@ int casaha_tocar(const char *tipo, const char *q) {
   pthread_mutex_unlock(&trava);
   if (!(p = calloc(1, sizeof *p))) { fioVivo = 0; return 0; }
   snprintf(p->q, sizeof p->q, "%s", q);
+  snprintf(p->q2, sizeof p->q2, "%s", q2 ? q2 : "");
   snprintf(p->tipo, sizeof p->tipo, "%s", tipo ? tipo : "");
   if (pthread_create(&t, NULL, fio, p)) { free(p); fioVivo = 0; return 0; }
   pthread_detach(t);

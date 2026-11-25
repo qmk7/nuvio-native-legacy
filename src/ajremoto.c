@@ -117,11 +117,12 @@ static char *pagina(void) {
   }
 }
 static void pedido(const LwPedido *p) {
-  char o[16], d[8], q[200], t[16];
+  char o[16], d[8], q[200], q2[200], t[16];
   // Home Assistant / Alexa: play a title by name (or tt id), or press a key.
   if (!strcmp(p->rota, "tocar")) {
     lanweb_campo(p->corpo, "tipo", t, sizeof t);
-    if (lanweb_campo(p->corpo, "q", q, sizeof q) && q[0]) casaha_tocar(t, q);
+    if (!lanweb_campo(p->corpo, "q2", q2, sizeof q2)) q2[0] = 0;
+    if (lanweb_campo(p->corpo, "q", q, sizeof q) && q[0]) casaha_tocar_alt(t, q, q2);
     return;
   }
   if (!strcmp(p->rota, "tecla")) {

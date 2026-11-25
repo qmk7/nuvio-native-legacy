@@ -4,6 +4,8 @@
 #include <stddef.h>
 int  casaha_tocar(const char *tipo, const char *q);          // UI thread; 1 = being looked up
 int  casaha_pegar(char *imdb, size_t n);                     // app loop: 1 = an id to open and play
+int  casaha_tocar_alt(const char *tipo, const char *q, const char *q2);   // q2: the title's other name (Arabic / English)
+void casaha_normalizar(const char *t, char *d, size_t n);       // transliteration-tolerant title key
 int  casaha_pendente(void);                                  // a request being looked up or waiting to open
 // app.c: the account's own titles first (Continue watching, history, home
 // rows); 1 = `id` is the one to play.

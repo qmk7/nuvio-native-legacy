@@ -270,6 +270,44 @@ def _entender(frase, onde_padrao):
     return None
 
 
+TITULO_ESQUEMA = {
+    "type": "object",
+    "properties": {
+        "titulo": {"type": "string", "description": "The title as listed on IMDb (its usual English / Latin name)."},
+        "arabe": {"type": "string", "description": "The Arabic title when the work is Arabic, else ''."},
+        "tipo": {"type": "string", "enum": ["filme", "serie", ""]},
+    },
+    "required": ["titulo", "arabe", "tipo"],
+    "additionalProperties": False,
+}
+
+
+def _titulo_ia(frase):
+    """The film / series Alexa heard, as IMDb lists it (Arabic names spelled any way in English). None without Claude."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    try:
+        import anthropic
+    except ImportError:
+        return None
+    try:
+        cli = anthropic.Anthropic(timeout=4.0, max_retries=0)
+        r = cli.messages.create(
+            model=MODELO, max_tokens=500,
+            output_config={"effort": "low", "format": {"type": "json_schema", "schema": TITULO_ESQUEMA}},
+            system="Someone asked a TV to play a film or series by voice; speech recognition wrote what they said. "
+                   "Give the title as IMDb lists it, its Arabic title if it is an Arabic work, and whether it is a film or a series "
+                   "(empty when unsure). If you do not recognise it, return the words as they are.",
+            messages=[{"role": "user", "content": frase}],
+        )
+        if r.stop_reason == "refusal":
+            return None
+        return json.loads(next((b.text for b in r.content if b.type == "text"), "") or "null")
+    except Exception as e:  # any failure: play with the words as heard
+        print("claude title: %s" % type(e).__name__)
+        return None
+
+
 def _fala(texto, fim=True):
     return {"version": "1.0", "response": {
         "outputSpeech": {"type": "PlainText", "text": texto}, "shouldEndSession": fim}}
@@ -349,7 +387,13 @@ def lambda_handler(event, context):
         q, tipo = _titulo(d.get("payload", {}))
         if not q:
             return _erro(d, "INVALID_VALUE", "No title")
-        if not _ha({"acao": "tocar", "q": q, "tipo": "serie" if tipo in ("Episode", "Season") else ""}):
+        msg = {"acao": "tocar", "q": q, "tipo": "serie" if tipo in ("Episode", "Season") else ""}
+        ia = _titulo_ia(q)
+        if ia and ia.get("titulo"):
+            msg["q"], msg["q2"] = ia["titulo"], ia.get("arabe") or (q if ia["titulo"].lower() != q.lower() else "")
+            if not msg["tipo"] and ia.get("tipo"):
+                msg["tipo"] = ia["tipo"]
+        if not _ha(msg):
             return _erro(d)
         return _ok(d)
     if ns == "Alexa.PlaybackController":
