@@ -40,3 +40,6 @@ More picked ideas: 29 "who is this actor?" (paused scene: cast on screen), 31 "w
 32 "add X to my list" -> Trakt watchlist (trakt_watchlist(imdb, 1) exists in trakt.c; new TV-link route "lista" + Lambda phrase;
 title resolved like casaha.c), 35 "play what I listened to yesterday" (Music Assistant recently played at that hour).
 Also picked: 50 "who sings this?" (Music Assistant now-playing of any speaker spoken by Alexa; shown on the TV when it is on).
+Also picked (all): 51 live channel by voice (Xtream), 52 latest episode, 53 random episode, 54 trailer,
+55 search by actor / genre on screen, 56 something short (< 25 min), 57 "what is it about" (spoiler-free),
+58 "is it worth watching" (IMDb / RT), 59 next season / episode date (Trakt), 60 YouTube by voice (official app, search / video).
