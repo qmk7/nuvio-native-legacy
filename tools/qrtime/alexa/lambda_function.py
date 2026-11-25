@@ -202,7 +202,7 @@ FALA_ONDE = {"soundbar": "the soundbar", "google": "the Google speakers", "casa"
 # upload zip), whatever was said after "play" is read by Claude: what to
 # search on YouTube Music, which speakers, radio or not, a volume. Without the
 # key (or if Claude is slow or fails) the words go to Music Assistant as said.
-MODELO = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
+MODELO = os.environ.get("CLAUDE_MODEL", "claude-haiku-5-5")  # fast: Alexa waits 8 s
 ESQUEMA = {
     "type": "object",
     "properties": {
@@ -237,15 +237,17 @@ def _entender(frase, onde_padrao):
         return None
     try:
         cli = anthropic.Anthropic(timeout=5.0, max_retries=0)  # Alexa waits 8 s for the whole answer
-        r = cli.beta.messages.create(
+        pedido = dict(
             model=MODELO,
             max_tokens=1000,
-            betas=["server-side-fallback-2026-07-01"],
-            fallbacks="default",
             output_config={"effort": "low", "format": {"type": "json_schema", "schema": ESQUEMA}},
             system=SISTEMA,
             messages=[{"role": "user", "content": "Default speakers: %s.\nRequest: %s" % (onde_padrao, frase)}],
         )
+        if "haiku" in MODELO:  # no server-side fallback for Haiku
+            r = cli.messages.create(**pedido)
+        else:
+            r = cli.beta.messages.create(betas=["server-side-fallback-2026-07-01"], fallbacks="default", **pedido)
         if r.stop_reason == "refusal":
             print("claude: refusal")
             return None

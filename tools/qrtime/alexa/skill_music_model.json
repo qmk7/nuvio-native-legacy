@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "music assistant",
+      "invocationName": "q. r. music",
       "intents": [
         {
           "name": "AMAZON.CancelIntent",
