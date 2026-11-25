@@ -5,6 +5,8 @@ forwards what is asked to Home Assistant at home:
   "Alexa, play Inception on TV"        -> Alexa.RemoteVideoPlayer SearchAndPlay
   "Alexa, turn on / turn off the TV"   -> Alexa.PowerController
   "Alexa, pause / resume the TV"       -> Alexa.PlaybackController
+  "Alexa, open YouTube on TV"          -> Alexa.Launcher (any app on the TV)
+  "Alexa, volume up / mute the TV"     -> Alexa.StepSpeaker
 
 Home Assistant (tools/qrtime/alexa/qrtime_alexa.yaml) wakes the TV
 (Wake-on-LAN), opens QR TIME and asks it to play the title through the
@@ -89,6 +91,8 @@ def _discovery(directive):
                     cap("Alexa.PowerController", properties={"supported": [{"name": "powerState"}], "retrievable": False}),
                     cap("Alexa.RemoteVideoPlayer", configuration={"operations": ["SearchAndPlay"]}),
                     cap("Alexa.PlaybackController", supportedOperations=["Play", "Pause", "Stop"]),
+                    cap("Alexa.Launcher"),
+                    cap("Alexa.StepSpeaker"),
                     cap("Alexa.EndpointHealth", properties={"supported": [{"name": "connectivity"}], "retrievable": False}),
                 ],
             }]},
@@ -131,8 +135,26 @@ def lambda_handler(event, context):
             return _erro(d)
         return _ok(d)
     if ns == "Alexa.PlaybackController":
-        tecla = {"Play": "play", "Pause": "play", "Stop": "back"}.get(name)
+        tecla = {"Play": "play", "Pause": "pause", "Stop": "stop"}.get(name)
         if tecla and not _ha({"acao": "tecla", "k": tecla}):
+            return _erro(d)
+        return _ok(d)
+    if ns == "Alexa.Launcher" and name == "LaunchTarget":
+        app = (d.get("payload") or {}).get("name") or ""
+        if not app:
+            return _erro(d, "INVALID_VALUE", "No app")
+        if not _ha({"acao": "abrir", "app": app}):
+            return _erro(d)
+        return _ok(d)
+    if ns == "Alexa.StepSpeaker":
+        pl = d.get("payload") or {}
+        if name == "AdjustVolume":
+            msg = {"acao": "volume", "passos": int(pl.get("volumeSteps") or 0)}
+        elif name == "SetMute":
+            msg = {"acao": "mudo", "mudo": bool(pl.get("mute"))}
+        else:
+            return _erro(d, "INVALID_DIRECTIVE", "Not supported")
+        if not _ha(msg):
             return _erro(d)
         return _ok(d)
     if ns == "Alexa" and name == "ReportState":
