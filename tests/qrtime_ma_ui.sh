@@ -37,7 +37,7 @@ LOG="$W/app.log"
 NUVIO_DADOS="$d" DISPLAY=":$D" "$ROOT/$BIN" "$ROOT/deploy/app/art" >"$LOG" 2>&1 & PIDS+=($!)
 espera() { local i; for i in $(seq 1 "${2:-60}"); do grep -qE "$1" "$3" && return 0; sleep 1; done; return 1; }
 tecla() { echo "$1" > /tmp/nuvio-key; sleep "${2:-1.0}"; }
-shot() { rm -f /tmp/nuvio-shot.bmp; touch /tmp/nuvio-shot-req; sleep 2; [ -f /tmp/nuvio-shot.bmp ] && cp /tmp/nuvio-shot.bmp "$W/$1.bmp"; }
+shot() { rm -f /tmp/nuvio-shot.bmp; echo 1 > /tmp/nuvio-shot-req; sleep 3; [ -f /tmp/nuvio-shot.bmp ] && cp /tmp/nuvio-shot.bmp "$W/$1.bmp"; }
 espera "tela=home" 90 "$LOG" || { erro "home did not open"; exit 1; }
 sleep 4
 tecla "tela:musica" 3
@@ -56,6 +56,5 @@ espera "player_queues/play_media" 20 "$W/ma-commands.log" && ok "a track asks pl
 grep "player_queues/play_media" "$W/ma-commands.log" | grep -q '"queue_id": "media_player.q990f"' && ok "on the chosen speaker" || erro "wrong speaker: $(grep play_media "$W/ma-commands.log")"
 shot ma-tocando
 grep -q "$TOKEN" "$LOG" && erro "the token is in the app log" || ok "no token in the app log"
-[ "${QRT_KEEP:-0}" = 1 ] && cp "$LOG" "$W/"
 [ "$fail" = 0 ] && echo "qrtime_ma_ui: ok"
 exit "$fail"
