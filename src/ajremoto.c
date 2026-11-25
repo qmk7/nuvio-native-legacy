@@ -157,9 +157,13 @@ void ajremoto_iniciar(void) {
 int ajremoto_abrir(void) { return ligar(); }
 void ajremoto_renovar(void) { if (novoToken()) ligar(); }
 void ajremoto_passo(Uint32 agora) {
-  static int tentou;
-  // Opened once before: back by itself ~10 s after the start (network up).
-  if (tentou || agora < 10000u) return;
-  tentou = 1;
-  if (lerToken()) ligar();
+  static int pronto;
+  static Uint32 proxima = 1500u;
+  // Opened once before: back by itself right after the start, so Home
+  // Assistant / Alexa can ask for a title seconds after opening the app; the
+  // network may come up late, so try again every 2 s until it is on the air.
+  if (pronto || agora < proxima) return;
+  proxima = agora + 2000u;
+  if (!lerToken()) { pronto = 1; return; }
+  if (ligar()) pronto = 1;
 }
