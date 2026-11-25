@@ -16,3 +16,19 @@
 - The real Music Assistant's command names (search, library_items, play_media, players/all current_media) are from its source, not its docs: verify on first real use.
 - Alexa+ sends "play X on <device>" to its own devices: music by voice only through the QR Music skill ("from QR Music" / "ask QR Music").
 - YouTube playback inside QR TIME: owner has not chosen an option.
+
+## Ideas the owner picked (Home Assistant + Alexa + QR TIME)
+Phase 1 (voice control of QR TIME, all through the TV device / QR Music skill):
+- 2 "continue on TV" (newest unfinished), 16 next episode / skip intro / rewind 30 s,
+  17 subtitles / audio track by voice, 3 sleep timer by voice, 27 "goodnight" (stop TV + music everywhere, remember where).
+Phase 2 (music):
+- 7 move the music to another room, 21 "like this song" (YouTube Music favourite),
+  23 lyrics of whatever plays (any speaker) on the TV, 20 the film's soundtrack after the film,
+  22 party mode (all speakers + big now-playing with lyrics on the TV + guests' requests).
+Phase 3 (home):
+- 1 cinema mode (lights, TV, soundbar, QR TIME; lights up a little on pause; needs smart lights),
+  10 doorbell on the TV (pause, door picture, Echo announces; EZVIZ), 26 small notices over the film
+  (washer done, door...), 12 guest mode (guest profile + scene).
+Phase 4 (smarter):
+- 15 "recommend something" by voice, 18 "what should I watch" spoken summary,
+  9 "what's this song" saved to YouTube Music, 19 move the film to another TV (needs a second TV).
