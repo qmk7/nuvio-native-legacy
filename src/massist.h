@@ -29,6 +29,12 @@ typedef struct {
   int  disponivel, grupo;
 } MaPlayer;
 
+typedef struct {
+  char titulo[200], artista[160], imagem[512], estado[16];   // estado: playing, paused, idle
+  int  dur;          // seconds, 0 unknown
+  double pos;        // seconds into the track when asked
+} MaAgora;
+
 enum { MA_OK = 0, MA_SEM_CONFIG, MA_REDE, MA_TOKEN, MA_SERVIDOR };
 
 // Config (any thread). url like "http://192.168.100.104:8095".
@@ -50,6 +56,9 @@ int  massist_faixas_de(const MaItem *pai, MaItem *out, int max, int *n);
 int  massist_players(MaPlayer *out, int max, int *n);
 // Play `uri` on `player` (replacing its queue); radio = keep going with similar songs.
 int  massist_tocar(const char *player, const char *uri, int radio);
+// What `player` is playing now (players/all: current_media, elapsed_time).
+int  massist_agora(const char *player, MaAgora *a);
+int  massist_ler_agora(const char *json, const char *player, MaAgora *a);   // tests
 // play, pause, play_pause, stop, next, previous, volume_up, volume_down
 int  massist_comando(const char *player, const char *cmd);
 

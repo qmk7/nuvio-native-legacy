@@ -50,7 +50,16 @@ class H(BaseHTTPRequestHandler):
         elif cmd == "music/search":
             res = {"tracks": [item("t3", "track", "Habibi Ya Nour El Ain", "Amr Diab")],
                    "artists": [item("a1", "artist", "Amr Diab")], "albums": [], "playlists": [item("p9", "playlist", "Amr Diab Hits")]}
-        elif cmd == "music/playlists/library_items": res = [item("p1", "playlist", "Liked music")]
+        elif cmd == "music/playlists/library_items": res = [item("p1", "playlist", "Liked music"), item("p3", "playlist", "Road trip"), item("p4", "playlist", "Sleep")]
+        elif cmd == "music/artists/library_items": res = [item("a3", "artist", "Fairuz"), item("a4", "artist", "Amr Diab"), item("a5", "artist", "Umm Kulthum")]
+        elif cmd == "player_queues/play_media":
+            uri = (args.get("media") or [""])[0]
+            hit = next((i for i in RECENT if i["uri"] == uri), None)
+            for p in PLAYERS:
+                if p["player_id"] == args.get("queue_id") and hit:
+                    p["state"] = "playing"; p["elapsed_time"] = 63
+                    p["current_media"] = {"title": hit["name"], "artist": (hit.get("artists") or [{"name": ""}])[0]["name"],
+                                          "image_url": hit["metadata"]["images"][0]["path"], "duration": 245}
         elif cmd == "music/playlists/playlist_tracks": res = RECENT
         elif cmd.endswith("/library_items"): res = []
         out = json.dumps({"message_id": "1", "result": res}).encode()

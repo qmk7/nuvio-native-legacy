@@ -57,5 +57,13 @@ int main(void) {
   CONFERE(massist_players(pl, 8, &n) == MA_TOKEN, "401: token problem");
   statusResp = 200; resposta = "{\"message_id\":\"1\",\"error_code\":5,\"details\":\"x\"}";
   CONFERE(massist_players(pl, 8, &n) == MA_SERVIDOR, "server error answer");
+  {
+    MaAgora ag;
+    const char *j = "[{\"player_id\":\"x\",\"state\":\"idle\"},{\"player_id\":\"sb\",\"state\":\"playing\",\"elapsed_time\":42.5,"
+                    "\"current_media\":{\"title\":\"Kifak Inta\",\"artist\":\"Fairuz\",\"image_url\":\"https://i/x.jpg\",\"duration\":245}}]";
+    CONFERE(massist_ler_agora(j, "sb", &ag) && !strcmp(ag.titulo, "Kifak Inta") && !strcmp(ag.artista, "Fairuz") && ag.dur == 245 &&
+            ag.pos > 42 && !strcmp(ag.estado, "playing") && !strncmp(ag.imagem, "https://", 8), "now playing on the chosen speaker");
+    CONFERE(massist_ler_agora(j, "x", &ag) && !ag.titulo[0] && !strcmp(ag.estado, "idle"), "idle speaker: nothing playing");
+  }
   return falhas ? 1 : 0;
 }

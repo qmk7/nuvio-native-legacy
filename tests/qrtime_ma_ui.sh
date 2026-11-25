@@ -44,16 +44,18 @@ tecla "tela:musica" 3
 espera "players/all|recently_played" 5 "$W/ma-commands.log" >/dev/null 2>&1
 # Home of the Music screen: the Music Assistant row is first.
 tecla right 1; tecla ok 3
-espera "music/recently_played_items" 20 "$W/ma-commands.log" && ok "Music Assistant page asks the recent items" || erro "no recently_played_items"
+espera "music/recently_played_items" 20 "$W/ma-commands.log" && ok "Music Assistant home asks the recent items" || erro "no recently_played_items"
+espera "music/playlists/library_items" 20 "$W/ma-commands.log" && ok "...and the playlists row" || erro "no playlists row"
 shot ma-home
-tecla ok 3                                      # "Play on" -> speakers page
-espera "players/all" 20 "$W/ma-commands.log" && ok "speakers listed" || erro "no players/all"
+tecla ok 3                                      # first cover, no speaker yet -> speakers page
+espera "players/all" 20 "$W/ma-commands.log" && ok "no speaker yet: speakers listed" || erro "no players/all"
 tecla ok 3                                      # pick the first speaker (soundbar)
 grep -q "media_player.q990f" "$d/music-assistant-player.txt" 2>/dev/null && ok "speaker kept on the TV" || erro "speaker not saved"
-for i in 1 2 3 4 5 6 7 8 9 10; do tecla down 0.4; done   # down to the first recent track
-tecla ok 3
-espera "player_queues/play_media" 20 "$W/ma-commands.log" && ok "a track asks play_media" || erro "no play_media"
+sleep 2
+tecla ok 3                                      # back on the first cover: play it
+espera "player_queues/play_media" 20 "$W/ma-commands.log" && ok "a cover asks play_media" || erro "no play_media"
 grep "player_queues/play_media" "$W/ma-commands.log" | grep -q '"queue_id": "media_player.q990f"' && ok "on the chosen speaker" || erro "wrong speaker: $(grep play_media "$W/ma-commands.log")"
+sleep 6
 shot ma-tocando
 grep -q "$TOKEN" "$LOG" && erro "the token is in the app log" || ok "no token in the app log"
 [ "$fail" = 0 ] && echo "qrtime_ma_ui: ok"

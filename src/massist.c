@@ -230,6 +230,43 @@ int massist_ler_players(const char *json, MaPlayer *out, int max) {
   return n;
 }
 
+int massist_ler_agora(const char *json, const char *player, MaAgora *a) {
+  const char *p;
+  memset(a, 0, sizeof *a);
+  if (!json || !(p = js_raiz_array(json))) return 0;
+  for (; p && *p == '{'; ) {
+    const char *f = js_fim(p);
+    char id[96] = "";
+    if (!f) break;
+    js_texto_raiz_em(p, f, "player_id", id, sizeof id);
+    if (!strcmp(id, player)) {
+      const char *m = strstr(p, "\"current_media\"");
+      js_texto_raiz_em(p, f, "state", a->estado, sizeof a->estado);
+      a->pos = js_num(p, f, "elapsed_time", 0);
+      if (m && m < f && (m = strchr(m, '{')) && m < f) {
+        const char *mf = js_fim(m);
+        if (mf && mf <= f) {
+          js_texto(m, mf, "title", a->titulo, sizeof a->titulo);
+          js_texto(m, mf, "artist", a->artista, sizeof a->artista);
+          js_texto(m, mf, "image_url", a->imagem, sizeof a->imagem);
+          a->dur = (int)js_num(m, mf, "duration", 0);
+          if (a->pos <= 0) a->pos = js_num(m, mf, "elapsed_time", 0);
+        }
+      }
+      return 1;
+    }
+    p = js_prox(f);
+  }
+  return 0;
+}
+int massist_agora(const char *player, MaAgora *a) {
+  char *r = NULL;
+  int e = comando("players/all", "{}", &r);
+  if (e == MA_OK && !massist_ler_agora(r, player, a)) memset(a, 0, sizeof *a);
+  free(r);
+  return e;
+}
+
 // ---------------------------------------------------------------- commands
 int massist_testar(char *desc, size_t n) {
   char *r = NULL;

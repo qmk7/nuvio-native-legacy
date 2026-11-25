@@ -76,6 +76,12 @@ static int festaLig, lrclibLig = 1;
 
 static Pagina *topo(void) { return nPilha ? &pilha[nPilha - 1] : NULL; }
 static float maRol;   // Music Assistant pages: scroll
+static MaAgora maAg;  // Music Assistant home: what the chosen speaker plays
+static Uint32 maAgEm, maAgProx;
+static int maAgFio;
+static char maAgAlto[96];
+static float maFilOff[16];
+static void maAgoraPedir(Uint32 agora, Uint32 daqui);
 static int ehMa(const Pagina *pg);
 static void maNavegar(Pagina *pg, SDL_Keycode k);
 static Linha *novaLinha(Pagina *pg) {
@@ -366,22 +372,28 @@ static void *fioCarga(void *u) {
       }
       massist_alto_ler(alto, sizeof alto, nomeAlto, sizeof nomeAlto);
       if (p.tipo == P_MA) {
-        snprintf(b, sizeof b, "%s: %s", i18n("Tocar em"), nomeAlto[0] ? nomeAlto : i18n("escolha uma caixa de som"));
-        acao(&tmp, A_MA_ALTOS, b, i18n("Barra de som, caixas Google, grupos..."));
-        acao(&tmp, A_MA_BUSCA, i18n("Buscar no YouTube Music"), i18n("Artista, música, álbum ou playlist"));
-        acao(&tmp, A_MA_LISTAS, i18n("Suas playlists"), NULL);
-        acao(&tmp, A_MA_ALBUNS, i18n("Seus álbuns"), NULL);
-        acao(&tmp, A_MA_ARTISTAS, i18n("Seus artistas"), NULL);
-        if (alto[0]) {
-          titulo(&tmp, i18n("Controle"));
-          acao(&tmp, A_MA_PLAY, i18n("Tocar / pausar"), NULL);
-          acao(&tmp, A_MA_PROX, i18n("Próxima"), NULL);
-          acao(&tmp, A_MA_ANT, i18n("Anterior"), NULL);
-          acao(&tmp, A_MA_VOLUP, i18n("Volume +"), NULL);
-          acao(&tmp, A_MA_VOLDN, i18n("Volume −"), NULL);
-        }
-        e = maErro(massist_recentes(v, 30, &n));
+        // Home: the now-playing card's buttons first, then rows of covers.
+        static const struct { const char *tipo, *titulo; int verTudo; } FILEIRAS[] = {
+          { "playlists", "Suas playlists", A_MA_LISTAS }, { "artists", "Seus artistas", A_MA_ARTISTAS }, { "albums", "Seus álbuns", A_MA_ALBUNS } };
+        acao(&tmp, A_MA_ANT, i18n("Anterior"), NULL);
+        acao(&tmp, A_MA_PLAY, i18n("Tocar / pausar"), NULL);
+        acao(&tmp, A_MA_PROX, i18n("Próxima"), NULL);
+        acao(&tmp, A_MA_VOLDN, i18n("Volume −"), NULL);
+        acao(&tmp, A_MA_VOLUP, i18n("Volume +"), NULL);
+        acao(&tmp, A_MA_BUSCA, i18n("Buscar"), NULL);
+        snprintf(b, sizeof b, "%s", nomeAlto[0] ? nomeAlto : i18n("escolha uma caixa de som"));
+        acao(&tmp, A_MA_ALTOS, b, NULL);
+        e = maErro(massist_recentes(v, 20, &n));
         if (n) titulo(&tmp, i18n("Tocadas recentemente"));
+        for (int i = 0; i < n; i++) { Linha *l = novaLinha(&tmp); if (l) linhaMa(l, &v[i]); }
+        for (size_t f = 0; e == MC_OK && f < sizeof FILEIRAS / sizeof *FILEIRAS; f++) {
+          int nf = 0;
+          if (massist_biblioteca(FILEIRAS[f].tipo, 0, v, 20, &nf) != MA_OK || !nf) continue;
+          titulo(&tmp, i18n(FILEIRAS[f].titulo));
+          for (int i = 0; i < nf; i++) { Linha *l = novaLinha(&tmp); if (l) linhaMa(l, &v[i]); }
+          acao(&tmp, FILEIRAS[f].verTudo, i18n("Ver tudo"), NULL);
+        }
+        n = 0;   // rows already added
       } else if (p.tipo == P_MA_ALTOS) {
         MaPlayer *pl = calloc(32, sizeof *pl);
         if (pl) e = maErro(massist_players(pl, 32, &n));
@@ -475,6 +487,10 @@ static void aplicar(void) {
     for (int k = 0; k < r[i].n; k++) { Linha *l = novaLinha(pg); if (l) *l = r[i].v[k]; }
     free(r[i].v);
     ajustarFoco(pg, 1);
+    if (pg->tipo == P_MA && !r[i].anexar) {
+      for (int k = 0; k < pg->n; k++) if (pg->v[k].tipo == L_MA) { pg->foco = k; break; }
+      memset(maFilOff, 0, sizeof maFilOff);
+    }
   }
 }
 
@@ -1052,6 +1068,7 @@ static void maConsumir(void) {
   r = maResultado; tocar = maFoiTocar; maResultado = -99;
   pthread_mutex_unlock(&trava);
   if (r == -99) return;
+  maAgProx = 0;   // the now-playing card asks again at once
   if (r == MA_OK) {
     if (!tocar) return;
     snprintf(b, sizeof b, "%s: %s", i18n("Tocando em"), maAltoNome);
@@ -1382,6 +1399,7 @@ void mcui_atualizar(float dt, Uint32 agora) {
   Pagina *pg;
   aplicar();
   maConsumir();
+  { Pagina *t = topo(); if (t && t->tipo == P_MA && massist_configurado()) maAgoraPedir(agora, 4000); }
   // Screen off: keep the app's own screensaver from drawing (posters, a clock)
   // over the black, by telling it someone is here every 10 s.
   if (telaOff && agora - telaToque > 10000u) { telaToque = agora; esmaecer_entrada(agora, 0); }
@@ -1523,9 +1541,141 @@ typedef struct { float x, y, w, h; } MaR;
 static MaR maR[PAG_MAX];
 static int ehMa(const Pagina *pg) { return pg && pg->tipo >= P_MA; }
 static int maFocavel(const Linha *l) { return !pulavel(l); }
+// Home (option 3): the now-playing card on top, then one row of covers per
+// section, each row sliding sideways to keep its focused cover on screen.
+#define MA_HERO 430.0f
+#define MA_CAPA 190.0f
+static int maHeroBotao(int a) {
+  return a == A_MA_ANT || a == A_MA_PLAY || a == A_MA_PROX || a == A_MA_VOLDN || a == A_MA_VOLUP || a == A_MA_BUSCA || a == A_MA_ALTOS;
+}
+static void *fioAgora(void *u) {
+  char id[96], nome[96];
+  MaAgora a;
+  (void)u;
+  memset(&a, 0, sizeof a);
+  nome[0] = 0;
+  if (massist_alto_ler(id, sizeof id, nome, sizeof nome)) massist_agora(id, &a);
+  pthread_mutex_lock(&trava);
+  maAg = a; maAgEm = SDL_GetTicks(); maAgFio = 0;
+  snprintf(maAgAlto, sizeof maAgAlto, "%s", nome);
+  pthread_mutex_unlock(&trava);
+  return NULL;
+}
+static void maAgoraPedir(Uint32 agora, Uint32 daqui) {
+  pthread_t t;
+  if (maAgFio || agora < maAgProx) return;
+  maAgProx = agora + daqui;
+  maAgFio = 1;
+  if (pthread_create(&t, NULL, fioAgora, NULL)) { maAgFio = 0; return; }
+  pthread_detach(t);
+}
+static float maLayoutInicio(const Pagina *pg, float x, float w) {
+  float x0 = x + 420, y = MA_HERO + 36, passo = MA_CAPA + 28, bx = x0;
+  int fil = -1, k = 0;
+  for (int i = 0; i < pg->n && i < PAG_MAX; i++) {
+    const Linha *l = &pg->v[i];
+    if (l->tipo == L_ACAO && maHeroBotao(l->acao)) {
+      float d = l->acao == A_MA_PLAY ? 84 : 64;
+      if (l->acao == A_MA_BUSCA || l->acao == A_MA_ALTOS) {
+        TxtLinha t = txt_linha(TXT_CALLOUT, l->t1, 255, 255, 255, 255);
+        float pw = (float)t.w + 64;
+        if (l->acao == A_MA_ALTOS) pw += 30;
+        if (pw > 420) pw = 420;
+        if (bx + 8 + pw > x + w - 40) pw = x + w - 40 - bx - 8;   // stays inside the card
+        maR[i] = (MaR){ bx + 8, 330, pw, 64 };
+        bx += pw + 20;
+      } else {
+        maR[i] = (MaR){ bx, 320 + (84 - d) * 0.5f, d, d };
+        bx += d + 26;
+      }
+      continue;
+    }
+    if (l->tipo == L_TITULO) {
+      if (fil >= 0) y += MA_CAPA + 122 + 24;
+      fil = fil + 1 < 16 ? fil + 1 : 15; k = 0;
+      maR[i] = (MaR){ x, y, w, 44 };
+      continue;
+    }
+    if (fil < 0) { maR[i] = (MaR){ x, y, w, 44 }; continue; }
+    // A cover (or the "See all" tile) in this row.
+    {
+      float lx = (float)k * passo, off = maFilOff[fil];
+      if (pg->foco == i) {
+        if (lx - off > w - MA_CAPA) off = lx - (w - MA_CAPA);
+        if (lx < off) off = lx;
+        maFilOff[fil] = off;
+      }
+      maR[i] = (MaR){ x + lx - maFilOff[fil], y + 56, MA_CAPA, MA_CAPA + 122 };
+      k++;
+    }
+  }
+  return fil >= 0 ? y + 56 + MA_CAPA + 122 : MA_HERO;
+}
+static void maBotaoHero(const Linha *l, float x, float y, float w, float h, int f) {
+  const char *ic = l->acao == A_MA_ANT ? "◀◀" : l->acao == A_MA_PROX ? "▶▶" : l->acao == A_MA_VOLDN ? "−" : l->acao == A_MA_VOLUP ? "+" : NULL;
+  if (l->acao == A_MA_BUSCA || l->acao == A_MA_ALTOS) {
+    gfx_cor((GfxRect){ x, y, w, h }, 0.5f, 1, 1, 1, f ? 1 : 0.12f);
+    { TxtLinha t = txt_linha_corta(TXT_CALLOUT, l->t1, f ? 18 : 245, f ? 18 : 246, f ? 22 : 250, 255, (int)(w - 48 - (l->acao == A_MA_ALTOS ? 30 : 0)));
+      float tx = x + 32;
+      if (l->acao == A_MA_ALTOS) { TxtLinha n = txt_linha(TXT_CALLOUT, "♪", f ? 29 : 120, f ? 140 : 220, f ? 70 : 140, 255); txt_desenhar_alpha(n, tx, y + (h - (float)n.h) * 0.5f, 1); tx += 30; }
+      txt_desenhar_alpha(t, tx, y + (h - (float)t.h) * 0.5f, 1); }
+    return;
+  }
+  if (l->acao == A_MA_PLAY) {
+    int tocando = !strcmp(maAg.estado, "playing");
+    gfx_cor((GfxRect){ x, y, w, h }, 0.5f, 1, 1, 1, 1);
+    if (f) gfx_anel_fora((GfxRect){ x, y, w, h }, 0.5f, 4, 4, 0.11f, 0.73f, 0.33f, 1);
+    if (tocando) {
+      gfx_cor((GfxRect){ x + w * 0.36f, y + h * 0.3f, w * 0.09f, h * 0.4f }, 0, 0.07f, 0.07f, 0.08f, 1);
+      gfx_cor((GfxRect){ x + w * 0.55f, y + h * 0.3f, w * 0.09f, h * 0.4f }, 0, 0.07f, 0.07f, 0.08f, 1);
+    } else { TxtLinha p = txt_linha(TXT_TITULO2, "▶", 18, 18, 22, 255); txt_desenhar_alpha(p, x + (w - (float)p.w) * 0.5f + 3, y + (h - (float)p.h) * 0.5f, 1); }
+    return;
+  }
+  gfx_cor((GfxRect){ x, y, w, h }, 0.5f, 1, 1, 1, f ? 1 : 0.14f);
+  if (ic) { TxtLinha t = txt_linha(TXT_CALLOUT, ic, f ? 18 : 245, f ? 18 : 246, f ? 22 : 250, 255); txt_desenhar_alpha(t, x + (w - (float)t.w) * 0.5f, y + (h - (float)t.h) * 0.5f, 1); }
+}
+static void maHero(float x, float y, float w, Uint32 agora) {
+  MaAgora a;
+  char alto[96], b[300];
+  float pos;
+  GLuint tx;
+  pthread_mutex_lock(&trava);
+  a = maAg; snprintf(alto, sizeof alto, "%s", maAgAlto);
+  pos = (float)a.pos + (!strcmp(a.estado, "playing") ? (float)(agora - maAgEm) / 1000.0f : 0);
+  pthread_mutex_unlock(&trava);
+  gfx_cor((GfxRect){ x, y, w, MA_HERO }, 28.0f / MA_HERO, 0.115f, 0.13f, 0.125f, 1);
+  tx = a.imagem[0] ? tex_obter_larg(a.imagem, 340) : 0;
+  if (tx) gfx_textura((GfxRect){ x + 40, y + 45, 340, 340 }, tx);
+  else {
+    gfx_cor((GfxRect){ x + 40, y + 45, 340, 340 }, 14.0f / 340, 0.2f, 0.42f, 0.24f, 1);
+    { TxtLinha n = txt_linha(TXT_TITULO2, "♪", 255, 255, 255, 255); txt_desenhar_alpha(n, x + 210 - (float)n.w * 0.5f, y + 215 - (float)n.h * 0.5f, 0.6f); }
+  }
+  gfx_anel((GfxRect){ x + 40, y + 45, 340, 340 }, 14.0f / 340, 6, 0.13f, 0.15f, 0.13f, 1);
+  snprintf(b, sizeof b, "%s%s%s", a.titulo[0] ? i18n("TOCANDO AGORA") : i18n("NADA TOCANDO"), alto[0] ? "  ·  " : "", alto);
+  { TxtLinha t = txt_linha_corta(TXT_CAPTION, b, 29, 185, 84, 255, (int)(w - 460)); txt_desenhar_alpha(t, x + 420, y + 60, 1); }
+  corta(TXT_TITULO2, a.titulo[0] ? a.titulo : i18n("Escolha algo abaixo para tocar"), x + 420, y + 100, w - 460, 1);
+  if (a.artista[0]) corta(TXT_CALLOUT, a.artista, x + 420, y + 176, w - 460, 0.75f);
+  if (a.dur > 0) {
+    float bw = w - 460, fr = pos / (float)a.dur;
+    char t1[16], t2[16];
+    if (fr > 1) fr = 1;
+    if (fr < 0) fr = 0;
+    gfx_cor((GfxRect){ x + 420, y + 250, bw, 8 }, 0.5f, 1, 1, 1, 0.2f);
+    gfx_cor((GfxRect){ x + 420, y + 250, bw * fr, 8 }, 0.5f, 1, 1, 1, 1);
+    durTexto((int)pos, t1, sizeof t1); durTexto(a.dur, t2, sizeof t2);
+    texto(TXT_CAPTION2, t1[0] ? t1 : "0:00", x + 420, y + 268, 0.6f);
+    { TxtLinha t = txt_linha(TXT_CAPTION2, t2, 240, 242, 248, 255); txt_desenhar_alpha(t, x + w - 40 - (float)t.w, y + 268, 0.6f); }
+  }
+}
+static void maVerTudo(const Linha *l, float x, float y, float s, int f) {
+  gfx_cor((GfxRect){ x, y, s, s }, 14.0f / s, 1, 1, 1, f ? 1 : 0.08f);
+  { TxtLinha t = txt_linha_corta(TXT_CALLOUT, l->t1, f ? 18 : 240, f ? 18 : 242, f ? 22 : 248, 255, (int)(s - 24));
+    txt_desenhar_alpha(t, x + (s - (float)t.w) * 0.5f, y + (s - (float)t.h) * 0.5f, 1); }
+}
 static float maLayout(const Pagina *pg, float x, float w) {
   float gap = 26, cw = (w - gap * (MA_COLS - 1)) / MA_COLS, cx = x, y = 0, alt = 0;
   int col = 0, tipoLinha = -1;   // 0 pills, 1 cards
+  if (pg->tipo == P_MA) return maLayoutInicio(pg, x, w);
   for (int i = 0; i < pg->n && i < PAG_MAX; i++) {
     const Linha *l = &pg->v[i];
     if (l->tipo == L_TITULO || l->tipo == L_INFO) {
@@ -1609,7 +1759,7 @@ static void maPilula(const Linha *l, float x, float y, float w, float h, int f) 
   { TxtLinha t = txt_linha_corta(TXT_CALLOUT, l->t1, f ? 18 : 245, f ? 18 : 246, f ? 22 : 250, 255, (int)(w - 48));
     txt_desenhar_alpha(t, x + 32, y + (h - (float)t.h) * 0.5f, 1); }
 }
-static void maDesenhar(Pagina *pg, float x, float y0, float w, float base) {
+static void maDesenhar(Pagina *pg, float x, float y0, float w, float base, Uint32 agora) {
   float topo = y0 + 96, alto, alvo;
   corta(TXT_TITULO2, pg->titulo, x, y0, w, 1);
   if (!pg->n) {
@@ -1630,12 +1780,17 @@ static void maDesenhar(Pagina *pg, float x, float y0, float w, float base) {
     maRol += (alvo - maRol) * 0.25f;
     if (maRol - alvo < 1 && alvo - maRol < 1) maRol = alvo;
   }
+  if (pg->tipo == P_MA && topo - maRol + MA_HERO > topo - 10) maHero(x, topo - maRol, w, agora);
   for (int i = 0; i < pg->n && i < PAG_MAX; i++) {
     const Linha *l = &pg->v[i];
     float ry = topo + maR[i].y - maRol;
     int f = zona == Z_LISTA && i == pg->foco;
     if (ry + maR[i].h < topo - 10 || ry > base) continue;
-    if (l->tipo == L_TITULO) texto(TXT_CALLOUT, l->t1, maR[i].x, ry + 8, 0.6f);
+    if (maR[i].x + maR[i].w < x - 4 || maR[i].x > NV_TELA_W) continue;   // a row's covers off to the side
+    if (pg->tipo == P_MA && l->tipo == L_ACAO) {
+      if (maHeroBotao(l->acao)) maBotaoHero(l, maR[i].x, ry, maR[i].w, maR[i].h, f);
+      else maVerTudo(l, maR[i].x, ry, MA_CAPA, f);
+    } else if (l->tipo == L_TITULO) texto(TXT_CALLOUT, l->t1, maR[i].x, ry + 8, pg->tipo == P_MA ? 0.95f : 0.6f);
     else if (l->tipo == L_INFO) txt_bloco_corta(TXT_CAPTION, l->t1, 200, 202, 210, maR[i].x, ry, maR[i].w, 32, 0.75f, 2);
     else if (l->tipo == L_MA) maCartao(l, maR[i].x, ry, maR[i].w, f);
     else maPilula(l, maR[i].x, ry, maR[i].w, maR[i].h, f);
@@ -1794,7 +1949,7 @@ void mcui_desenhar(Uint32 agora) {
     { TxtLinha l = txt_linha_corta(TXT_CALLOUT, i18n(SECOES[i]), foco ? 20 : 240, foco ? 20 : 242, foco ? 24 : 248, 255, menuW - 30); txt_desenhar_alpha(l, mx + 8, sy + 6, i == secao ? 1 : 0.7f); }
   }
   if (zona == Z_FORM) { desenharForm(x, y0, w); if (teclado_aberto()) teclado_desenhar(agora); barraMini(NV_TELA_H - 90); return; }
-  if (ehMa(pg)) { maDesenhar(pg, x, y0, w, base); goto depoisLista; }
+  if (ehMa(pg)) { maDesenhar(pg, x, y0, w, base, agora); goto depoisLista; }
   if (pg) {
     float y = y0, rh = 96;
     int vis, de;
