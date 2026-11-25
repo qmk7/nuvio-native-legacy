@@ -53,3 +53,7 @@ Owner wants everything in the cloud, not only family books: QR-Yummy already has
 books, recipes, shopping list 'shop', week plan 'week'). Make the personal book live there too, and let Alexa ADD:
 "add milk to my shopping list" (shop), "add kabsa to Thursday" (week), "save a recipe ..." (recipe, Claude structures it);
 the app pulls the change on its next sync.
+Owner chose: Alexa's own shopping list synced into QR-Yummy (skill with list permissions + AlexaHouseholdListEvent
+ItemsCreated -> read the item via the List Management API -> add to the Household 'shop' list in Arabic (Claude translates)
+-> delete it from Alexa's list). "add cucumber to my shopping list" works without the skill name. Verify list events under Alexa+ first.
+Also keep "ask my kitchen ..." for recipes / week plan.
