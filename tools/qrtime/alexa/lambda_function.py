@@ -211,7 +211,7 @@ ESQUEMA = {
         "onde": {"type": "string", "description": "Where: the room or speaker name the person said (e.g. bedroom, kitchen, soundbar), 'all' for every speaker, '' when none was said."},
         "radio": {"type": "boolean", "description": "Keep playing similar music after it."},
         "volume": {"type": "integer", "description": "0-100 when a loudness was asked for, else -1."},
-        "resposta": {"type": "string", "description": "A short spoken confirmation, same language as the request."},
+        "resposta": {"type": "string", "description": "A short spoken confirmation in the request's language (Gulf Arabic when the request is Arabic)."},
     },
     "required": ["busca", "tipo", "onde", "radio", "volume", "resposta"],
     "additionalProperties": False,
@@ -275,12 +275,24 @@ def _fala(texto, fim=True):
         "outputSpeech": {"type": "PlainText", "text": texto}, "shouldEndSession": fim}}
 
 
+FALAS = {
+    "o_que": ("What should I play?", "شو أشغّل لك؟"),
+    "sem_ha": ("Home Assistant did not answer.", "ما ردّ هوم أسيستنت."),
+    "ok": ("OK.", "تمام."),
+    "tocando": ("Playing %s.", "أشغّل %s."),
+    "ajuda": ("Say, play a song or an artist, in a room, or everywhere.", "قل: شغّل أغنية أو فنان، في غرفة، أو في كل البيت."),
+    "nao": ("Sorry, I can't do that yet.", "آسف، ما أقدر أسوي هذا للحين."),
+}
+
+
 def _skill(event):
     req = event.get("request", {})
     tipo = req.get("type")
+    ar = (req.get("locale") or "").startswith("ar")
+    t = lambda k: FALAS[k][1 if ar else 0]
     print("skill %s %s" % (tipo, (req.get("intent") or {}).get("name", "")))
     if tipo == "LaunchRequest":
-        return _fala("What should I play?", fim=False)
+        return _fala(t("o_que"), fim=False)
     if tipo != "IntentRequest":
         return _fala("", fim=True)
     intent = req.get("intent") or {}
@@ -288,7 +300,7 @@ def _skill(event):
     if nome in ONDE_POR_INTENT:
         q = ((intent.get("slots") or {}).get("q") or {}).get("value") or ""
         if not q:
-            return _fala("What should I play?", fim=False)
+            return _fala(t("o_que"), fim=False)
         onde = ONDE_POR_INTENT[nome]
         d = _entender(q, onde)
         if d:
@@ -299,19 +311,19 @@ def _skill(event):
                 msg["tipo"] = d["tipo"]
             if 0 <= d["volume"] <= 100:
                 msg["volume"] = d["volume"]
-            fala = d.get("resposta") or "Playing %s." % d["busca"]
+            fala = d.get("resposta") or t("tocando") % d["busca"]
         else:
             msg = {"acao": "musica", "onde": onde, "q": q}
-            fala = "Playing %s on %s." % (q, FALA_ONDE[onde])
+            fala = t("tocando") % q
         if not _ha(msg):
-            return _fala("Home Assistant did not answer.")
+            return _fala(t("sem_ha"))
         return _fala(fala)
     if nome in TECLA_POR_INTENT:
         _ha({"acao": "musica_tecla", "onde": "casa", "k": TECLA_POR_INTENT[nome]})
-        return _fala("OK.")
+        return _fala(t("ok"))
     if nome == "AMAZON.HelpIntent":
-        return _fala("Say, play a song or an artist, on the soundbar, the Google speakers, or all speakers.", fim=False)
-    return _fala("Sorry, I can't do that yet.")
+        return _fala(t("ajuda"), fim=False)
+    return _fala(t("nao"))
 
 
 def lambda_handler(event, context):
