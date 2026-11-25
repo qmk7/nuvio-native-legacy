@@ -1,0 +1,145 @@
+# Settings > Automations & scenes > QR TIME: Alexa > ⋮ > Edit in YAML.
+# Replace <WEBHOOK_ID>, <TV_LINK_CODE>, <TV_IP>, <TV_MAC_WIFI>, <TV_MAC_LAN>
+# and the TV entity with your own values.
+alias: "QR TIME: Alexa"
+mode: queued
+variables:
+  tv: media_player.living_room_qr_tv
+  ip: "<TV_IP>"
+  codigo: "<TV_LINK_CODE>"
+triggers:
+  - trigger: webhook
+    webhook_id: <WEBHOOK_ID>
+    allowed_methods:
+      - POST
+    local_only: false
+conditions: []
+actions:
+  - variables:
+      acao: "{{ trigger.json.acao | default('') }}"
+      k: "{{ trigger.json.k | default('') }}"
+  - if:
+      - condition: template
+        value_template: "{{ acao.startswith('musica') }}"
+    then:
+      - action: script.qrtime_music
+        data:
+          acao: "{{ acao }}"
+          onde: "{{ trigger.json.onde | default('') }}"
+          q: "{{ trigger.json.q | default('') }}"
+          k: "{{ k }}"
+          passos: "{{ trigger.json.passos | default(0) }}"
+          tipo: "{{ trigger.json.tipo | default('') }}"
+          radio: "{{ trigger.json.radio | default(true) }}"
+          volume: "{{ trigger.json.volume | default(-1) }}"
+      - stop: "music"
+  - if:
+      - condition: template
+        value_template: "{{ acao in ['tocar', 'ligar', 'abrir'] and is_state(tv, 'off') }}"
+    then:
+      - action: wake_on_lan.send_magic_packet
+        data:
+          mac: "<TV_MAC_WIFI>"
+      - action: wake_on_lan.send_magic_packet
+        data:
+          mac: "<TV_MAC_LAN>"
+      - wait_template: "{{ not is_state(tv, 'off') }}"
+        timeout: "00:00:30"
+        continue_on_timeout: true
+      - delay: "00:00:02"
+  - if:
+      - condition: template
+        value_template: "{{ acao == 'desligar' }}"
+    then:
+      - action: media_player.turn_off
+        target:
+          entity_id: "{{ tv }}"
+      - stop: "off"
+  - if:
+      - condition: template
+        value_template: "{{ acao == 'abrir' }}"
+    then:
+      - variables:
+          achado: >-
+            {% set p = (trigger.json.app | default('')) | lower | replace(' ', '') %}
+            {% set ns = namespace(r='') %}
+            {% for s in (state_attr(tv, 'source_list') or []) %}
+            {% set t = s | lower | replace(' ', '') %}
+            {% if ns.r == '' and p and (p in t or t in p) %}{% set ns.r = s %}{% endif %}
+            {% endfor %}
+            {{ ns.r if ns.r else trigger.json.app | default('') }}
+      - action: media_player.select_source
+        target:
+          entity_id: "{{ tv }}"
+        data:
+          source: "{{ achado | trim }}"
+      - stop: "opened"
+  - if:
+      - condition: template
+        value_template: "{{ acao == 'volume' }}"
+    then:
+      - repeat:
+          count: "{{ [ (trigger.json.passos | int(0)) | abs, 20 ] | min }}"
+          sequence:
+            - action: "{{ 'media_player.volume_up' if (trigger.json.passos | int(0)) > 0 else 'media_player.volume_down' }}"
+              target:
+                entity_id: "{{ tv }}"
+      - stop: "volume"
+  - if:
+      - condition: template
+        value_template: "{{ acao == 'mudo' }}"
+    then:
+      - action: media_player.volume_mute
+        target:
+          entity_id: "{{ tv }}"
+        data:
+          is_volume_muted: "{{ trigger.json.mudo | default(true) }}"
+      - stop: "mute"
+  - if:
+      - condition: template
+        value_template: "{{ acao == 'tecla' and state_attr(tv, 'source') != 'QR TIME' }}"
+    then:
+      - action: >-
+          {{ {'pause': 'media_player.media_pause', 'stop': 'media_player.media_stop'}.get(k, 'media_player.media_play') }}
+        target:
+          entity_id: "{{ tv }}"
+      - stop: "other app"
+  - if:
+      - condition: template
+        value_template: "{{ acao not in ['tocar', 'tecla'] }}"
+    then:
+      - stop: "done"
+  - variables:
+      rota: "{{ 'tocar' if acao == 'tocar' else 'tecla' }}"
+      corpo: >-
+        {% if acao == 'tocar' %}q={{ trigger.json.q | default('') | urlencode }}&tipo={{ trigger.json.tipo | default('') }}{% else %}k={{ {'pause': 'play', 'stop': 'back'}.get(k, k) }}{% endif %}
+  - if:
+      - condition: template
+        value_template: "{{ acao == 'tocar' and state_attr(tv, 'source') != 'QR TIME' }}"
+    then:
+      - delay: "00:00:03"
+      - action: media_player.select_source
+        target:
+          entity_id: "{{ tv }}"
+        data:
+          source: "QR TIME"
+  - repeat:
+      sequence:
+        - repeat:
+            for_each: [8098, 18098, 28098, 38098]
+            sequence:
+              - action: rest_command.qrtime
+                continue_on_error: true
+                response_variable: r
+                data:
+                  url: "http://{{ ip }}:{{ repeat.item }}/{{ codigo }}/{{ rota }}"
+                  payload: "{{ corpo }}"
+              - if:
+                  - condition: template
+                    value_template: "{{ r is defined and r.status == 200 }}"
+                then:
+                  - stop: "sent"
+        - delay: "00:00:01"
+      until:
+        - condition: template
+          value_template: "{{ repeat.index >= 10 }}"

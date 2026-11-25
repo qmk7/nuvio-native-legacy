@@ -1,0 +1,90 @@
+# Settings > Automations & scenes > Scripts > qrtime_music > ⋮ > Edit in YAML.
+# No speaker names inside: the room (Home Assistant Area) or the speaker name
+# said is matched against Music Assistant's players at the moment of asking.
+alias: qrtime_music
+mode: queued
+fields:
+  acao: {}
+  onde: {}
+  q: {}
+  k: {}
+  passos: {}
+  tipo: {}
+  radio: {}
+  volume: {}
+sequence:
+  - variables:
+      alvos: >-
+        {% set pedido = (onde | default('') | string | lower | trim) %}
+        {% set ns = namespace(todos=[], grupos=[], r=[], padrao=[]) %}
+        {% for e in integration_entities('music_assistant') if e.startswith('media_player.') %}
+        {% set nome = (state_attr(e, 'friendly_name') or '') | lower %}
+        {% set membros = state_attr(e, 'group_members') or [] %}
+        {% if (membros | count) > 1 or nome in ['all speakers', 'living room speakers'] %}
+        {% set ns.grupos = ns.grupos + [e] %}
+        {% elif state_attr(e, 'device_class') != 'tv' and 'tv' not in nome.split() %}
+        {% set ns.todos = ns.todos + [e] %}
+        {% endif %}
+        {% endfor %}
+        {% for e in ns.todos %}
+        {% set nome = (state_attr(e, 'friendly_name') or '') | lower %}
+        {% set area = (area_name(e) or '') | lower %}
+        {% if 'soundbar' in nome %}{% set ns.padrao = ns.padrao + [e] %}{% endif %}
+        {% if pedido and pedido not in ['casa', 'soundbar'] and (pedido in nome or (area and (pedido in area or area in pedido))) %}
+        {% set ns.r = ns.r + [e] %}
+        {% endif %}
+        {% endfor %}
+        {% if pedido == 'casa' %}{{ ns.grupos[:1] if ns.grupos else ns.todos }}
+        {% elif ns.r %}{{ ns.r }}
+        {% else %}{{ ns.padrao if ns.padrao else ns.todos[:1] }}{% endif %}
+  - condition: template
+    value_template: "{{ alvos | count > 0 }}"
+  - choose:
+      - conditions: "{{ acao == 'musica' }}"
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ (volume | int(-1)) >= 0 }}"
+            then:
+              - action: media_player.volume_set
+                continue_on_error: true
+                target:
+                  entity_id: "{{ alvos }}"
+                data:
+                  volume_level: "{{ (volume | int) / 100 }}"
+          - if:
+              - condition: template
+                value_template: "{{ tipo in ['track', 'artist', 'album', 'playlist'] }}"
+            then:
+              - action: music_assistant.play_media
+                target:
+                  entity_id: "{{ alvos }}"
+                data:
+                  media_id: "{{ q }}"
+                  media_type: "{{ tipo }}"
+                  enqueue: replace
+                  radio_mode: "{{ radio | default(true) | bool }}"
+            else:
+              - action: music_assistant.play_media
+                target:
+                  entity_id: "{{ alvos }}"
+                data:
+                  media_id: "{{ q }}"
+                  enqueue: replace
+                  radio_mode: "{{ radio | default(true) | bool }}"
+      - conditions: "{{ acao == 'musica_volume' }}"
+        sequence:
+          - repeat:
+              count: "{{ [ (passos | int(0)) | abs, 20 ] | min }}"
+              sequence:
+                - action: "{{ 'media_player.volume_up' if (passos | int(0)) > 0 else 'media_player.volume_down' }}"
+                  target:
+                    entity_id: "{{ alvos }}"
+      - conditions: "{{ acao == 'musica_tecla' }}"
+        sequence:
+          - action: >-
+              {{ {'pause': 'media_player.media_pause', 'stop': 'media_player.media_stop',
+                  'next': 'media_player.media_next_track',
+                  'previous': 'media_player.media_previous_track'}.get(k, 'media_player.media_play') }}
+            target:
+              entity_id: "{{ alvos }}"

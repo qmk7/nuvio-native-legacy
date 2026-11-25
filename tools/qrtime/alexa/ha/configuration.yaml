@@ -1,0 +1,10 @@
+# End of /config/configuration.yaml (then Settings > System > Restart).
+wake_on_lan:
+
+rest_command:
+  qrtime:
+    url: "{{ url }}"
+    method: POST
+    content_type: "application/x-www-form-urlencoded"
+    payload: "{{ payload }}"
+    timeout: 3
