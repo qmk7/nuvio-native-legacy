@@ -3,26 +3,100 @@
     "languageModel": {
       "invocationName": "music assistant",
       "intents": [
-        { "name": "AMAZON.CancelIntent", "samples": [] },
-        { "name": "AMAZON.HelpIntent", "samples": [] },
-        { "name": "AMAZON.StopIntent", "samples": [] },
-        { "name": "AMAZON.PauseIntent", "samples": [] },
-        { "name": "AMAZON.ResumeIntent", "samples": [] },
-        { "name": "AMAZON.NextIntent", "samples": [] },
-        { "name": "AMAZON.PreviousIntent", "samples": [] },
-        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
-        { "name": "TocarIntent",
-          "slots": [ { "name": "q", "type": "AMAZON.SearchQuery" } ],
-          "samples": [ "play {q}", "put on {q}", "i want to hear {q}" ] },
-        { "name": "TocarSoundbarIntent",
-          "slots": [ { "name": "q", "type": "AMAZON.SearchQuery" } ],
-          "samples": [ "play {q} on the soundbar", "play {q} on soundbar", "play {q} in the living room" ] },
-        { "name": "TocarGoogleIntent",
-          "slots": [ { "name": "q", "type": "AMAZON.SearchQuery" } ],
-          "samples": [ "play {q} on the google speakers", "play {q} on google speakers", "play {q} on google" ] },
-        { "name": "TocarTodasIntent",
-          "slots": [ { "name": "q", "type": "AMAZON.SearchQuery" } ],
-          "samples": [ "play {q} on all speakers", "play {q} everywhere", "play {q} in the whole house" ] }
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.PauseIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.ResumeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NextIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.PreviousIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "TocarIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "play {q}",
+            "put on {q}",
+            "i want to hear {q}"
+          ]
+        },
+        {
+          "name": "TocarSoundbarIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "play {q} on the soundbar",
+            "play {q} on soundbar",
+            "play {q} in the living room"
+          ]
+        },
+        {
+          "name": "TocarGoogleIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "play {q} on the google speakers",
+            "play {q} on google speakers",
+            "play {q} on google",
+            "play {q} with google",
+            "play {q} in the kitchen and bedroom"
+          ]
+        },
+        {
+          "name": "TocarTodasIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "play {q} on all speakers",
+            "play {q} everywhere",
+            "play {q} in the whole house",
+            "play {q} in every room",
+            "play {q} party mode",
+            "play {q} in party mode",
+            "party mode {q}"
+          ]
+        }
       ],
       "types": []
     }
