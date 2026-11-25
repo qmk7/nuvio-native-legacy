@@ -35,3 +35,7 @@ Phase 4 (smarter):
 
 Owner's devices for phase 3: doorbell EZVIZ (QR TIME already has ezviz.c alerts), lights Tuya (Smart Life):
 add the Tuya integration to Home Assistant (Settings > Devices & services > Tuya, sign in with the Smart Life app's QR) before cinema mode.
+
+More picked ideas: 29 "who is this actor?" (paused scene: cast on screen), 31 "what happened last episode?" (spoiler-free recap spoken),
+32 "add X to my list" -> Trakt watchlist (trakt_watchlist(imdb, 1) exists in trakt.c; new TV-link route "lista" + Lambda phrase;
+title resolved like casaha.c), 35 "play what I listened to yesterday" (Music Assistant recently played at that hour).
