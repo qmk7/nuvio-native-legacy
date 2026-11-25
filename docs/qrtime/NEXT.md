@@ -39,3 +39,4 @@ add the Tuya integration to Home Assistant (Settings > Devices & services > Tuya
 More picked ideas: 29 "who is this actor?" (paused scene: cast on screen), 31 "what happened last episode?" (spoiler-free recap spoken),
 32 "add X to my list" -> Trakt watchlist (trakt_watchlist(imdb, 1) exists in trakt.c; new TV-link route "lista" + Lambda phrase;
 title resolved like casaha.c), 35 "play what I listened to yesterday" (Music Assistant recently played at that hour).
+Also picked: 50 "who sings this?" (Music Assistant now-playing of any speaker spoken by Alexa; shown on the TV when it is on).
