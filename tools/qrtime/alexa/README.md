@@ -70,7 +70,10 @@ answers on your home network.
 ## What you can say
 
 - "Alexa, play Inception on TV" / "Alexa, watch Breaking Bad on TV"
-- "Alexa, turn on the TV" / "Alexa, turn off the TV"
+  (the account's own titles first: "play Friends" resumes the Friends you
+  were watching; a film and a show with the same name go to the famous one)
+- "Alexa, play continue watching on TV": the newest unfinished title
+- "Alexa, turn on the TV" (the TV only) / "Alexa, turn off the TV"
 - "Alexa, pause TV" / "Alexa, resume TV"
 
 Which words Alexa accepts in Arabic depends on Amazon's support for this
