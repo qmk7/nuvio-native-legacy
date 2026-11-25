@@ -108,4 +108,4 @@ qrtime_ezviz
 qrtime_legtrad
 qrtime_qr
 qrtime_casaha
-tests/qrtime_massist.sh
+qrtime_massist
