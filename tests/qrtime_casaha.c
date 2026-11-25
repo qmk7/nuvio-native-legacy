@@ -21,5 +21,14 @@ int main(void) {
   CONFERE(casaha_escolher(j, "the cobol job", id, sizeof id) && !strcmp(id, "tt0000002"), "no exact title: Cinemeta's first (most popular)");
   CONFERE(!casaha_escolher("{\"metas\":[{\"id\":\"kitsu:9\",\"name\":\"X\"}]}", "x", id, sizeof id), "never a non-IMDb id");
   CONFERE(!casaha_escolher(NULL, "x", id, sizeof id) && !casaha_escolher("{}", "x", id, sizeof id), "no answer: nothing to play");
+  {
+    const char *fm = "{\"metas\":[{\"imdb_id\":\"tt9000001\",\"name\":\"Friends\",\"imdbRating\":\"5.1\"}]}";
+    const char *fs = "{\"metas\":[{\"imdb_id\":\"tt0108778\",\"name\":\"Friends\",\"imdbRating\":\"8.9\"}]}";
+    const char *im = "{\"metas\":[{\"imdb_id\":\"tt1375666\",\"name\":\"Inception\",\"imdbRating\":\"8.8\"}]}";
+    const char *is = "{\"metas\":[{\"imdb_id\":\"tt7777777\",\"name\":\"Inception Stories\"}]}";
+    CONFERE(casaha_entre_tipos(fm, fs, "Friends", id, sizeof id) && !strcmp(id, "tt0108778"), "film and show with the same name: the famous one (Friends, the show)");
+    CONFERE(casaha_entre_tipos(im, is, "Inception", id, sizeof id) && !strcmp(id, "tt1375666"), "only the film is exact: the film");
+    CONFERE(casaha_entre_tipos(NULL, fs, "Friends", id, sizeof id) && !strcmp(id, "tt0108778"), "shows only (Alexa said a season or episode)");
+  }
   return falhas ? 1 : 0;
 }

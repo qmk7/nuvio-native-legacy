@@ -34,6 +34,9 @@
 #include "convidado.h"
 #include "nuvem.h"
 #include "perfis.h"
+#include "progresso.h"
+#include "iptvvod.h"
+#include "catalogo.h"
 #include "fontevolta.h"
 #include "cacheboost.h"
 #include "retomamorna.h"
@@ -204,8 +207,66 @@ void video_tpk_cdn_arquivo(const char *url, int usenet, int item, int file);
 // setas. Chegar em South Park pela busca com o teclado da tela sao dezenas de
 // teclas; aqui e uma linha.
 static char abrirTeste[64];
-static char haTocar[24];      // Home Assistant: play this title when its page is open
+static char haTocar[64];      // Home Assistant: play this title when its page is open
 static Uint32 haDesde;
+// HOME ASSISTANT / ALEXA, THE ACCOUNT FIRST (casaha.c asks here before
+// Cinemeta): "continue watching" / "resume" plays the newest unfinished title;
+// a name plays the title the person already watched with that name (newest
+// first: their Friends, from their episode), then one on their home rows.
+// UI thread (ajremoto's request handler).
+static int haEhContinuar(const char *nq) {
+  static const char *const F[] = { "continue watching", "continue", "resume", "keep watching", "continue my show",
+    "where i left off", "what i was watching", "my show", "last", "last watched", "continuar", "continuar assistindo" };
+  for (size_t i = 0; i < sizeof F / sizeof *F; i++) if (!strcmp(nq, F[i])) return 1;
+  return 0;
+}
+typedef struct { const char *nq; const char *tipo; char id[64]; } HaBusca;
+static int haNoCatalogo(const CatItem *c, void *u) {
+  HaBusca *b = u;
+  char nn[128];
+  if (!c->imdb[0] || (strcmp(c->tipo, "movie") && strcmp(c->tipo, "series"))) return 0;
+  if (!strcmp(b->tipo, "serie") && strcmp(c->tipo, "series")) return 0;
+  if (!strcmp(b->tipo, "filme") && strcmp(c->tipo, "movie")) return 0;
+  iptvvod_normalizar(c->titulo, nn, sizeof nn);
+  if (strcmp(nn, b->nq)) return 0;
+  snprintf(b->id, sizeof b->id, "%s", c->imdb);
+  return 1;
+}
+static int haDaConta(const char *q, const char *tipo, char *id, size_t n) {
+  char nq[128];
+  ProgRegistro *r;
+  CatItem *c;
+  int k, achou = 0;
+  iptvvod_normalizar(q, nq, sizeof nq);
+  if (!nq[0]) return 0;
+  if (haEhContinuar(nq)) {
+    ProgRegistro um;
+    if (prog_continuar_de_perfil_min(perfis_ativo(), ajustes_cw_minimo(), ajustes_cw_concluido(), &um) && um.contentId[0]) {
+      snprintf(id, n, "%s", um.contentId);
+      return 1;
+    }
+  }
+  r = malloc(sizeof *r * PROG_MAX);
+  c = malloc(sizeof *c);
+  if (r && c) {
+    k = prog_ler(r, PROG_MAX);
+    for (int i = 0; i < k && !achou; i++) {
+      char nn[128];
+      if (!r[i].contentId[0]) continue;
+      if (!strcmp(tipo, "serie") && strcmp(r[i].tipo, "series")) continue;
+      if (!strcmp(tipo, "filme") && strcmp(r[i].tipo, "movie")) continue;
+      if (!cat_copiar_por_id(r[i].contentId, r[i].tipo, c)) continue;
+      iptvvod_normalizar(c->titulo, nn, sizeof nn);
+      if (!strcmp(nn, nq)) { snprintf(id, n, "%s", r[i].contentId); achou = 1; }
+    }
+  }
+  free(r); free(c);
+  if (!achou) {
+    HaBusca b = { nq, tipo, "" };
+    if (cat_percorrer(haNoCatalogo, &b) && b.id[0]) { snprintf(id, n, "%s", b.id); achou = 1; }
+  }
+  return achou;
+}
 void app_abrir_titulo(const char *imdb) {
   snprintf(abrirTeste, sizeof abrirTeste, "%s", imdb ? imdb : "");
 }
@@ -3875,6 +3936,7 @@ int app_iniciar(const char *dirArte) {
   // #415: MemAvailable abaixo do piso -> despeja texturas, mkvass, texto,
   // libass e heap; sem isto o aviso so rodava malloc_trim.
   memlog_quando_aviso(aliviarMemoria);
+  casaha_definir_local(haDaConta);   // Alexa / Home Assistant: the account's titles first
   legenda2_vincular_atraso(ajustes_leg2_atraso(), ajustes_leg2_definir_atraso);
   // A faixa de audio escolhida a mao fica gravada por perfil (audiomemoria.h).
   audioesc_definir_memoria(audiomem_ler, audiomem_gravar);
@@ -5199,7 +5261,10 @@ void app_atualizar(float dt, Uint32 agora) {
     home_oculta(0);
     perfilsel_atualizar(dt, agora);
     if (perfilsel_pediu_repetir()) { sync_iniciar(); return; }
-    if (perfilsel_quer_sair()) {
+    // Alexa / Home Assistant asked for a title with the TV just switched on:
+    // keep yesterday's profile (as Back would) so the title plays without a
+    // question. A profile behind a PIN still asks.
+    if (perfilsel_quer_sair() || (casaha_pendente() && perfis_pode_dispensar())) {
       // Voltar = "segue com quem ja estava". So vale quando ha uma escolha
       // gravada e ela nao esta atras de um PIN — senao o Voltar entraria no
       // perfil 1 por acidente, ou seria a chave da fechadura.
@@ -5616,7 +5681,7 @@ void app_atualizar(float dt, Uint32 agora) {
   // once it is this title's page. A playing video is not interrupted: the
   // request waits until it is closed.
   if (!player_aberto()) {
-    char ha[24];
+    char ha[64];
     if (casaha_pegar(ha, sizeof ha)) {
       snprintf(haTocar, sizeof haTocar, "%s", ha); haDesde = SDL_GetTicks();
       if (detail_aberto()) detail_fechar_seco();
