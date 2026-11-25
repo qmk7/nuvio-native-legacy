@@ -49,3 +49,7 @@ qmk7/QR-Yummy: PWA on Cloudflare Workers. Personal recipes live only on the phon
 (Durable Object FamilyBook, SQLite, /api/family/<secret id>), and the worker already calls Claude (/api/ask, recipe-ai.js).
 Plan: an Alexa custom skill whose HTTPS endpoint is the Worker itself (/api/alexa, no Lambda), reading a family book:
 "ask my kitchen how to make kabsa", "next step", timers, "what can I cook with...". Recipes to use by voice go in a family book.
+Owner wants everything in the cloud, not only family books: QR-Yummy already has «مكتبة البيت» (Household Durable Object:
+books, recipes, shopping list 'shop', week plan 'week'). Make the personal book live there too, and let Alexa ADD:
+"add milk to my shopping list" (shop), "add kabsa to Thursday" (week), "save a recipe ..." (recipe, Claude structures it);
+the app pulls the change on its next sync.
