@@ -530,6 +530,7 @@ static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
     }
     // "tela:esportes" opens the Sport Center (as the side bar does).
     if (dp && !strcmp(linha, "tela:esportes")) { menu_ir(MENU_ESPORTES); continue; }
+    if (dp && !strcmp(linha, "tela:musica")) { menu_ir(MENU_MUSICA); continue; }
     // "tela:central" opens the Control Center (as holding CH+ does).
     if (dp && !strcmp(linha, "tela:central")) { if (app_central_pode()) central_abrir(); else printf("[central] porta de teste: agora nao (tela ocupada)\n"); fflush(stdout); continue; }
 #endif

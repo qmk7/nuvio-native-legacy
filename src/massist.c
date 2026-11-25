@@ -41,6 +41,25 @@ int massist_gravar(const char *url, const char *token) {
   return dados_gravar(ARQ, b);
 }
 
+#define ARQ_ALTO "music-assistant-player.txt"
+int massist_alto_ler(char *id, size_t ni, char *nome, size_t nn) {
+  char *t = dados_ler(ARQ_ALTO), *l2;
+  if (ni) id[0] = 0;
+  if (nn) nome[0] = 0;
+  if (!t) return 0;
+  l2 = strchr(t, '\n');
+  if (l2) *l2++ = 0;
+  snprintf(id, ni, "%s", t);
+  if (l2) { l2[strcspn(l2, "\r\n")] = 0; snprintf(nome, nn, "%s", l2); }
+  free(t);
+  return id[0] != 0;
+}
+int massist_alto_gravar(const char *id, const char *nome) {
+  char b[300];
+  snprintf(b, sizeof b, "%s\n%s\n", id ? id : "", nome ? nome : "");
+  return dados_gravar(ARQ_ALTO, b);
+}
+
 // ---------------------------------------------------------------- transport
 static char *postarRede(const char *url, const char *corpo, const char *token, int *status) {
   char auth[1100];

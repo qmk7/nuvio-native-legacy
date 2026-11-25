@@ -8,6 +8,7 @@
 #include "mcoffline.h"
 #include "mcplayer.h"
 #include "mcspotify.h"
+#include "massist.h"
 #include "ytapi.h"
 #include "ondever.h"
 #include "video.h"
@@ -33,11 +34,13 @@
 #define LOTE 60
 
 // ---------------------------------------------------------------- rows and pages
-enum { L_FAIXA, L_ALBUM, L_ARTISTA, L_PLAYLIST, L_GENERO, L_PASTA, L_FONTE, L_ACAO, L_TITULO, L_INFO, L_YTVIDEO, L_YTLISTA };
+enum { L_FAIXA, L_ALBUM, L_ARTISTA, L_PLAYLIST, L_GENERO, L_PASTA, L_FONTE, L_ACAO, L_TITULO, L_INFO, L_YTVIDEO, L_YTLISTA, L_MA };
 enum {
   A_NADA, A_RETOMAR, A_TOCAR_TUDO, A_ALEATORIO_TUDO, A_ADD_SUBSONIC, A_ADD_WEBDAV, A_LFM_CHAVE, A_LFM_SEGREDO,
   A_LFM_CONECTAR, A_LFM_SAIR, A_YTMUSIC, A_FESTA, A_LRCLIB, A_FILA_ALEATORIO, A_FILA_REPETIR, A_FILA_LIMPAR,
-  A_FILA_SALVAR, A_NOVA_BUSCA, A_SIMILAR, A_TOCANDO, A_SP_ID, A_SP_SEGREDO, A_SP_IMPORTAR, A_YT_BUSCA, A_YT_LISTA_TOCAR, A_YTM_ABRIR
+  A_FILA_SALVAR, A_NOVA_BUSCA, A_SIMILAR, A_TOCANDO, A_SP_ID, A_SP_SEGREDO, A_SP_IMPORTAR, A_YT_BUSCA, A_YT_LISTA_TOCAR, A_YTM_ABRIR,
+  A_MA_ABRIR, A_MA_BUSCA, A_MA_ALTOS, A_MA_ESCOLHER, A_MA_TOCAR_PAI, A_MA_PLAY, A_MA_PAUSA, A_MA_PROX, A_MA_ANT, A_MA_VOLUP, A_MA_VOLDN,
+  A_MA_LISTAS, A_MA_ALBUNS, A_MA_ARTISTAS
 };
 typedef struct {
   int tipo, acao;
@@ -50,7 +53,8 @@ typedef struct {
 enum {
   P_INICIO, P_RECENTES, P_ARTISTAS, P_ALBUNS, P_FAIXAS, P_GENEROS, P_PLAYLISTS, P_FAVORITOS, P_OFFLINE, P_FILA,
   P_BUSCAR, P_SERVICOS, P_AJUSTES, P_SECOES,
-  P_ALBUM = 100, P_ARTISTA, P_PLAYLIST, P_GENERO, P_PASTA, P_YTM, P_YTM_BUSCA, P_YTM_LISTA
+  P_ALBUM = 100, P_ARTISTA, P_PLAYLIST, P_GENERO, P_PASTA, P_YTM, P_YTM_BUSCA, P_YTM_LISTA,
+  P_MA, P_MA_BUSCA, P_MA_LISTA, P_MA_ALTOS, P_MA_BIB
 };
 static const char *const SECOES[P_SECOES] = {
   "Início", "Tocadas recentemente", "Artistas", "Álbuns", "Faixas", "Gêneros", "Playlists", "Favoritos",
@@ -117,6 +121,41 @@ static void linhaAlbum(Linha *l, const McAlbum *a) {
   else snprintf(l->t2, sizeof l->t2, "%s  ·  %d %s", a->artista, a->faixas, i18n("faixas"));
   snprintf(l->capa, sizeof l->capa, "%s", a->capa);
 }
+
+// QR TIME + Music Assistant (massist.c): YouTube Music and the home's
+// speakers. A row keeps what play_media and the track lists need: the uri
+// (ref), the media type (f.genero), item id (f.albumId) and provider
+// (f.artistaId). A list page's arg is "type\x1fprovider\x1fitem_id\x1furi".
+static void linhaMa(Linha *l, const MaItem *m) {
+  static const char *const TIPOS[][2] = { { "track", "Faixa" }, { "album", "Álbum" }, { "artist", "Artista" },
+                                          { "playlist", "Playlist" }, { "radio", "Rádio" } };
+  const char *rot = "";
+  char d[16];
+  for (size_t i = 0; i < sizeof TIPOS / sizeof *TIPOS; i++) if (!strcmp(m->tipo, TIPOS[i][0])) rot = i18n(TIPOS[i][1]);
+  l->tipo = L_MA;
+  snprintf(l->ref, sizeof l->ref, "%s", m->uri);
+  snprintf(l->t1, sizeof l->t1, "%s", m->nome);
+  durTexto(m->dur, d, sizeof d);
+  snprintf(l->t2, sizeof l->t2, "%s%s%s%s%s", rot, m->sub[0] ? "  ·  " : "", m->sub, d[0] ? "  ·  " : "", d);
+  snprintf(l->thumb, sizeof l->thumb, "%s", strlen(m->imagem) < sizeof l->thumb ? m->imagem : "");
+  snprintf(l->f.genero, sizeof l->f.genero, "%s", m->tipo);
+  snprintf(l->f.albumId, sizeof l->f.albumId, "%s", m->item_id);
+  snprintf(l->f.artistaId, sizeof l->f.artistaId, "%s", m->provider);
+}
+static void maPai(const char *arg, MaItem *pai) {
+  char b[MC_ID], *c[4] = { 0 };
+  int k = 0;
+  memset(pai, 0, sizeof *pai);
+  snprintf(b, sizeof b, "%s", arg);
+  c[k++] = b;
+  for (char *x = b; *x && k < 4; x++) if (*x == '\x1f') { *x = 0; c[k++] = x + 1; }
+  if (k < 4) return;
+  snprintf(pai->tipo, sizeof pai->tipo, "%s", c[0]);
+  snprintf(pai->provider, sizeof pai->provider, "%s", c[1]);
+  snprintf(pai->item_id, sizeof pai->item_id, "%s", c[2]);
+  snprintf(pai->uri, sizeof pai->uri, "%s", c[3]);
+}
+static int maErro(int e) { return e == MA_OK ? MC_OK : e == MA_REDE ? MC_ERRO_REDE : e == MA_TOKEN ? MC_ERRO_LOGIN : MC_ERRO_SERVIDOR; }
 
 // ---------------------------------------------------------------- worker
 typedef struct { Pagina *alvo; unsigned gen; int tipo, offset, anexar; char arg[MC_ID]; } Pedido;
@@ -313,6 +352,58 @@ static void *fioCarga(void *u) {
       }
       free(v);
       break; }
+    case P_MA: case P_MA_BUSCA: case P_MA_LISTA: case P_MA_ALTOS: case P_MA_BIB: {
+      MaItem *v = calloc(80, sizeof *v);
+      char alto[96], nomeAlto[96], b[300];
+      if (!v) { e = MC_ERRO_OUTRO; break; }
+      if (!massist_configurado()) {
+        info(&tmp, i18n("Conecte o Music Assistant da sua casa: no celular, em Contas > Celular > Configurar música pelo celular, informe o endereço e o token."));
+        free(v);
+        break;
+      }
+      massist_alto_ler(alto, sizeof alto, nomeAlto, sizeof nomeAlto);
+      if (p.tipo == P_MA) {
+        snprintf(b, sizeof b, "%s: %s", i18n("Tocar em"), nomeAlto[0] ? nomeAlto : i18n("escolha uma caixa de som"));
+        acao(&tmp, A_MA_ALTOS, b, i18n("Barra de som, caixas Google, grupos..."));
+        acao(&tmp, A_MA_BUSCA, i18n("Buscar no YouTube Music"), i18n("Artista, música, álbum ou playlist"));
+        acao(&tmp, A_MA_LISTAS, i18n("Suas playlists"), NULL);
+        acao(&tmp, A_MA_ALBUNS, i18n("Seus álbuns"), NULL);
+        acao(&tmp, A_MA_ARTISTAS, i18n("Seus artistas"), NULL);
+        if (alto[0]) {
+          titulo(&tmp, i18n("Controle"));
+          acao(&tmp, A_MA_PLAY, i18n("Tocar / pausar"), NULL);
+          acao(&tmp, A_MA_PROX, i18n("Próxima"), NULL);
+          acao(&tmp, A_MA_ANT, i18n("Anterior"), NULL);
+          acao(&tmp, A_MA_VOLUP, i18n("Volume +"), NULL);
+          acao(&tmp, A_MA_VOLDN, i18n("Volume −"), NULL);
+        }
+        e = maErro(massist_recentes(v, 30, &n));
+        if (n) titulo(&tmp, i18n("Tocadas recentemente"));
+      } else if (p.tipo == P_MA_ALTOS) {
+        MaPlayer *pl = calloc(32, sizeof *pl);
+        if (pl) e = maErro(massist_players(pl, 32, &n));
+        for (int i = 0; pl && i < n; i++) {
+          Linha *l = novaLinha(&tmp);
+          if (!l) break;
+          l->tipo = L_ACAO; l->acao = A_MA_ESCOLHER;
+          snprintf(l->ref, sizeof l->ref, "%s", pl[i].id);
+          snprintf(l->t1, sizeof l->t1, "%s%s", !strcmp(pl[i].id, alto) ? "✓ " : "", pl[i].nome);
+          snprintf(l->t2, sizeof l->t2, "%s%s%s", pl[i].grupo ? i18n("Grupo") : "", pl[i].grupo && !pl[i].disponivel ? "  ·  " : "",
+                   pl[i].disponivel ? "" : i18n("indisponível"));
+        }
+        free(pl);
+        n = 0;
+      } else if (p.tipo == P_MA_BUSCA) e = maErro(massist_buscar(p.arg, v, 80, &n));
+      else if (p.tipo == P_MA_BIB) e = maErro(massist_biblioteca(p.arg, 0, v, 80, &n));
+      else {
+        MaItem pai;
+        maPai(p.arg, &pai);
+        if (pai.uri[0]) acao(&tmp, A_MA_TOCAR_PAI, i18n("Tocar tudo"), NULL);
+        e = maErro(massist_faixas_de(&pai, v, 80, &n));
+      }
+      for (int i = 0; i < n; i++) { Linha *l = novaLinha(&tmp); if (l) linhaMa(l, &v[i]); }
+      free(v);
+      break; }
     case P_PASTA: {
       DavItem *pa = calloc(200, sizeof *pa);
       McFaixa *ar = calloc(300, sizeof *ar);
@@ -443,6 +534,12 @@ static void construirLocal(Pagina *pg) {
       titulo(pg, i18n("Outros serviços"));
       {
         Linha *l = novaLinha(pg);
+        if (l) { l->tipo = L_ACAO; l->acao = A_MA_ABRIR; snprintf(l->t1, sizeof l->t1, "Music Assistant");
+                 snprintf(l->t2, sizeof l->t2, "%s", i18n(massist_configurado() ? "YouTube Music nas caixas de som da casa" :
+                                                           "Conecte pelo celular: Configurar música pelo celular")); }
+      }
+      {
+        Linha *l = novaLinha(pg);
         if (l) { l->tipo = L_ACAO; l->acao = A_YTM_ABRIR; snprintf(l->t1, sizeof l->t1, "YouTube Music");
                  snprintf(l->t2, sizeof l->t2, "%s", i18n("Busca e as suas playlists; toca no app oficial do YouTube")); }
       }
@@ -494,6 +591,7 @@ static void carregar(Pagina *pg) {
   else if (pg->tipo == P_INICIO) {
     // "Continue" first (this profile's saved queue), then the servers' rows.
     pg->n = 0; pg->foco = 0; pg->offset = 0; pg->mais = 0; pg->gen = ++geracao;
+    if (massist_configurado()) acao(pg, A_MA_ABRIR, "Music Assistant", i18n("YouTube Music nas caixas de som da casa"));
     if (mcq_faixa_atual()) {
       char t[300];
       snprintf(t, sizeof t, "%s: %s — %s", i18n("Continuar"), mcq_faixa_atual()->titulo, mcq_faixa_atual()->artista);
@@ -658,7 +756,7 @@ static void emFio(const McFaixa *f, int liga, int baixar) {
   pthread_detach(t);
 }
 static int tecladoCampo = -1;
-enum { TC_BUSCA = 1, TC_LFM_CHAVE, TC_LFM_SEGREDO, TC_NOVA_LISTA, TC_FILA_LISTA, TC_FORM, TC_SP_ID, TC_SP_SEGREDO, TC_SP_URL, TC_YT_BUSCA };
+enum { TC_BUSCA = 1, TC_LFM_CHAVE, TC_LFM_SEGREDO, TC_NOVA_LISTA, TC_FILA_LISTA, TC_FORM, TC_SP_ID, TC_SP_SEGREDO, TC_SP_URL, TC_YT_BUSCA, TC_MA_BUSCA };
 static void executarAcao(int a) {
   Pagina *pg = topo();
   zona = Z_LISTA;
@@ -894,7 +992,7 @@ void mcui_abrir(void) {
       mcp_festa(festaLig);
       free(t);
     }
-    abrirSecao(mcfontes_n() ? P_INICIO : P_SERVICOS);
+    abrirSecao(mcfontes_n() || massist_configurado() ? P_INICIO : P_SERVICOS);
     zona = Z_MENU;
   } else if (topo() && ehLocal(topo()->tipo)) construirLocal(topo());
 }
@@ -913,6 +1011,51 @@ int mcui_teste_n(void) { Pagina *pg = topo(); return pg ? pg->n : 0; }
 int mcui_teste_zona(void) { return zona; }
 void mcui_fundo(Uint32 agora) { if (abertoUmaVez) mcp_atualizar(agora); spotifyConsumir(); }
 
+// Music Assistant commands run on a worker; the answer shows on the island.
+typedef struct { char alto[96], cmd[16], uri[MA_URI]; } MaCmd;
+static int maResultado = -99, maFoiTocar;
+static char maAltoNome[96];
+static void *fioMa(void *u) {
+  MaCmd c = *(MaCmd *)u;
+  int e;
+  free(u);
+  e = c.uri[0] ? massist_tocar(c.alto, c.uri, 1) : massist_comando(c.alto, c.cmd);
+  pthread_mutex_lock(&trava);
+  maResultado = e; maFoiTocar = c.uri[0] != 0;
+  pthread_mutex_unlock(&trava);
+  return NULL;
+}
+static void maEnviar(const char *uri, const char *cmd) {
+  MaCmd *c;
+  pthread_t t;
+  char alto[96];
+  if (!massist_alto_ler(alto, sizeof alto, maAltoNome, sizeof maAltoNome)) {
+    ilha_avisar("mcma", ILHA_INFO, NULL, i18n("Escolha primeiro onde tocar."), 3000u, 0);
+    empilhar(P_MA_ALTOS, "", i18n("Tocar em"));
+    return;
+  }
+  if (!(c = calloc(1, sizeof *c))) return;
+  snprintf(c->alto, sizeof c->alto, "%s", alto);
+  snprintf(c->cmd, sizeof c->cmd, "%s", cmd ? cmd : "");
+  snprintf(c->uri, sizeof c->uri, "%s", uri ? uri : "");
+  if (pthread_create(&t, NULL, fioMa, c)) { free(c); return; }
+  pthread_detach(t);
+}
+static void maConsumir(void) {
+  int r, tocar;
+  char b[200];
+  pthread_mutex_lock(&trava);
+  r = maResultado; tocar = maFoiTocar; maResultado = -99;
+  pthread_mutex_unlock(&trava);
+  if (r == -99) return;
+  if (r == MA_OK) {
+    if (!tocar) return;
+    snprintf(b, sizeof b, "%s: %s", i18n("Tocando em"), maAltoNome);
+    ilha_avisar("mcma", ILHA_OK, "aj_music", b, 3000u, 0);
+  } else ilha_avisar("mcma", ILHA_ERRO, "aj_music", i18n(r == MA_TOKEN ? "O Music Assistant recusou o token. Confira pelo celular." :
+                     r == MA_REDE ? "Sem conexão com o Music Assistant." : "O Music Assistant não conseguiu tocar nesta caixa de som."), 4000u, 0);
+}
+
 static void ativar(Pagina *pg, int i) {
   Linha *l = &pg->v[i];
   switch (l->tipo) {
@@ -923,6 +1066,13 @@ static void ativar(Pagina *pg, int i) {
     case L_GENERO: empilhar(P_GENERO, l->ref, l->t1); break;
     case L_PASTA: empilhar(P_PASTA, l->ref, l->t1); break;
     case L_YTLISTA: empilhar(P_YTM_LISTA, l->ref, l->t1); break;
+    case L_MA:
+      if (!strcmp(l->f.genero, "album") || !strcmp(l->f.genero, "playlist")) {
+        char a[MC_ID];
+        snprintf(a, sizeof a, "%s\x1f%s\x1f%s\x1f%s", l->f.genero, l->f.artistaId, l->f.albumId, l->ref);
+        empilhar(P_MA_LISTA, a, l->t1);
+      } else maEnviar(l->ref, NULL);
+      break;
     case L_YTVIDEO: {
       int e = ondever_youtube_lista(l->ref, l->lista[0] ? l->lista : NULL);
       ilha_avisar("mcyt", ILHA_INFO, NULL, i18n(e == ONDE_INFO ? "O YouTube abre no app da própria TV, que não está disponível neste aparelho." :
@@ -975,6 +1125,30 @@ static void ativar(Pagina *pg, int i) {
           }
           break;
         case A_YTM_ABRIR: empilhar(P_YTM, "", "YouTube Music"); break;
+        case A_MA_ABRIR: empilhar(P_MA, "", "Music Assistant"); break;
+        case A_MA_ALTOS: empilhar(P_MA_ALTOS, "", i18n("Tocar em")); break;
+        case A_MA_ESCOLHER: {
+          char nome[200];
+          snprintf(nome, sizeof nome, "%s", strncmp(l->t1, "✓ ", 4) ? l->t1 : l->t1 + 4);
+          massist_alto_gravar(l->ref, nome);
+          ilha_avisar("mcma", ILHA_OK, "aj_music", nome, 2500u, 0);
+          if (nPilha > 1) { Pagina *v = &pilha[--nPilha]; v->gen = ++geracao; if (topo()) carregar(topo()); }
+          break; }
+        case A_MA_BUSCA:
+          tecladoCampo = TC_MA_BUSCA;
+          teclado_contexto("YouTube Music");
+          teclado_abrir_com(i18n("Buscar no YouTube Music"), i18n("Artista, música, álbum ou playlist"), 100, NULL, NULL);
+          teclado_aceitar_utf8(1);
+          break;
+        case A_MA_LISTAS: empilhar(P_MA_BIB, "playlists", i18n("Suas playlists")); break;
+        case A_MA_ALBUNS: empilhar(P_MA_BIB, "albums", i18n("Seus álbuns")); break;
+        case A_MA_ARTISTAS: empilhar(P_MA_BIB, "artists", i18n("Seus artistas")); break;
+        case A_MA_TOCAR_PAI: { MaItem pai; maPai(pg->arg, &pai); if (pai.uri[0]) maEnviar(pai.uri, NULL); break; }
+        case A_MA_PLAY: maEnviar(NULL, "play_pause"); break;
+        case A_MA_PROX: maEnviar(NULL, "next"); break;
+        case A_MA_ANT: maEnviar(NULL, "previous"); break;
+        case A_MA_VOLUP: maEnviar(NULL, "volume_up"); break;
+        case A_MA_VOLDN: maEnviar(NULL, "volume_down"); break;
         case A_YT_BUSCA:
           tecladoCampo = TC_YT_BUSCA;
           teclado_contexto("YouTube Music");
@@ -1202,6 +1376,7 @@ static const char *mensagem(int e) {
 void mcui_atualizar(float dt, Uint32 agora) {
   Pagina *pg;
   aplicar();
+  maConsumir();
   // Screen off: keep the app's own screensaver from drawing (posters, a clock)
   // over the black, by telling it someone is here every 10 s.
   if (telaOff && agora - telaToque > 10000u) { telaToque = agora; esmaecer_entrada(agora, 0); }
@@ -1243,6 +1418,9 @@ void mcui_atualizar(float dt, Uint32 agora) {
           break; }
         case TC_YT_BUSCA:
           if (t[0]) empilhar(P_YTM_BUSCA, t, t);
+          break;
+        case TC_MA_BUSCA:
+          if (t[0]) empilhar(P_MA_BUSCA, t, t);
           break;
         case TC_SP_URL: {
           char id[64];
@@ -1491,7 +1669,10 @@ void mcui_desenhar(Uint32 agora) {
     if (vis < 1) vis = 1;
     de = pg->foco >= vis ? pg->foco - vis + 1 : 0;
     if (!pg->n) {
-      const char *m = pg->carregando ? "Carregando…" : pg->erro ? mensagem(pg->erro) : !mcfontes_n() && !ehLocal(pg->tipo) ?
+      const char *m = pg->carregando ? "Carregando…" :
+                      pg->erro && pg->tipo >= P_MA ? (pg->erro == MC_ERRO_LOGIN ? "O Music Assistant recusou o token. Confira pelo celular." :
+                                                     "Sem conexão com o Music Assistant. Pressione OK para tentar de novo.") :
+                      pg->erro ? mensagem(pg->erro) : !mcfontes_n() && !ehLocal(pg->tipo) && pg->tipo < P_MA ?
                       "Nenhum servidor de música ainda. Adicione um Navidrome, Subsonic ou WebDAV em Serviços de música." : "Nada por aqui.";
       txt_bloco_corta(TXT_BODY, i18n(m), 240, 242, 248, x, y + 10, w, 44, 0.75f, 3);
     }
@@ -1506,7 +1687,7 @@ void mcui_desenhar(Uint32 agora) {
         corta(TXT_BODY, l->t1, x + 100, ry + 8, w - 120, foco ? 1 : 0.88f);
         corta(TXT_CAPTION, l->t2, x + 100, ry + 50, w - 120, 0.6f);
         if (l->tipo == L_FAIXA && (l->f.fav || mcv_fav(l->f.id))) texto(TXT_CAPTION, "♥", x + w - 30, ry + 10, 0.8f);
-      } else if (l->tipo == L_YTVIDEO || l->tipo == L_YTLISTA) {
+      } else if (l->tipo == L_YTVIDEO || l->tipo == L_YTLISTA || l->tipo == L_MA) {
         GLuint tx = l->thumb[0] ? tex_obter_larg(l->thumb, 142) : 0;
         if (tx) gfx_textura((GfxRect){ x, ry, 142, 80 }, tx);
         else gfx_cor((GfxRect){ x, ry, 142, 80 }, 0.12f, 1, 1, 1, 0.07f);

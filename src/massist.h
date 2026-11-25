@@ -36,6 +36,9 @@ int  massist_configurado(void);
 int  massist_ler(char *url, size_t nu, char *token, size_t nt);
 int  massist_gravar(const char *url, const char *token);
 
+// The speaker QR TIME plays on (its player_id and name), kept on this TV.
+int  massist_alto_ler(char *id, size_t ni, char *nome, size_t nn);
+int  massist_alto_gravar(const char *id, const char *nome);
 // MA_OK + "Music Assistant 2.x" in desc when the address and token work.
 int  massist_testar(char *desc, size_t n);
 // tipo: "playlists", "albums", "artists", "tracks", "radios"
