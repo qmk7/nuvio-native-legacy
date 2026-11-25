@@ -194,7 +194,7 @@ TECLA_POR_INTENT = {
     "AMAZON.PauseIntent": "pause", "AMAZON.StopIntent": "stop", "AMAZON.CancelIntent": "stop",
     "AMAZON.ResumeIntent": "play", "AMAZON.NextIntent": "next", "AMAZON.PreviousIntent": "previous",
 }
-FALA_ONDE = {"soundbar": "the soundbar", "google": "the Google speakers", "casa": "all speakers"}
+FALA_ONDE = {"soundbar": "the soundbar", "kitchen": "the kitchen", "bedroom": "the bedroom", "google": "the Google speakers", "casa": "all speakers"}
 
 
 # ---- understanding free speech with Claude (optional) ----
@@ -208,7 +208,7 @@ ESQUEMA = {
     "properties": {
         "busca": {"type": "string", "description": "What to search on YouTube Music: artist, song, album, playlist or a mood turned into a concrete search."},
         "tipo": {"type": "string", "enum": ["track", "artist", "album", "playlist", "any"]},
-        "onde": {"type": "string", "enum": ["soundbar", "google", "casa"]},
+        "onde": {"type": "string", "enum": ["soundbar", "kitchen", "bedroom", "google", "casa"]},
         "radio": {"type": "boolean", "description": "Keep playing similar music after it."},
         "volume": {"type": "integer", "description": "0-100 when a loudness was asked for, else -1."},
         "resposta": {"type": "string", "description": "A short spoken confirmation, same language as the request."},
@@ -218,7 +218,8 @@ ESQUEMA = {
 }
 SISTEMA = (
     "You turn a music request spoken to Alexa into a YouTube Music search for Music Assistant. "
-    "Speakers: 'soundbar' (living room soundbar, the default), 'google' (the Google speakers: kitchen and bedroom), "
+    "Speakers: 'soundbar' (living room soundbar, the default), 'kitchen' (the Google Home Mini), "
+    "'bedroom' (the Harman Kardon speaker), 'google' (kitchen and bedroom together), "
     "'casa' (all speakers / everywhere / whole house / party). "
     "Turn moods and descriptions into a concrete search (\"something calm to sleep\" -> a calm sleep playlist; "
     "\"the song from Titanic\" -> My Heart Will Go On Celine Dion). Arabic artists keep their usual Latin spelling. "
