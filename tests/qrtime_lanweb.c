@@ -76,5 +76,32 @@ int main(void) {
   for (int i = 0; i < LW_ERROS_MAX + 2; i++) pedir("GET", "/zzzzzzzzzzzz/", NULL, NULL, NULL);
   CONFERE(pedir("GET", c1, NULL, NULL, NULL) != 200, "too many wrong paths: server closes");
   lanweb_parar();
+  {
+    // The fixed port is taken at the start (the previous run still closing):
+    // a stand-in port first, then the fixed one once it is free again.
+    struct sockaddr_in a;
+    int um = 1, dono = socket(AF_INET, SOCK_STREAM, 0), pref = 0, antes;
+    socklen_t t = sizeof a;
+    char u[160];
+    memset(&a, 0, sizeof a); a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY);
+    setsockopt(dono, SOL_SOCKET, SO_REUSEADDR, &um, sizeof um);
+    if (!bind(dono, (struct sockaddr *)&a, sizeof a) && !listen(dono, 1) && !getsockname(dono, (struct sockaddr *)&a, &t)) pref = ntohs(a.sin_port);
+    lanweb_porta_preferida(pref);
+    CONFERE(pref && lanweb_registrar("ajustes", "<html>settings</html>", 64) && lanweb_porta() != pref, "fixed port taken: up on a stand-in port");
+    antes = lanweb_porta();
+    close(dono);
+    for (int i = 0; i < 60 && lanweb_porta() != pref; i++) usleep(100000);
+    snprintf(u, sizeof u, ":%d/", pref);
+    CONFERE(lanweb_porta() == pref && strstr(lanweb_url("ajustes"), u), "fixed port free again: taken, and the link shows it");
+    snprintf(c1, sizeof c1, "/%s/", lanweb_teste_token("ajustes"));
+    CONFERE(pedir("GET", c1, NULL, NULL, NULL) == 200 && strstr(resp, "settings"), "served on the fixed port");
+    {
+      char h[64];
+      snprintf(h, sizeof h, "127.0.0.1:%d", antes);
+      // pedir() connects to lanweb_porta(); the stand-in's Host is still accepted
+      CONFERE(pedir("GET", c1, h, NULL, NULL) == 200, "the stand-in port's links keep working");
+    }
+    lanweb_parar();
+  }
   return falhas ? 1 : 0;
 }

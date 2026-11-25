@@ -89,9 +89,10 @@ typedef struct {
 
 static pthread_mutex_t trava = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t fio;
-static int fioVivo, ouvir = -1, acorda[2] = { -1, -1 }, porta, erros;
+static int fioVivo, ouvir = -1, ouvir2 = -1, acorda[2] = { -1, -1 }, porta, erros;
 static volatile int noAr;
 static char hostLan[64], hostLocal[64], origem[96], urlTmp[LW_APPS][128];
+static char hostAntigo[64], localAntigo[64], origemAntiga[96];   // the stand-in port, still served
 static App apps[LW_APPS];
 static LwPedido fila[LW_FILA];
 static int filaIni, filaN;
@@ -246,13 +247,14 @@ static void atender(int c, const char *cli) {
   temCorpo = n - fimCab;
   *sep = 0;
   if (sscanf(cab, "%7s %199s", metodo, caminho) != 2) { responderTxt(c, 400, NULL); return; }
-  if (!cabecalho(cab, "Host", host, sizeof host) || (strcmp(host, hostLan) && strcmp(host, hostLocal))) {
+  if (!cabecalho(cab, "Host", host, sizeof host) || (strcmp(host, hostLan) && strcmp(host, hostLocal) &&
+      (!hostAntigo[0] || (strcmp(host, hostAntigo) && strcmp(host, localAntigo))))) {
     puts("[lanweb] recusado: Host de fora"); responderTxt(c, 403, NULL); return;
   }
   if (cabecalho(cab, "Origin", orig, sizeof orig)) {
     char o2[96];
     snprintf(o2, sizeof o2, "http://%s", hostLocal);
-    if (strcmp(orig, origem) && strcmp(orig, o2)) { puts("[lanweb] recusado: Origin de fora"); responderTxt(c, 403, NULL); return; }
+    if (strcmp(orig, origem) && strcmp(orig, o2) && (!origemAntiga[0] || strcmp(orig, origemAntiga))) { puts("[lanweb] recusado: Origin de fora"); responderTxt(c, 403, NULL); return; }
   }
   { char *q = strchr(caminho, '?'); if (q) *q = 0; }
   if (caminho[0] != '/') { responderTxt(c, 400, NULL); return; }
@@ -330,21 +332,63 @@ static void atender(int c, const char *cli) {
   }
 }
 
+// The fixed port was taken at the start (often the previous run of the app
+// still closing): keep trying it, and once it is ours serve it too and show
+// it in the links, so Home Assistant and bookmarks find the TV again.
+static int abrirPreferida(void) {
+  struct sockaddr_in a;
+  int um = 1, s;
+  if (!portaPreferida || porta == portaPreferida || ouvir2 >= 0) return 0;
+  s = socket(AF_INET, SOCK_STREAM, 0);
+  if (s < 0) return 0;
+  setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &um, sizeof um);
+  memset(&a, 0, sizeof a);
+  a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY); a.sin_port = htons((unsigned short)portaPreferida);
+  if (bind(s, (struct sockaddr *)&a, sizeof a) || listen(s, 8)) { close(s); return 0; }
+  ouvir2 = s;
+  pthread_mutex_lock(&trava);
+  {
+    char ip[64];
+    snprintf(ip, sizeof ip, "%s", hostLan);
+    char *dp = strrchr(ip, ':');
+    if (dp) *dp = 0;
+    snprintf(hostAntigo, sizeof hostAntigo, "%s", hostLan);
+    snprintf(localAntigo, sizeof localAntigo, "%s", hostLocal);
+    snprintf(origemAntiga, sizeof origemAntiga, "%s", origem);
+    porta = portaPreferida;
+    snprintf(hostLan, sizeof hostLan, "%.47s:%d", ip, porta);
+    snprintf(hostLocal, sizeof hostLocal, "127.0.0.1:%d", porta);
+    snprintf(origem, sizeof origem, "http://%s", hostLan);
+  }
+  pthread_mutex_unlock(&trava);
+  printf("[lanweb] porta fixa %d livre de novo: links voltam para ela\n", portaPreferida);
+  fflush(stdout);
+  return 1;
+}
+
 static void *servir(void *arg) {
+  time_t ultimaTentativa = 0;
   (void)arg;
   while (noAr) {
-    struct pollfd p[2];
-    int r;
+    struct pollfd p[3];
+    int r, np = 2, qual = -1;
+    if (portaPreferida && porta != portaPreferida && time(NULL) - ultimaTentativa >= 3) {
+      ultimaTentativa = time(NULL);
+      abrirPreferida();
+    }
     p[0].fd = ouvir; p[0].events = POLLIN; p[0].revents = 0;
     p[1].fd = acorda[0]; p[1].events = POLLIN; p[1].revents = 0;
-    r = poll(p, 2, 1000);
+    if (ouvir2 >= 0) { p[2].fd = ouvir2; p[2].events = POLLIN; p[2].revents = 0; np = 3; }
+    r = poll(p, (nfds_t)np, 1000);
     if (r < 0 && errno == EINTR) continue;
     if (r < 0 || (p[1].revents & POLLIN)) break;
-    if (p[0].revents & POLLIN) {
+    if (p[0].revents & POLLIN) qual = ouvir;
+    else if (np == 3 && (p[2].revents & POLLIN)) qual = ouvir2;
+    if (qual >= 0) {
       struct sockaddr_in de;
       socklen_t dt = sizeof de;
       char cli[48];
-      int c = accept(ouvir, (struct sockaddr *)&de, &dt);
+      int c = accept(qual, (struct sockaddr *)&de, &dt);
       if (c < 0) continue;
 #ifdef SO_NOSIGPIPE
       { int um = 1; setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &um, sizeof um); }
@@ -359,6 +403,7 @@ static void *servir(void *arg) {
         puts("[lanweb] caminhos errados demais: servidor fechado");
         noAr = 0;
         close(ouvir); ouvir = -1;   // new connections are refused, not left waiting
+        if (ouvir2 >= 0) { close(ouvir2); ouvir2 = -1; }
         break;
       }
     }
@@ -381,7 +426,10 @@ static int subir(void) {
   a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_ANY); a.sin_port = htons((unsigned short)portaPreferida);
   // A fixed port keeps bookmarked links (the settings page) working across
   // restarts; taken, any free port.
-  if (portaPreferida && bind(ouvir, (struct sockaddr *)&a, sizeof a)) { a.sin_port = 0; }
+  if (portaPreferida && bind(ouvir, (struct sockaddr *)&a, sizeof a)) {
+    printf("[lanweb] porta %d ocupada (errno %d): outra por enquanto, tentando de novo\n", portaPreferida, errno);
+    a.sin_port = 0;
+  }
   else if (portaPreferida) goto ligada;
   if (bind(ouvir, (struct sockaddr *)&a, sizeof a)) goto falhou;
 ligada:
@@ -412,6 +460,8 @@ void lanweb_parar(void) {
     fioVivo = 0;
   }
   if (ouvir >= 0) { close(ouvir); ouvir = -1; }
+  if (ouvir2 >= 0) { close(ouvir2); ouvir2 = -1; }
+  hostAntigo[0] = localAntigo[0] = origemAntiga[0] = 0;
   if (acorda[0] >= 0) { close(acorda[0]); close(acorda[1]); acorda[0] = acorda[1] = -1; }
   porta = 0;
 }
