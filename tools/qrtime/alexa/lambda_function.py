@@ -180,7 +180,57 @@ def _musica(d, ns, name, onde):
     return _ok(d)
 
 
+# ---- the custom "YouTube Music" voice skill (same Lambda, second skill) ----
+# "Alexa, ask YouTube Music to play Fairuz on the soundbar": a custom skill
+# (interaction model: skill_music_model.json) whose intents name the speaker;
+# the song goes to Home Assistant like the smart-home music devices do.
+ONDE_POR_INTENT = {
+    "TocarIntent": "soundbar",
+    "TocarSoundbarIntent": "soundbar",
+    "TocarGoogleIntent": "google",
+    "TocarTodasIntent": "casa",
+}
+TECLA_POR_INTENT = {
+    "AMAZON.PauseIntent": "pause", "AMAZON.StopIntent": "stop", "AMAZON.CancelIntent": "stop",
+    "AMAZON.ResumeIntent": "play", "AMAZON.NextIntent": "next", "AMAZON.PreviousIntent": "previous",
+}
+FALA_ONDE = {"soundbar": "the soundbar", "google": "the Google speakers", "casa": "all speakers"}
+
+
+def _fala(texto, fim=True):
+    return {"version": "1.0", "response": {
+        "outputSpeech": {"type": "PlainText", "text": texto}, "shouldEndSession": fim}}
+
+
+def _skill(event):
+    req = event.get("request", {})
+    tipo = req.get("type")
+    print("skill %s %s" % (tipo, (req.get("intent") or {}).get("name", "")))
+    if tipo == "LaunchRequest":
+        return _fala("What should I play?", fim=False)
+    if tipo != "IntentRequest":
+        return _fala("", fim=True)
+    intent = req.get("intent") or {}
+    nome = intent.get("name", "")
+    if nome in ONDE_POR_INTENT:
+        q = ((intent.get("slots") or {}).get("q") or {}).get("value") or ""
+        if not q:
+            return _fala("What should I play?", fim=False)
+        onde = ONDE_POR_INTENT[nome]
+        if not _ha({"acao": "musica", "onde": onde, "q": q}):
+            return _fala("Home Assistant did not answer.")
+        return _fala("Playing %s on %s." % (q, FALA_ONDE[onde]))
+    if nome in TECLA_POR_INTENT:
+        _ha({"acao": "musica_tecla", "onde": "casa", "k": TECLA_POR_INTENT[nome]})
+        return _fala("OK.")
+    if nome == "AMAZON.HelpIntent":
+        return _fala("Say, play a song or an artist, on the soundbar, the Google speakers, or all speakers.", fim=False)
+    return _fala("Sorry, I can't do that yet.")
+
+
 def lambda_handler(event, context):
+    if "request" in event and "directive" not in event:
+        return _skill(event)
     d = event.get("directive", {})
     ns, name = d.get("header", {}).get("namespace"), d.get("header", {}).get("name")
     print("directive %s.%s" % (ns, name))  # never the payload: it may carry tokens
