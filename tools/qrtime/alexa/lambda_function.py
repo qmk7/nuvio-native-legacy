@@ -197,6 +197,76 @@ TECLA_POR_INTENT = {
 FALA_ONDE = {"soundbar": "the soundbar", "google": "the Google speakers", "casa": "all speakers"}
 
 
+# ---- understanding free speech with Claude (optional) ----
+# With ANTHROPIC_API_KEY set on the Lambda (and the "anthropic" package in the
+# upload zip), whatever was said after "play" is read by Claude: what to
+# search on YouTube Music, which speakers, radio or not, a volume. Without the
+# key (or if Claude is slow or fails) the words go to Music Assistant as said.
+MODELO = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
+ESQUEMA = {
+    "type": "object",
+    "properties": {
+        "busca": {"type": "string", "description": "What to search on YouTube Music: artist, song, album, playlist or a mood turned into a concrete search."},
+        "tipo": {"type": "string", "enum": ["track", "artist", "album", "playlist", "any"]},
+        "onde": {"type": "string", "enum": ["soundbar", "google", "casa"]},
+        "radio": {"type": "boolean", "description": "Keep playing similar music after it."},
+        "volume": {"type": "integer", "description": "0-100 when a loudness was asked for, else -1."},
+        "resposta": {"type": "string", "description": "A short spoken confirmation, same language as the request."},
+    },
+    "required": ["busca", "tipo", "onde", "radio", "volume", "resposta"],
+    "additionalProperties": False,
+}
+SISTEMA = (
+    "You turn a music request spoken to Alexa into a YouTube Music search for Music Assistant. "
+    "Speakers: 'soundbar' (living room soundbar, the default), 'google' (the Google speakers: kitchen and bedroom), "
+    "'casa' (all speakers / everywhere / whole house / party). "
+    "Turn moods and descriptions into a concrete search (\"something calm to sleep\" -> a calm sleep playlist; "
+    "\"the song from Titanic\" -> My Heart Will Go On Celine Dion). Arabic artists keep their usual Latin spelling. "
+    "radio is true unless one exact song was asked for. volume: 'quiet/low' about 20, 'loud' about 70, else -1."
+)
+
+
+def _entender(frase, onde_padrao):
+    """Claude's reading of `frase`, or None (no key, no package, slow, refused)."""
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    try:
+        import anthropic
+    except ImportError:
+        print("claude: anthropic package not in the zip")
+        return None
+    try:
+        cli = anthropic.Anthropic(timeout=5.0, max_retries=0)  # Alexa waits 8 s for the whole answer
+        r = cli.beta.messages.create(
+            model=MODELO,
+            max_tokens=1000,
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            output_config={"effort": "low", "format": {"type": "json_schema", "schema": ESQUEMA}},
+            system=SISTEMA,
+            messages=[{"role": "user", "content": "Default speakers: %s.\nRequest: %s" % (onde_padrao, frase)}],
+        )
+        if r.stop_reason == "refusal":
+            print("claude: refusal")
+            return None
+        texto = next((b.text for b in r.content if b.type == "text"), "")
+        d = json.loads(texto)
+        if not d.get("busca"):
+            return None
+        return d
+    except anthropic.APITimeoutError:
+        print("claude: timeout")
+    except anthropic.RateLimitError:
+        print("claude: rate limited")
+    except anthropic.APIStatusError as e:
+        print("claude: status %s" % e.status_code)
+    except anthropic.APIConnectionError:
+        print("claude: connection")
+    except (ValueError, StopIteration):
+        print("claude: unreadable answer")
+    return None
+
+
 def _fala(texto, fim=True):
     return {"version": "1.0", "response": {
         "outputSpeech": {"type": "PlainText", "text": texto}, "shouldEndSession": fim}}
@@ -217,9 +287,20 @@ def _skill(event):
         if not q:
             return _fala("What should I play?", fim=False)
         onde = ONDE_POR_INTENT[nome]
-        if not _ha({"acao": "musica", "onde": onde, "q": q}):
+        d = _entender(q, onde)
+        if d:
+            msg = {"acao": "musica", "onde": d["onde"], "q": d["busca"], "radio": d["radio"]}
+            if d["tipo"] != "any":
+                msg["tipo"] = d["tipo"]
+            if 0 <= d["volume"] <= 100:
+                msg["volume"] = d["volume"]
+            fala = d.get("resposta") or "Playing %s on %s." % (d["busca"], FALA_ONDE[d["onde"]])
+        else:
+            msg = {"acao": "musica", "onde": onde, "q": q}
+            fala = "Playing %s on %s." % (q, FALA_ONDE[onde])
+        if not _ha(msg):
             return _fala("Home Assistant did not answer.")
-        return _fala("Playing %s on %s." % (q, FALA_ONDE[onde]))
+        return _fala(fala)
     if nome in TECLA_POR_INTENT:
         _ha({"acao": "musica_tecla", "onde": "casa", "k": TECLA_POR_INTENT[nome]})
         return _fala("OK.")
