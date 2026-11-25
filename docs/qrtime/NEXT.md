@@ -32,3 +32,6 @@ Phase 3 (home):
 Phase 4 (smarter):
 - 15 "recommend something" by voice, 18 "what should I watch" spoken summary,
   9 "what's this song" saved to YouTube Music, 19 move the film to another TV (needs a second TV).
+
+Owner's devices for phase 3: doorbell EZVIZ (QR TIME already has ezviz.c alerts), lights Tuya (Smart Life):
+add the Tuya integration to Home Assistant (Settings > Devices & services > Tuya, sign in with the Smart Life app's QR) before cinema mode.
