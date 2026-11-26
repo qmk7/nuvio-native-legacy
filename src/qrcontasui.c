@@ -11,6 +11,7 @@
 #include "legtrad.h"
 #include "songid.h"
 #include "qrtex.h"
+#include "ponteiro.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -207,6 +208,10 @@ static const char *estadoTxt(int e) {
     default: return "Não configurado";
   }
 }
+// Magic Remote: hover focuses, click is OK (ponteiro.c).
+static void pFocarAba(int a, int b) { (void)b; if (a != aba) { aba = a; foco = 0; botao = 0; } zona = Z_ABAS; }
+static void pFocarLinha(int a, int b) { if (a >= 0 && a < nItens()) { if (a != foco) botao = 0; foco = a; zona = Z_LISTA; if (b >= 0) botao = b; } }
+static void pFocarConf(int a, int b) { (void)b; botaoConf = a; }
 static float botaoDesenhar(const char *t, float x, float y, int focado) {
   TxtLinha l = txt_linha(TXT_CAPTION, i18n(t), focado ? 20 : 240, focado ? 20 : 242, focado ? 24 : 248, 255);
   float w = (float)l.w + 32;
@@ -227,6 +232,7 @@ static void desenharProvedores(float x, float y, float w) {
     char msg[160];
     int rt = qrc_resultado(l, msg, sizeof msg);
     if (rt >= 0 && est != QRC_E_DESLIGADO) est = rt;
+    ponteiro_alvo(x - 12, ry - 6, w + 24, rh - 10, pFocarLinha, NULL, i, -1);
     if (f) gfx_cor((GfxRect){ x - 12, ry - 6, w + 24, rh - 10 }, 0.25f, 1, 1, 1, 0.10f);
     estadoCor(est, &cr, &cg, &cb);
     gfx_cor((GfxRect){ x, ry + 14, 14, 14 }, 0.5f, cr, cg, cb, 1);
@@ -236,7 +242,11 @@ static void desenharProvedores(float x, float y, float w) {
     if (f) {
       int b[B_N], nb = botoes(l, b);
       float bx = x + w * 0.45f;
-      for (int j = 0; j < nb; j++) bx += botaoDesenhar(rotuloBotao(b[j], l), bx, ry + 42, j == botao);
+      for (int j = 0; j < nb; j++) {
+        float bw = botaoDesenhar(rotuloBotao(b[j], l), bx, ry + 42, j == botao);
+        ponteiro_alvo(bx, ry + 42, bw - 10, 40, pFocarLinha, NULL, i, j);
+        bx += bw;
+      }
     }
   }
 }
@@ -255,6 +265,7 @@ static void desenharDados(float x, float y, float w) {
   for (int i = de; i < QRR_N && i < de + vis; i++) {
     int f = zona == Z_LISTA && i == foco;
     float ry = y + (float)(i - de) * rh;
+    ponteiro_alvo(x - 12, ry - 6, w + 24, rh - 10, pFocarLinha, NULL, i, -1);
     if (f) gfx_cor((GfxRect){ x - 12, ry - 6, w + 24, rh - 10 }, 0.25f, 1, 1, 1, 0.10f);
     corta(TXT_BODY, i18n(qrdados_reset_nome(i)), x, ry, w * 0.7f, f ? 1 : 0.9f);
     corta(TXT_CAPTION, i18n(qrdados_reset_por_tv(i) ? "Nesta TV" : "Neste perfil"), x + w * 0.75f, ry + 6, w * 0.25f, 0.7f);
@@ -269,6 +280,7 @@ static void desenharCelular(float x, float y, float w) {
   for (int i = 0; i < CA_N; i++) {
     int f = zona == Z_LISTA && i == foco, no = celapps_url(i)[0] != 0;
     float ry = y + (float)i * rh;
+    ponteiro_alvo(x - 12, ry - 6, lw + 24, rh - 10, pFocarLinha, NULL, i, -1);
     if (f) gfx_cor((GfxRect){ x - 12, ry - 6, lw + 24, rh - 10 }, 0.25f, 1, 1, 1, 0.10f);
     gfx_icone((GfxRect){ x, ry + 4, 36, 36 }, celapps_icone(i), 1, 1, 1, f ? 1 : 0.8f);
     corta(TXT_BODY, i18n(celapps_nome(i)), x + 52, ry, lw - 180, f ? 1 : 0.9f);
@@ -288,6 +300,7 @@ static void desenharCelular(float x, float y, float w) {
 }
 static void desenharConfirmacao(void) {
   float w = 900, h = 330, x = (NV_TELA_W - w) / 2, y = (NV_TELA_H - h) / 2;
+  ponteiro_camada();
   gfx_cor((GfxRect){ 0, 0, NV_TELA_W, NV_TELA_H }, 0, 0, 0, 0, 0.6f);
   gfx_cor((GfxRect){ x, y, w, h }, 0.06f, 0.10f, 0.105f, 0.12f, 1);
   corta(TXT_TITULO2, i18n(qrdados_reset_nome(confirmando)), x + 40, y + 34, w - 80, 1);
@@ -295,8 +308,11 @@ static void desenharConfirmacao(void) {
   corta(TXT_CAPTION, i18n(qrdados_reset_por_tv(confirmando) ? "Vale para todos os perfis desta TV." : "Só o perfil atual."), x + 40, y + 222, w - 80, 0.65f);
   {
     float bx = x + 40;
-    bx += botaoDesenhar("Cancelar", bx, y + 266, botaoConf == 0);
-    botaoDesenhar("Apagar", bx, y + 266, botaoConf == 1);
+    float bw = botaoDesenhar("Cancelar", bx, y + 266, botaoConf == 0);
+    ponteiro_alvo(bx, y + 266, bw - 10, 40, pFocarConf, NULL, 0, 0);
+    bx += bw;
+    bw = botaoDesenhar("Apagar", bx, y + 266, botaoConf == 1);
+    ponteiro_alvo(bx, y + 266, bw - 10, 40, pFocarConf, NULL, 1, 0);
   }
 }
 void qrcui_desenhar(Uint32 agora) {
@@ -310,6 +326,7 @@ void qrcui_desenhar(Uint32 agora) {
       TxtLinha l = txt_linha(TXT_CALLOUT, i18n(ABAS[i]), 240, 242, 248, 255);
       float lw = (float)l.w + 40;
       int f = zona == Z_ABAS && i == aba;
+      ponteiro_alvo(tx, y, lw, 52, pFocarAba, NULL, i, 0);
       gfx_cor((GfxRect){ tx, y, lw, 52 }, 0.5f, 1, 1, 1, i == aba ? (f ? 0.9f : 0.18f) : 0.06f);
       if (f) txt_desenhar_alpha(txt_linha(TXT_CALLOUT, i18n(ABAS[i]), 20, 20, 24, 255), tx + 20, y + 10, 1);
       else txt_desenhar_alpha(l, tx + 20, y + 10, i == aba ? 1 : 0.7f);

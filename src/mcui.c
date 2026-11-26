@@ -1794,6 +1794,9 @@ static void maNavegar(Pagina *pg, SDL_Keycode k) {
   else if (k == SDLK_UP) zona = Z_MENU;
   else if (mcp_estado() != MCP_PARADO) { zonaAntesTocando = Z_LISTA; zona = Z_TOCANDO; }
 }
+static void pFocarSecao(int a, int b) { (void)b; if (a != secao) abrirSecao(a); zona = Z_MENU; }
+static void pFocarLinha(int a, int b) { Pagina *pg = topo(); (void)b; if (pg && a >= 0 && a < pg->n && !pulavel(&pg->v[a])) { pg->foco = a; zona = Z_LISTA; } }
+static void pFocarAcao(int a, int b) { (void)b; if (a >= 0 && a < nAcoes) focoAcao = a; }
 static void maPonteiroFocar(int a, int b) {
   Pagina *pg = topo();
   (void)b;
@@ -1896,6 +1899,7 @@ static void barraMini(float y) {
   gfx_cor((GfxRect){ x + 84, y + 50, w - 84, 4 }, 0, 1, 1, 1, 0.15f);
   gfx_cor((GfxRect){ x + 84, y + 50, (w - 84) * (pct > 1 ? 1 : pct), 4 }, 0, 1, 1, 1, 0.85f);
 }
+static void pFocarBotaoTocando(int a, int b) { (void)b; focoBarra = 0; focoTocando = a; zona = Z_TOCANDO; }
 static void desenharTocando(Uint32 agora) {
   const McFaixa *f = mcq_faixa_atual();
   float x = NV_MARGEM_X, y = NV_MARGEM_Y + 20, w = NV_TELA_W - 2 * NV_MARGEM_X, s = 480;
@@ -1968,6 +1972,7 @@ static void desenharTocando(Uint32 agora) {
       float bw = (float)l.w + 44;
       gfx_cor((GfxRect){ bx, y, bw, 60 }, 0.5f, 1, 1, 1, foco ? 0.92f : 0.1f);
       txt_desenhar_alpha(l, bx + 22, y + 14, 1);
+      ponteiro_alvo(bx, y, bw, 60, pFocarBotaoTocando, NULL, i, 0);
       bx += bw + 14;
     }
   }
@@ -2024,6 +2029,7 @@ void mcui_desenhar(Uint32 agora) {
     int foco = zona == Z_MENU && i == secao;
     if (i == secao) gfx_cor((GfxRect){ mx - 12, sy - 6, menuW, 52 }, 0.4f, 1, 1, 1, foco ? 0.9f : 0.12f);
     { TxtLinha l = txt_linha_corta(TXT_CALLOUT, i18n(SECOES[i]), foco ? 20 : 240, foco ? 20 : 242, foco ? 24 : 248, 255, menuW - 30); txt_desenhar_alpha(l, mx + 8, sy + 6, i == secao ? 1 : 0.7f); }
+    ponteiro_alvo(mx - 12, sy - 6, menuW, 52, pFocarSecao, NULL, i, 0);
   }
   if (zona == Z_FORM) { desenharForm(x, y0, w); if (teclado_aberto()) teclado_desenhar(agora); barraMini(NV_TELA_H - 90); return; }
   if (ehMa(pg)) { maDesenhar(pg, x, y0, w, base, agora); goto depoisLista; }
@@ -2048,6 +2054,7 @@ void mcui_desenhar(Uint32 agora) {
       int foco = zona == Z_LISTA && i == pg->foco;
       float ry = y + (float)(i - de) * rh;
       if (l->tipo == L_TITULO) { texto(TXT_CALLOUT, l->t1, x, ry + 40, 0.6f); continue; }
+      if (!pulavel(l)) ponteiro_alvo(x - 12, ry - 6, w + 24, rh - 8, pFocarLinha, NULL, i, 0);
       if (foco) gfx_cor((GfxRect){ x - 12, ry - 6, w + 24, rh - 8 }, 0.25f, 1, 1, 1, 0.13f);
       if (l->tipo == L_FAIXA || l->tipo == L_ALBUM || l->tipo == L_ARTISTA || l->tipo == L_PLAYLIST) {
         capa(l->tipo == L_FAIXA ? l->f.id : l->ref, l->capa, x, ry, 80);
@@ -2076,9 +2083,11 @@ depoisLista:;
     float ax = NV_TELA_W - 620, ay = 180, aw = 560;
     gfx_cor((GfxRect){ ax - 24, ay - 24, aw + 48, 80 + (float)nAcoes * 64 }, 0.3f, 0.12f, 0.125f, 0.14f, 0.98f);
     corta(TXT_CALLOUT, linhaAcao.t1, ax, ay, aw, 0.9f);
+    ponteiro_camada();   // the sheet owns the pointer while open
     for (int i = 0; i < nAcoes; i++) {
       int foco = i == focoAcao;
       float yy = ay + 60 + (float)i * 64;
+      ponteiro_alvo(ax - 10, yy - 6, aw + 20, 56, pFocarAcao, NULL, i, 0);
       if (foco) gfx_cor((GfxRect){ ax - 10, yy - 6, aw + 20, 56 }, 0.25f, 1, 1, 1, 0.9f);
       { TxtLinha l = txt_linha(TXT_BODY, i18n(rotuloAcao(acoes[i])), foco ? 20 : 240, foco ? 20 : 242, foco ? 24 : 248, 255); txt_desenhar_alpha(l, ax, yy + 4, 1); }
     }

@@ -1,4 +1,5 @@
 #include "esporteui.h"
+#include "ponteiro.h"
 #include "esportenomes.h"
 #include "espn.h"
 #include "esporte.h"
@@ -901,6 +902,10 @@ static void cartaoSimples(const char *logoUrl, const char *txt, const char *sub,
   else gfx_anel(r, raio, 1, 1, 1, 1, 0.2f);
 }
 
+// Magic Remote: hovering a tab / a filter / a card focuses it (the variables the arrows move), a click is OK.
+static void pFocarAba(int a, int b) { (void)b; if (a != aba) { aba = a; foco = 0; rolagem = 0; montar(); } zona = Z_ABAS; }
+static void pFocarFiltro(int a, int b) { (void)b; filtroFoco = a; zona = Z_FILTROS; }
+static void pFocarLinha(int a, int b) { (void)b; foco = a; zona = Z_LISTA; }
 void esporteui_desenhar(Uint32 agora) {
   float x = NV_MARGEM_X, y = NV_MARGEM_Y, w = NV_TELA_W - 2 * NV_MARGEM_X;
   char b[200];
@@ -1012,6 +1017,7 @@ void esporteui_desenhar(Uint32 agora) {
       else { gfx_cor(rr, 0.5f, 0.118f, 0.129f, 0.173f, 0.78f); gfx_anel(rr, 0.5f, 1, 1, 1, 1, 0.2f); }
       if (f) gfx_anel_fora(rr, 0.5f, 3, 3, 1, 1, 1, 1);
       txt_desenhar_alpha(l, tx + 20, y + (52 - (float)l.h) * 0.5f, sel || f ? 1 : 0.85f);
+      ponteiro_alvo(rr.x, rr.y, rr.w, rr.h, pFocarAba, NULL, i, 0);
       tx += lw + 10;
     }
     y += 72;
@@ -1039,6 +1045,7 @@ void esporteui_desenhar(Uint32 agora) {
       gfx_cor(rr, 0.5f, 1, 1, 1, f ? 0.16f : 0.05f);
       if (f) gfx_anel_fora(rr, 0.5f, 3, 3, 1, 1, 1, 1);
       txt_desenhar_alpha(l, tx + 16, y + (42 - (float)l.h) * 0.5f, f ? 1 : 0.85f);
+      ponteiro_alvo(rr.x, rr.y, rr.w, rr.h, pFocarFiltro, NULL, i, 0);
       tx += lw + 10;
     }
     y += 64;
@@ -1066,6 +1073,7 @@ void esporteui_desenhar(Uint32 agora) {
         int f = zona == Z_LISTA && i == foco;
         float ry = y + (float)(i - de) * rh;
         const EspPos *p = &tab[i];
+        ponteiro_alvo(x - 12, ry - 4, w + 24, rh - 10, pFocarLinha, NULL, i, 0);
         {
           GfxRect rr = { x - 12, ry - 4, w + 24, rh - 10 };
           gfx_cor(rr, 12.0f / rr.h, 0.118f, 0.129f, 0.173f, i % 2 ? 0.55f : 0.78f);
@@ -1130,6 +1138,7 @@ void esporteui_desenhar(Uint32 agora) {
         for (int k = 0; k < vl[r].n; k++) {
           int i = vl[r].c[k], f = zona == Z_LISTA && i == foco;
           GfxRect rc = { x + (float)k * (cw + gap), yy, cw, ch };
+          ponteiro_alvo(rc.x, rc.y, rc.w, rc.h, pFocarLinha, NULL, i, 0);
           if (aba == ABA_LIGAS) {
             const EspLiga *ls;
             char lg[200];

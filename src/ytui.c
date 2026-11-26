@@ -1,4 +1,5 @@
 #include "ytui.h"
+#include "ponteiro.h"
 #include "ytapi.h"
 #include "ondever.h"
 #include "gfx.h"
@@ -585,6 +586,9 @@ static void cartaoYt(const YtItem *it, float x, float y, float w, int f) {
   { TxtLinha l = txt_linha_corta(TXT_CAPTION2, b, 170, 174, 186, 255, (int)w); txt_desenhar_alpha(l, x, y, 1); }
 }
 
+// Magic Remote: hovering a tab / a card focuses it (the same variables the arrows move), a click is OK.
+static void pFocarAba(int a, int b) { (void)b; if (a != aba) trocarAba(a); zona = Z_ABAS; }
+static void pFocarCartao(int a, int b) { Pagina *pg = atual(); (void)b; if (pg && a >= 0 && a < pg->n) { pg->foco = a; zona = Z_LISTA; } }
 void ytui_desenhar(Uint32 agora) {
   float x = NV_MARGEM_X, y = NV_MARGEM_Y, w = NV_TELA_W - 2 * NV_MARGEM_X;
   Pagina *pg = atual();
@@ -611,6 +615,7 @@ void ytui_desenhar(Uint32 agora) {
       else { gfx_cor(rr, 0.5f, 0.118f, 0.129f, 0.173f, 0.78f); gfx_anel(rr, 0.5f, 1, 1, 1, 1, 0.2f); }
       if (f) gfx_anel_fora(rr, 0.5f, 3, 3, 1, 1, 1, 1);
       txt_desenhar_alpha(l, tx + 20, y + (52 - (float)l.h) * 0.5f, sel || f ? 1 : 0.85f);
+      ponteiro_alvo(rr.x, rr.y, rr.w, rr.h, pFocarAba, NULL, i, 0);
       tx += lw + 10;
     }
     y += 80;
@@ -632,8 +637,11 @@ void ytui_desenhar(Uint32 agora) {
                       !pg->pedido ? "" : "Nada por aqui.";
       if (m[0]) txt_bloco_corta(TXT_BODY, i18n(m), 240, 242, 248, x, y + 20, w, 40, 0.75f, 3);
     }
-    for (int i = l0 * YT_COLS; i < pg->n && i < (l0 + linhas) * YT_COLS; i++)
-      cartaoYt(&pg->itens[i], x + (float)(i % YT_COLS) * (cw + gap), y + (float)(i / YT_COLS - l0) * rh, cw, zona == Z_LISTA && i == pg->foco);
+    for (int i = l0 * YT_COLS; i < pg->n && i < (l0 + linhas) * YT_COLS; i++) {
+      float cx = x + (float)(i % YT_COLS) * (cw + gap), cy = y + (float)(i / YT_COLS - l0) * rh;
+      cartaoYt(&pg->itens[i], cx, cy, cw, zona == Z_LISTA && i == pg->foco);
+      ponteiro_alvo(cx, cy, cw, rh - gap, pFocarCartao, NULL, i, 0);
+    }
     if (pg->n && pg->carregando) texto(TXT_CAPTION, i18n("Carregando mais…"), x, NV_TELA_H - 56, 0.6f);
     else if (pg->n && pg->erro) corta(TXT_CAPTION, i18n(mensagemErro(pg->erro, pg->tipo)), x, NV_TELA_H - 56, w, 0.7f);
   }
