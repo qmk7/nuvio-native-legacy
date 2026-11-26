@@ -62,6 +62,9 @@ shot ma-artistas
 tecla up 1; tecla up 1; tecla right 2
 tecla "mover:800,760" 1; tecla "clicar:800,760" 3
 espera '"media": \["ytmusic://track/t2"\]' 10 "$W/ma-commands.log" && ok "pointer click plays the cover under it" || erro "pointer click did not play"
+# Magic Remote on the side menu: a click on Albums opens Music Assistant's albums.
+tecla "mover:200,340" 1; tecla "clicar:200,340" 3
+espera 'music/albums/library_items' 10 "$W/ma-commands.log" && ok "pointer click on the side menu opens Albums" || erro "side menu ignores the pointer"
 grep -q "$TOKEN" "$LOG" && erro "the token is in the app log" || ok "no token in the app log"
 [ "$fail" = 0 ] && echo "qrtime_ma_ui: ok"
 exit "$fail"
