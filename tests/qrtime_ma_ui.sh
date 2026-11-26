@@ -47,13 +47,9 @@ sleep 3   # Music opens straight on the Music Assistant home
 espera "music/recently_played_items" 20 "$W/ma-commands.log" && ok "Music Assistant home asks the recent items" || erro "no recently_played_items"
 espera "music/playlists/library_items" 20 "$W/ma-commands.log" && ok "...and the playlists row" || erro "no playlists row"
 shot ma-home
-tecla ok 3                                      # first cover, no speaker yet -> speakers page
-espera "players/all" 20 "$W/ma-commands.log" && ok "no speaker yet: speakers listed" || erro "no players/all"
-tecla ok 3                                      # pick the first speaker (soundbar)
-grep -q "media_player.q990f" "$d/music-assistant-player.txt" 2>/dev/null && ok "speaker kept on the TV" || erro "speaker not saved"
-sleep 2
-tecla ok 3                                      # back on the first cover: play it
-espera "player_queues/play_media" 20 "$W/ma-commands.log" && ok "a cover asks play_media" || erro "no play_media"
+tecla ok 3                                      # first cover, no speaker yet: the soundbar is picked by itself
+grep -q "media_player.q990f" "$d/music-assistant-player.txt" 2>/dev/null && ok "no speaker yet: the soundbar picked and kept" || erro "speaker not picked"
+espera "player_queues/play_media" 20 "$W/ma-commands.log" && ok "the cover plays at once" || erro "no play_media"
 grep "player_queues/play_media" "$W/ma-commands.log" | grep -q '"queue_id": "media_player.q990f"' && ok "on the chosen speaker" || erro "wrong speaker: $(grep play_media "$W/ma-commands.log")"
 sleep 6
 shot ma-tocando

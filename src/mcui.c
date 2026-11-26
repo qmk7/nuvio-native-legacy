@@ -1074,7 +1074,30 @@ static void *fioMa(void *u) {
   MaCmd c = *(MaCmd *)u;
   int e;
   free(u);
-  e = c.uri[0] ? massist_tocar(c.alto, c.uri, 1) : massist_comando(c.alto, c.cmd);
+  // No speaker chosen yet: the soundbar (or the first speaker there is), kept, so a cover plays at once.
+  if (!c.alto[0]) {
+    MaPlayer *pl = calloc(32, sizeof *pl);
+    int n = 0, k = -1;
+    if (pl && massist_players(pl, 32, &n) == MA_OK)
+      for (int i = 0; i < n; i++) {
+        char nm[96];
+        size_t j = 0;
+        if (!pl[i].disponivel) continue;
+        for (; pl[i].nome[j] && j + 1 < sizeof nm; j++) nm[j] = (char)tolower((unsigned char)pl[i].nome[j]);
+        nm[j] = 0;
+        if (strstr(nm, "soundbar") || strstr(nm, "sound bar")) { k = i; break; }
+        if (k < 0 && !pl[i].grupo) k = i;
+      }
+    if (k >= 0) {
+      snprintf(c.alto, sizeof c.alto, "%s", pl[k].id);
+      massist_alto_gravar(pl[k].id, pl[k].nome);
+      pthread_mutex_lock(&trava);
+      snprintf(maAltoNome, sizeof maAltoNome, "%s", pl[k].nome);
+      pthread_mutex_unlock(&trava);
+    }
+    free(pl);
+  }
+  e = !c.alto[0] ? MA_SERVIDOR : c.uri[0] ? massist_tocar(c.alto, c.uri, 1) : massist_comando(c.alto, c.cmd);
   pthread_mutex_lock(&trava);
   maResultado = e; maFoiTocar = c.uri[0] != 0;
   pthread_mutex_unlock(&trava);
@@ -1084,11 +1107,7 @@ static void maEnviar(const char *uri, const char *cmd) {
   MaCmd *c;
   pthread_t t;
   char alto[96];
-  if (!massist_alto_ler(alto, sizeof alto, maAltoNome, sizeof maAltoNome)) {
-    ilha_avisar("mcma", ILHA_INFO, NULL, i18n("Escolha primeiro onde tocar."), 3000u, 0);
-    empilhar(P_MA_ALTOS, "", i18n("Tocar em"));
-    return;
-  }
+  if (!massist_alto_ler(alto, sizeof alto, maAltoNome, sizeof maAltoNome)) alto[0] = 0;   // the worker picks one
   if (!(c = calloc(1, sizeof *c))) return;
   snprintf(c->alto, sizeof c->alto, "%s", alto);
   snprintf(c->cmd, sizeof c->cmd, "%s", cmd ? cmd : "");
