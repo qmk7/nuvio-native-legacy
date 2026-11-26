@@ -408,7 +408,9 @@ static void *fioCarga(void *u) {
         }
         free(pl);
         n = 0;
-      } else if (p.tipo == P_MA_BUSCA) e = maErro(massist_buscar(p.arg, v, 80, &n));
+      } else if (p.tipo == P_MA_BUSCA && !p.arg[0]) acao(&tmp, A_MA_BUSCA, i18n("Buscar no YouTube Music"), i18n("Artista, música, álbum ou playlist"));
+      else if (p.tipo == P_MA_BUSCA) e = maErro(massist_buscar(p.arg, v, 80, &n));
+      else if (p.tipo == P_MA_BIB && !strcmp(p.arg, "recent")) e = maErro(massist_recentes(v, 80, &n));
       else if (p.tipo == P_MA_BIB) e = maErro(massist_biblioteca(p.arg, 0, v, 80, &n));
       else {
         MaItem pai;
@@ -657,10 +659,23 @@ static void empilhar(int tipo, const char *arg, const char *t) {
   carregar(pg);
   zona = Z_LISTA;
 }
+// Music Assistant and no server of its own: every section is Music
+// Assistant's (YouTube Music and whatever else it has), the sections it has
+// no counterpart for (genres, offline, the local queue) are not shown.
+static int modoMa(void) { return massist_configurado() && !mcfontes_n(); }
+static int secaoVisivel(int s) { return !modoMa() || (s != P_GENEROS && s != P_OFFLINE && s != P_FILA); }
 static void abrirSecao(int s) {
   for (int i = 0; i < nPilha; i++) pilha[i].gen = ++geracao;
   nPilha = 0;
   secao = s;
+  if (modoMa()) {
+    static const struct { int s, p; const char *arg; } MAPA[] = {
+      { P_INICIO, P_MA, "" }, { P_RECENTES, P_MA_BIB, "recent" }, { P_ARTISTAS, P_MA_BIB, "artists" },
+      { P_ALBUNS, P_MA_BIB, "albums" }, { P_FAIXAS, P_MA_BIB, "tracks" }, { P_PLAYLISTS, P_MA_BIB, "playlists" },
+      { P_FAVORITOS, P_MA_BIB, "favorites" }, { P_BUSCAR, P_MA_BUSCA, "" } };
+    for (size_t i = 0; i < sizeof MAPA / sizeof *MAPA; i++)
+      if (MAPA[i].s == s) { empilhar(MAPA[i].p, MAPA[i].arg, i18n(SECOES[s])); return; }
+  }
   empilhar(s, "", i18n(SECOES[s]));
 }
 
@@ -1016,7 +1031,7 @@ void mcui_abrir(void) {
     zona = Z_MENU;
     // Music Assistant and no server of its own: Music opens on its home (the
     // now-playing card and the rows of covers), Back returns to the sections.
-    if (massist_configurado() && !mcfontes_n()) { empilhar(P_MA, "", "Music Assistant"); zona = Z_LISTA; }
+    if (modoMa()) zona = Z_LISTA;
   } else if (topo() && ehLocal(topo()->tipo)) construirLocal(topo());
 }
 void mcui_perfil_trocou(void) {
@@ -1358,8 +1373,11 @@ void mcui_evento(const SDL_Event *e) {
   }
   if (zona == Z_MENU) {
     if (voltar) { sair = 1; return; }
-    if (k == SDLK_UP && secao > 0) abrirSecao(secao - 1), zona = Z_MENU;
-    else if (k == SDLK_DOWN && secao + 1 < P_SECOES) abrirSecao(secao + 1), zona = Z_MENU;
+    int ant = secao - 1, prox = secao + 1;
+    while (ant >= 0 && !secaoVisivel(ant)) ant--;
+    while (prox < P_SECOES && !secaoVisivel(prox)) prox++;
+    if (k == SDLK_UP && ant >= 0) abrirSecao(ant), zona = Z_MENU;
+    else if (k == SDLK_DOWN && prox < P_SECOES) abrirSecao(prox), zona = Z_MENU;
     else if ((k == SDLK_RIGHT || ok) && pg) {
       zona = Z_LISTA;
       if (pg->tipo == P_BUSCAR && !pg->arg[0] && ok) ativar(pg, 0);
@@ -1945,8 +1963,10 @@ void mcui_desenhar(Uint32 agora) {
   }
   // Sections.
   texto(TXT_TITULO2, i18n("Música"), mx, y0, 1);
-  for (int i = 0; i < P_SECOES; i++) {
-    float sy = y0 + 80 + (float)i * 58;
+  for (int i = 0, k = 0; i < P_SECOES; i++) {
+    float sy;
+    if (!secaoVisivel(i)) continue;
+    sy = y0 + 80 + (float)(k++) * 58;
     int foco = zona == Z_MENU && i == secao;
     if (i == secao) gfx_cor((GfxRect){ mx - 12, sy - 6, menuW, 52 }, 0.4f, 1, 1, 1, foco ? 0.9f : 0.12f);
     { TxtLinha l = txt_linha_corta(TXT_CALLOUT, i18n(SECOES[i]), foco ? 20 : 240, foco ? 20 : 242, foco ? 24 : 248, 255, menuW - 30); txt_desenhar_alpha(l, mx + 8, sy + 6, i == secao ? 1 : 0.7f); }

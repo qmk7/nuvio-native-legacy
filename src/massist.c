@@ -283,8 +283,10 @@ int massist_biblioteca(const char *tipo, int offset, MaItem *out, int max, int *
   char cmd[64], args[96], *r;
   int e;
   *n = 0;
-  snprintf(cmd, sizeof cmd, "music/%s/library_items", tipo);
-  snprintf(args, sizeof args, "{\"limit\":%d,\"offset\":%d}", max, offset);
+  // "favorites": the tracks marked favourite (liked songs on YouTube Music).
+  int fav = !strcmp(tipo, "favorites");
+  snprintf(cmd, sizeof cmd, "music/%s/library_items", fav ? "tracks" : tipo);
+  snprintf(args, sizeof args, "{\"limit\":%d,\"offset\":%d%s}", max, offset, fav ? ",\"favorite\":true" : "");
   if ((e = comando(cmd, args, &r)) == MA_OK) *n = massist_ler_itens(r, NULL, out, max);
   free(r);
   return e;

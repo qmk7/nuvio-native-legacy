@@ -57,6 +57,11 @@ espera "player_queues/play_media" 20 "$W/ma-commands.log" && ok "a cover asks pl
 grep "player_queues/play_media" "$W/ma-commands.log" | grep -q '"queue_id": "media_player.q990f"' && ok "on the chosen speaker" || erro "wrong speaker: $(grep play_media "$W/ma-commands.log")"
 sleep 6
 shot ma-tocando
+# The sections on the left are Music Assistant's too: Artists lists its artists.
+tecla back 1
+for i in 1 2; do tecla down 1; done
+espera 'music/artists/library_items \{"limit": 80' 10 "$W/ma-commands.log" && ok "Artists section asks Music Assistant" || erro "Artists section not from Music Assistant"
+shot ma-artistas
 grep -q "$TOKEN" "$LOG" && erro "the token is in the app log" || ok "no token in the app log"
 [ "$fail" = 0 ] && echo "qrtime_ma_ui: ok"
 exit "$fail"
