@@ -62,6 +62,10 @@ tecla back 1
 for i in 1 2; do tecla down 1; done
 espera 'music/artists/library_items \{"limit": 80' 10 "$W/ma-commands.log" && ok "Artists section asks Music Assistant" || erro "Artists section not from Music Assistant"
 shot ma-artistas
+# Magic Remote: a click on the second cover of the home plays it.
+tecla up 1; tecla up 1; tecla right 2
+tecla "mover:800,760" 1; tecla "clicar:800,760" 3
+espera '"media": \["ytmusic://track/t2"\]' 10 "$W/ma-commands.log" && ok "pointer click plays the cover under it" || erro "pointer click did not play"
 grep -q "$TOKEN" "$LOG" && erro "the token is in the app log" || ok "no token in the app log"
 [ "$fail" = 0 ] && echo "qrtime_ma_ui: ok"
 exit "$fail"

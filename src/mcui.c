@@ -23,6 +23,7 @@
 #include "teclado.h"
 #include "tex_cache.h"
 #include "qrtex.h"
+#include "ponteiro.h"
 #include <ctype.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -80,7 +81,7 @@ static MaAgora maAg;  // Music Assistant home: what the chosen speaker plays
 static Uint32 maAgEm, maAgProx;
 static int maAgFio;
 static char maAgAlto[96];
-static float maFilOff[16];
+static float maFilOff[16], maFilAlvo[16];
 static void maAgoraPedir(Uint32 agora, Uint32 daqui);
 static int ehMa(const Pagina *pg);
 static void maNavegar(Pagina *pg, SDL_Keycode k);
@@ -172,6 +173,14 @@ typedef struct { Pagina *alvo; unsigned gen; int anexar, erro, mais; Linha *v; i
 static pthread_mutex_t trava = PTHREAD_MUTEX_INITIALIZER;
 static Resultado fila[8]; static int nFila;
 
+typedef struct { const char *tipo; MaItem *v; int n, e; } MaFila;
+static void *fioMaFila(void *u) {
+  MaFila *f = u;
+  f->v = calloc(20, sizeof *f->v);
+  if (!f->v) { f->e = MA_REDE; return NULL; }
+  f->e = !strcmp(f->tipo, "recent") ? massist_recentes(f->v, 20, &f->n) : massist_biblioteca(f->tipo, 0, f->v, 20, &f->n);
+  return NULL;
+}
 static void *fioCarga(void *u) {
   Pedido p = *(Pedido *)u;
   Pagina tmp;
@@ -373,8 +382,6 @@ static void *fioCarga(void *u) {
       massist_alto_ler(alto, sizeof alto, nomeAlto, sizeof nomeAlto);
       if (p.tipo == P_MA) {
         // Home: the now-playing card's buttons first, then rows of covers.
-        static const struct { const char *tipo, *titulo; int verTudo; } FILEIRAS[] = {
-          { "playlists", "Suas playlists", A_MA_LISTAS }, { "artists", "Seus artistas", A_MA_ARTISTAS }, { "albums", "Seus álbuns", A_MA_ALBUNS } };
         acao(&tmp, A_MA_ANT, i18n("Anterior"), NULL);
         acao(&tmp, A_MA_PLAY, i18n("Tocar / pausar"), NULL);
         acao(&tmp, A_MA_PROX, i18n("Próxima"), NULL);
@@ -383,15 +390,24 @@ static void *fioCarga(void *u) {
         acao(&tmp, A_MA_BUSCA, i18n("Buscar"), NULL);
         snprintf(b, sizeof b, "%s", nomeAlto[0] ? nomeAlto : i18n("escolha uma caixa de som"));
         acao(&tmp, A_MA_ALTOS, b, NULL);
-        e = maErro(massist_recentes(v, 20, &n));
-        if (n) titulo(&tmp, i18n("Tocadas recentemente"));
-        for (int i = 0; i < n; i++) { Linha *l = novaLinha(&tmp); if (l) linhaMa(l, &v[i]); }
-        for (size_t f = 0; e == MC_OK && f < sizeof FILEIRAS / sizeof *FILEIRAS; f++) {
-          int nf = 0;
-          if (massist_biblioteca(FILEIRAS[f].tipo, 0, v, 20, &nf) != MA_OK || !nf) continue;
-          titulo(&tmp, i18n(FILEIRAS[f].titulo));
-          for (int i = 0; i < nf; i++) { Linha *l = novaLinha(&tmp); if (l) linhaMa(l, &v[i]); }
-          acao(&tmp, FILEIRAS[f].verTudo, i18n("Ver tudo"), NULL);
+        // The four rows at once (each its own request), then laid out in order.
+        {
+          MaFila fl[4] = { { "recent", NULL, 0, 0 }, { "playlists", NULL, 0, 0 }, { "artists", NULL, 0, 0 }, { "albums", NULL, 0, 0 } };
+          pthread_t th[4];
+          int vivo[4];
+          for (int f = 0; f < 4; f++) vivo[f] = !pthread_create(&th[f], NULL, fioMaFila, &fl[f]);
+          for (int f = 0; f < 4; f++) { if (vivo[f]) pthread_join(th[f], NULL); else fioMaFila(&fl[f]); }
+          e = maErro(fl[0].e == MA_OK || fl[1].e == MA_OK ? MA_OK : fl[0].e);
+          for (int f = 0; f < 4; f++) {
+            static const char *const TIT[4] = { "Tocadas recentemente", "Suas playlists", "Seus artistas", "Seus álbuns" };
+            static const int VER[4] = { 0, A_MA_LISTAS, A_MA_ARTISTAS, A_MA_ALBUNS };
+            if (fl[f].e == MA_OK && fl[f].n) {
+              titulo(&tmp, i18n(TIT[f]));
+              for (int i = 0; i < fl[f].n; i++) { Linha *l = novaLinha(&tmp); if (l) linhaMa(l, &fl[f].v[i]); }
+              if (VER[f]) acao(&tmp, VER[f], i18n("Ver tudo"), NULL);
+            }
+            free(fl[f].v);
+          }
         }
         n = 0;   // rows already added
       } else if (p.tipo == P_MA_ALTOS) {
@@ -492,6 +508,7 @@ static void aplicar(void) {
     if (pg->tipo == P_MA && !r[i].anexar) {
       for (int k = 0; k < pg->n; k++) if (pg->v[k].tipo == L_MA) { pg->foco = k; break; }
       memset(maFilOff, 0, sizeof maFilOff);
+      memset(maFilAlvo, 0, sizeof maFilAlvo);
     }
   }
 }
@@ -662,7 +679,7 @@ static void empilhar(int tipo, const char *arg, const char *t) {
 // Music Assistant and no server of its own: every section is Music
 // Assistant's (YouTube Music and whatever else it has), the sections it has
 // no counterpart for (genres, offline, the local queue) are not shown.
-static int modoMa(void) { return massist_configurado() && !mcfontes_n(); }
+static int modoMa(void) { return massist_configurado(); }   // Music Assistant set up: it IS the music
 static int secaoVisivel(int s) { return !modoMa() || (s != P_GENEROS && s != P_OFFLINE && s != P_FILA); }
 static void abrirSecao(int s) {
   for (int i = 0; i < nPilha; i++) pilha[i].gen = ++geracao;
@@ -1392,6 +1409,8 @@ void mcui_evento(const SDL_Event *e) {
     return;
   }
   if (ehMa(pg) && pg->n && (k == SDLK_LEFT || k == SDLK_RIGHT || k == SDLK_UP || k == SDLK_DOWN)) { maNavegar(pg, k); return; }
+  // The remote's volume keys (when the TV lets the app have them) move the speaker Music Assistant plays on.
+  if (ehMa(pg) && (k == SDLK_VOLUMEUP || k == SDLK_VOLUMEDOWN)) { maEnviar(NULL, k == SDLK_VOLUMEUP ? "volume_up" : "volume_down"); return; }
   if (k == SDLK_LEFT) { zona = Z_MENU; return; }
   if (k == SDLK_UP) { int f = pg->foco; pg->foco--; ajustarFoco(pg, -1); if (pg->foco == f && f <= 0) zona = Z_MENU; return; }
   if (k == SDLK_DOWN) {
@@ -1620,11 +1639,11 @@ static float maLayoutInicio(const Pagina *pg, float x, float w) {
     if (fil < 0) { maR[i] = (MaR){ x, y, w, 44 }; continue; }
     // A cover (or the "See all" tile) in this row.
     {
-      float lx = (float)k * passo, off = maFilOff[fil];
+      float lx = (float)k * passo, off = maFilAlvo[fil];
       if (pg->foco == i) {
         if (lx - off > w - MA_CAPA) off = lx - (w - MA_CAPA);
         if (lx < off) off = lx;
-        maFilOff[fil] = off;
+        maFilAlvo[fil] = off;
       }
       maR[i] = (MaR){ x + lx - maFilOff[fil], y + 56, MA_CAPA, MA_CAPA + 122 };
       k++;
@@ -1748,9 +1767,18 @@ static void maNavegar(Pagina *pg, SDL_Keycode k) {
       if (d < md) { md = d; melhor = i; }
     }
   }
+  // From the covers up into the now-playing card: land on Play / pause.
+  if (melhor >= 0 && k == SDLK_UP && pg->tipo == P_MA && pg->v[melhor].tipo == L_ACAO && maHeroBotao(pg->v[melhor].acao)
+      && !(pg->v[pg->foco].tipo == L_ACAO && maHeroBotao(pg->v[pg->foco].acao)))
+    for (int i = 0; i < pg->n; i++) if (pg->v[i].tipo == L_ACAO && pg->v[i].acao == A_MA_PLAY) { melhor = i; break; }
   if (melhor >= 0) pg->foco = melhor;
   else if (k == SDLK_UP) zona = Z_MENU;
   else if (mcp_estado() != MCP_PARADO) { zonaAntesTocando = Z_LISTA; zona = Z_TOCANDO; }
+}
+static void maPonteiroFocar(int a, int b) {
+  Pagina *pg = topo();
+  (void)b;
+  if (pg && ehMa(pg) && a >= 0 && a < pg->n) { pg->foco = a; zona = Z_LISTA; }
 }
 static void maCartao(const Linha *l, float x, float y, float w, int f) {
   int redondo = !strcmp(l->f.genero, "artist");
@@ -1789,6 +1817,11 @@ static void maDesenhar(Pagina *pg, float x, float y0, float w, float base, Uint3
     txt_bloco_corta(TXT_BODY, i18n(m), 240, 242, 248, x, topo + 10, w, 44, 0.75f, 3);
     return;
   }
+  // Rows glide sideways to their focused cover (eased, like the page).
+  for (int r = 0; r < 16; r++) {
+    float d = maFilAlvo[r] - maFilOff[r];
+    maFilOff[r] = (d < 1 && d > -1) ? maFilAlvo[r] : maFilOff[r] + d * 0.28f;
+  }
   alto = maLayout(pg, x, w);
   // Keep the focused item on screen, gliding.
   if (pg->foco >= 0 && pg->foco < pg->n) {
@@ -1808,6 +1841,8 @@ static void maDesenhar(Pagina *pg, float x, float y0, float w, float base, Uint3
     int f = zona == Z_LISTA && i == pg->foco;
     if (ry + maR[i].h < topo - 10 || ry > base) continue;
     if (maR[i].x + maR[i].w < x - 4 || maR[i].x > NV_TELA_W) continue;   // a row's covers off to the side
+    // Magic Remote: hovering focuses, a click is OK.
+    if (maFocavel(l) && ry >= topo - 4) ponteiro_alvo(maR[i].x, ry, maR[i].w, l->tipo == L_MA ? maR[i].w : maR[i].h, maPonteiroFocar, NULL, i, 0);
     if (pg->tipo == P_MA && l->tipo == L_ACAO) {
       if (maHeroBotao(l->acao)) maBotaoHero(l, maR[i].x, ry, maR[i].w, maR[i].h, f);
       else maVerTudo(l, maR[i].x, ry, MA_CAPA, f);

@@ -99,6 +99,7 @@ static int comando(const char *cmd, const char *args, char **res) {
   snprintf(corpo, n, "{\"command\":\"%s\",\"args\":%s}", cmd, args ? args : "{}");
   strncat(url, "/api", sizeof url - strlen(url) - 1);
   r = transporte(url, corpo, token, &st);
+  if (!r) r = transporte(url, corpo, token, &st);   // the first call after a quiet while can drop: once more
   free(corpo);
   memset(token, 0, sizeof token);
   if (!r) return MA_REDE;
