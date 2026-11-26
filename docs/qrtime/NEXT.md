@@ -4,6 +4,12 @@
 - 2.1.52: Music Assistant in Music (list design), phone setup page for its address + token.
 - Alexa / Home Assistant: TV device (play titles, apps, volume, on/off), fixed link ports 8098/18098/28098/38098, profile picker skipped for voice requests, the account's own titles first.
 
+## Released since (2.1.67 and later)
+- Music Assistant home "option 3" released; Music IS Music Assistant once connected (all sections from it, Genres/Offline/Queue hidden);
+  Magic Remote on its pages; rows glide; home rows load in parallel; a dropped first call is retried; volume keys -> speaker (if webOS hands them over).
+- Arabic titles said in English (casaha_normalizar + q2) released.
+- Open: owner's Alexa shows two "TV" devices (ours + LG's own): rename LG's to "LG" or ours to "QR TIME".
+
 ## Built, NOT released (waiting for the owner)
 - Music Assistant home "option 3": now-playing card (cover, progress, controls, speaker) + rows of covers (recent, playlists, artists, albums, "See all"). Commit "design(music): Music Assistant home as option 3". Release = a commit with [ipk].
 - Checked only against tests/qrtime_ma_mock.py (tests/qrtime_ma_ui.sh), not against the owner's real Music Assistant.
