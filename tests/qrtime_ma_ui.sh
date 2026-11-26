@@ -42,8 +42,8 @@ espera "tela=home" 90 "$LOG" || { erro "home did not open"; exit 1; }
 sleep 4
 tecla "tela:musica" 3
 espera "players/all|recently_played" 5 "$W/ma-commands.log" >/dev/null 2>&1
-# Home of the Music screen: the Music Assistant row is first.
-tecla right 1; tecla ok 3
+# Music Assistant and no server of its own: Music opens on its home.
+sleep 3   # Music opens straight on the Music Assistant home
 espera "music/recently_played_items" 20 "$W/ma-commands.log" && ok "Music Assistant home asks the recent items" || erro "no recently_played_items"
 espera "music/playlists/library_items" 20 "$W/ma-commands.log" && ok "...and the playlists row" || erro "no playlists row"
 shot ma-home

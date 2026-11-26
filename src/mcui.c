@@ -1014,6 +1014,9 @@ void mcui_abrir(void) {
     }
     abrirSecao(mcfontes_n() || massist_configurado() ? P_INICIO : P_SERVICOS);
     zona = Z_MENU;
+    // Music Assistant and no server of its own: Music opens on its home (the
+    // now-playing card and the rows of covers), Back returns to the sections.
+    if (massist_configurado() && !mcfontes_n()) { empilhar(P_MA, "", "Music Assistant"); zona = Z_LISTA; }
   } else if (topo() && ehLocal(topo()->tipo)) construirLocal(topo());
 }
 void mcui_perfil_trocou(void) {
