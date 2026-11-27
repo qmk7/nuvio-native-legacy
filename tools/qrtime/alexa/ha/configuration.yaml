@@ -8,3 +8,21 @@ rest_command:
     content_type: "application/x-www-form-urlencoded"
     payload: "{{ payload }}"
     timeout: 3
+
+# The house for Alexa (through the QR TIME skill's Lambda, HA_TOKEN): what
+# Home Assistant shows Alexa. The TV and the speakers are not here: the skill
+# has them already, and a second "TV" would confuse Alexa.
+alexa:
+  smart_home:
+    locale: en-US
+    filter:
+      include_domains:
+        - light
+        - switch
+        - climate
+        - fan
+        - cover
+        - humidifier
+        - vacuum
+        - water_heater
+        - scene

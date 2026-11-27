@@ -18,9 +18,15 @@ Home Assistant (tools/qrtime/alexa/qrtime_alexa.yaml) wakes the TV
 (Wake-on-LAN), opens QR TIME and asks it to play the title through the
 settings page's fixed link (POST <link>/tocar). Nothing is stored here.
 
-AWS Lambda, Python 3.12, no packages. Environment variables:
+THE REST OF THE HOUSE (optional): with HA_TOKEN set and "alexa: smart_home:"
+in Home Assistant, every light, switch, AC, fan, cover and scene Home Assistant
+exposes joins this skill at discovery ("Alexa, turn off the kitchen light").
+
+AWS Lambda, Python 3.12. Environment variables:
   HA_WEBHOOK_URL   https://<your-tailscale-funnel-name>/api/webhook/<webhook id>
   DEVICE_NAME      the name Alexa shows and you say ("TV" by default)
+  HA_TOKEN         Home Assistant long-lived token (house devices; optional)
+  HA_URL           Home Assistant address, by default the webhook's
 Account linking uses Login with Amazon (see README.md): the token Alexa
 sends is not used here; the webhook id is the shared secret.
 """
@@ -46,6 +52,65 @@ def _ha(payload):
     except Exception as e:  # network or HA down: Alexa says the device is not responding
         print("home assistant: %s" % type(e).__name__)
         return False
+
+
+# ---- the rest of the house: Home Assistant as the brain ----
+# Home Assistant's own Alexa Smart Home endpoint (alexa: smart_home: in its
+# configuration.yaml) turns every exposed light, switch, AC, fan, cover and
+# scene into Alexa endpoints. This skill adds them to its own TV and speakers at
+# discovery and forwards their directives as they are, so one skill runs the
+# whole house. HA_TOKEN is a Home Assistant long-lived token; it only travels in
+# the Authorization header and is never printed.
+def _casa_url():
+    base = os.environ.get("HA_URL", "")
+    if not base:
+        w = os.environ.get("HA_WEBHOOK_URL", "")
+        i = w.find("/api/webhook/")
+        base = w[:i] if i > 0 else ""
+    base = base.rstrip("/")
+    return base + "/api/alexa/smart_home" if base.startswith("https://") else ""
+
+
+def _casa(event):
+    """Home Assistant's answer to a Smart Home directive, None when not set up or down."""
+    url, tok = _casa_url(), os.environ.get("HA_TOKEN", "")
+    if not url or not tok:
+        return None
+    req = urllib.request.Request(url, data=json.dumps(event).encode(), method="POST",
+                                 headers={"Content-Type": "application/json", "Authorization": "Bearer " + tok})
+    try:
+        with urllib.request.urlopen(req, timeout=7) as r:
+            return json.loads(r.read().decode())
+    except Exception as e:
+        print("home assistant devices: %s" % type(e).__name__)
+        return None
+
+
+def _nosso(ep):
+    return ep == ENDPOINT_ID or ep.startswith(MUSICA)
+
+
+def _juntar_casa(resp, event):
+    """Discovery: this skill's endpoints plus Home Assistant's, never the same name twice."""
+    casa = _casa(event)
+    if not casa:
+        return resp
+    eps = resp["event"]["payload"]["endpoints"]
+    nomes = {e.get("friendlyName", "").strip().lower() for e in eps}
+    ids = {e.get("endpointId") for e in eps}
+    novos = 0
+    for e in (casa.get("event", {}).get("payload", {}).get("endpoints") or []):
+        n = e.get("friendlyName", "").strip().lower()
+        if not e.get("endpointId") or e["endpointId"] in ids or _nosso(e["endpointId"]) or n in nomes:
+            continue
+        if len(eps) >= 300:   # Alexa's limit per skill
+            break
+        eps.append(e)
+        nomes.add(n)
+        ids.add(e["endpointId"])
+        novos += 1
+    print("discovery: %d from Home Assistant" % novos)
+    return resp
 
 
 def _hdr(namespace, name, correlation=None):
@@ -371,10 +436,12 @@ def lambda_handler(event, context):
     ns, name = d.get("header", {}).get("namespace"), d.get("header", {}).get("name")
     print("directive %s.%s" % (ns, name))  # never the payload: it may carry tokens
     if ns == "Alexa.Discovery":
-        return _discovery(d)
+        return _juntar_casa(_discovery(d), event)
     if ns == "Alexa.Authorization" and name == "AcceptGrant":
         return {"event": {"header": _hdr("Alexa.Authorization", "AcceptGrant.Response"), "payload": {}}}
     ep = d.get("endpoint", {}).get("endpointId", "")
+    if ep and not _nosso(ep):   # a Home Assistant device: it answers for itself
+        return _casa(event) or _erro(d)
     if ep.startswith(MUSICA):
         return _musica(d, ns, name, ep[len(MUSICA):])
     if ns == "Alexa.PowerController":
