@@ -63,7 +63,14 @@ Alexa gets Home Assistant's devices through the QR TIME skill, HA_TOKEN; HomeKit
 - H10 energy guard: ACs on and nobody home for an hour -> phone notice "turn them off?" (HA presence + ConnectLife/Sensibo).
 - H11 "should I watch this?" on the focused title: rating, length, and how it compares with what was liked (Trakt history), spoken.
 - H12 "surprise me": Claude picks a short unseen film/series of a liked genre and plays it.
-Not wanted: morning wake-up music, kids mode by voice, weekly summary on the phone, watch party, leaving-soon list, coffee scene, series theme song, song from the film.
+- H13 "what's the score?" spoken from Sport Center for the owner's team while a match runs.
+- H14 "play the Al-Hilal match on TV": opens the channel that shows it (Sport Center schedule + Xtream).
+- H15 "last episode": finish this episode, then TV and lights off instead of the next one.
+- H16 "what did I miss?": back to where the viewer left the room, or a short spoken recap.
+- H17 "I can't hear them": soundbar voice / dialogue mode (Samsung Q990F) without raising the effects.
+- H18 "movie night" scene: AC 22, lights dim, QR TIME open, Claude suggests a film.
+- H19 "who's at the door?": EZVIZ picture on the TV by voice.
+Not wanted: morning wake-up music, prayer/adhan pause, Ramadan mode, Quran by voice, goal light flash, kids mode by voice, weekly summary on the phone, watch party, leaving-soon list, coffee scene, series theme song, song from the film.
 
 ## QR-Yummy (cooking app) + Alexa
 qmk7/QR-Yummy: PWA on Cloudflare Workers. Personal recipes live only on the phone; "family books" are on the server
