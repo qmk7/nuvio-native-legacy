@@ -35,7 +35,7 @@ actions:
       - stop: "music"
   - if:
       - condition: template
-        value_template: "{{ acao in ['tocar', 'ligar', 'abrir'] and is_state(tv, 'off') }}"
+        value_template: "{{ acao in ['tocar', 'ligar', 'abrir'] and states(tv) in ['off', 'unavailable', 'unknown'] }}"
     then:
       - action: wake_on_lan.send_magic_packet
         data:
@@ -43,8 +43,9 @@ actions:
       - action: wake_on_lan.send_magic_packet
         data:
           mac: "<TV_MAC_LAN>"
-      - wait_template: "{{ not is_state(tv, 'off') }}"
-        timeout: "00:00:30"
+      # Asleep the LG shows "unavailable", not "off": wait until it is really on.
+      - wait_template: "{{ is_state(tv, 'on') or is_state(tv, 'playing') or is_state(tv, 'idle') or is_state(tv, 'paused') }}"
+        timeout: "00:00:40"
         continue_on_timeout: true
       - delay: "00:00:02"
   - if:
@@ -119,6 +120,7 @@ actions:
     then:
       - delay: "00:00:03"
       - action: media_player.select_source
+        continue_on_error: true
         target:
           entity_id: "{{ tv }}"
         data:
