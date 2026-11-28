@@ -59,7 +59,11 @@ Alexa gets Home Assistant's devices through the QR TIME skill, HA_TOKEN; HomeKit
 - H6 "what happened in the series" spoken spoiler-free recap of the last two episodes before resuming.
 - H7 "who is this actor" spoken + shown on screen (same as 29, by voice while playing).
 - H8 the music follows you ("move the music to the kitchen", Music Assistant transfer queue) (same as 7).
-Not wanted: morning wake-up music, kids mode by voice, weekly summary on the phone.
+- H9 "remind me when the new episode is out" (Trakt calendar; notice on the TV / phone, OK plays it).
+- H10 energy guard: ACs on and nobody home for an hour -> phone notice "turn them off?" (HA presence + ConnectLife/Sensibo).
+- H11 "should I watch this?" on the focused title: rating, length, and how it compares with what was liked (Trakt history), spoken.
+- H12 "surprise me": Claude picks a short unseen film/series of a liked genre and plays it.
+Not wanted: morning wake-up music, kids mode by voice, weekly summary on the phone, watch party, leaving-soon list, coffee scene, series theme song, song from the film.
 
 ## QR-Yummy (cooking app) + Alexa
 qmk7/QR-Yummy: PWA on Cloudflare Workers. Personal recipes live only on the phone; "family books" are on the server
