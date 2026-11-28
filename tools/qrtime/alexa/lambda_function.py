@@ -272,6 +272,7 @@ MODELO = os.environ.get("CLAUDE_MODEL", "claude-haiku-5-5")  # fast: Alexa waits
 ESQUEMA = {
     "type": "object",
     "properties": {
+        "midia": {"type": "string", "enum": ["music", "video"], "description": "video only for a film or a TV series/show to watch; music otherwise or when unsure."},
         "busca": {"type": "string", "description": "What to search on YouTube Music: artist, song, album, playlist or a mood turned into a concrete search."},
         "tipo": {"type": "string", "enum": ["track", "artist", "album", "playlist", "any"]},
         "onde": {"type": "string", "description": "Where: the room or speaker name the person said (e.g. bedroom, kitchen, soundbar), 'all' for every speaker, '' when none was said."},
@@ -279,7 +280,7 @@ ESQUEMA = {
         "volume": {"type": "integer", "description": "0-100 when a loudness was asked for, else -1."},
         "resposta": {"type": "string", "description": "A short spoken confirmation in the request's language (Gulf Arabic when the request is Arabic)."},
     },
-    "required": ["busca", "tipo", "onde", "radio", "volume", "resposta"],
+    "required": ["midia", "busca", "tipo", "onde", "radio", "volume", "resposta"],
     "additionalProperties": False,
 }
 SISTEMA = (
@@ -289,6 +290,9 @@ SISTEMA = (
     "'' when no place was said. Home Assistant matches it to the speakers' current rooms and names. "
     "Turn moods and descriptions into a concrete search (\"something calm to sleep\" -> a calm sleep playlist; "
     "\"the song from Titanic\" -> My Heart Will Go On Celine Dion). Arabic artists keep their usual Latin spelling. "
+    "midia: 'video' when the words name a film or a TV series/show to watch (MobLand, Friends, Inception, "
+    "Bab Al-Hara) and no speaker or room was said, or when the TV was named; then busca is just the title. "
+    "Songs, artists, albums, moods and anything that could be either (Titanic) are 'music'. "
     "radio is true unless one exact song was asked for. volume: 'quiet/low' about 20, 'loud' about 70, else -1."
 )
 
@@ -434,6 +438,12 @@ def _skill(event):
             return _fala(t("tocando") % msg["q"])
         onde = ONDE_POR_INTENT[nome]
         d = _entender(q, onde)
+        lugar = ((d or {}).get("onde") or "").strip().lower()
+        if d and d.get("midia") == "video" and lugar in ("", "tv", "television", "qr time"):
+            msg = _tocar_tv((d.get("busca") or q).strip())
+            if not _ha(msg):
+                return _fala(t("sem_ha"))
+            return _fala(t("tocando") % msg["q"])
         if d:
             lugar = (d.get("onde") or "").strip().lower()
             d["onde"] = "casa" if lugar in ("all", "everywhere") else (lugar or onde)
