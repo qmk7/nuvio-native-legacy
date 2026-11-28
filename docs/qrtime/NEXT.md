@@ -49,6 +49,17 @@ Also picked: 50 "who sings this?" (Music Assistant now-playing of any speaker sp
 Also picked (all): 51 live channel by voice (Xtream), 52 latest episode, 53 random episode, 54 trailer,
 55 search by actor / genre on screen, 56 something short (< 25 min), 57 "what is it about" (spoiler-free),
 58 "is it worth watching" (IMDb / RT), 59 next season / episode date (Trakt), 60 YouTube by voice (official app, search / video).
+Picked 2026-11-28 (Home Assistant is now the brain: Tuya, ConnectLife AC/appliances, Sensibo, Music Assistant;
+Alexa gets Home Assistant's devices through the QR TIME skill, HA_TOKEN; HomeKit Bridge to pair at home):
+- H1 house status strip in QR TIME (temperature, ACs on, lights on) controllable with the remote (HA REST/WebSocket on the LAN).
+- H2 the AC follows the film (quiet mode during a long night film, back when the TV goes off).
+- H3 "I'm leaving": everything off (TV, ACs, lights, music) and a spoken report of what was turned off.
+- H4 appliance notices over the film (washer done, fridge door open, AC filter) from ConnectLife entities.
+- H5 "what should I watch tonight" as a two-question voice chat with Claude, then plays it.
+- H6 "what happened in the series" spoken spoiler-free recap of the last two episodes before resuming.
+- H7 "who is this actor" spoken + shown on screen (same as 29, by voice while playing).
+- H8 the music follows you ("move the music to the kitchen", Music Assistant transfer queue) (same as 7).
+Not wanted: morning wake-up music, kids mode by voice, weekly summary on the phone.
 
 ## QR-Yummy (cooking app) + Alexa
 qmk7/QR-Yummy: PWA on Cloudflare Workers. Personal recipes live only on the phone; "family books" are on the server
