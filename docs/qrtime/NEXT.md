@@ -8,7 +8,11 @@
 - Music Assistant home "option 3" released; Music IS Music Assistant once connected (all sections from it, Genres/Offline/Queue hidden);
   Magic Remote on its pages; rows glide; home rows load in parallel; a dropped first call is retried; volume keys -> speaker (if webOS hands them over).
 - Arabic titles said in English (casaha_normalizar + q2) released.
-- Open: owner's Alexa shows two "TV" devices (ours + LG's own): rename LG's to "LG" or ours to "QR TIME".
+- Magic Remote on Music's menu/lists/sheet/Now Playing, YouTube, Sport Center and Accounts.
+- Alexa video control: seek N s, start over, next episode, rewind/fast-forward, speed (QR TIME voice keys nx/rs/s:/r:).
+- What's this song: 40 s limit, "still listening", answers as notices.
+- Alexa side (Lambda zip, not in the IPK): Home Assistant devices join the QR TIME skill (HA_TOKEN), QR Music plays
+  films/series ("on TV" or Claude's reading), HA automation wakes an "unavailable" TV. LG's Alexa device renamed by the owner.
 
 ## Built, NOT released (waiting for the owner)
 - Music Assistant home "option 3": now-playing card (cover, progress, controls, speaker) + rows of covers (recent, playlists, artists, albums, "See all"). Commit "design(music): Music Assistant home as option 3". Release = a commit with [ipk].
