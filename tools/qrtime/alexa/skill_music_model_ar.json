@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "كيو ار ميوزك",
+      "invocationName": "كيو ار",
       "intents": [
         {
           "name": "AMAZON.CancelIntent",
