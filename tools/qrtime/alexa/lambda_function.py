@@ -31,6 +31,7 @@ Account linking uses Login with Amazon (see README.md): the token Alexa
 sends is not used here; the webhook id is the shared secret.
 """
 import json
+import re
 import os
 import time
 import urllib.request
@@ -388,6 +389,27 @@ FALAS = {
 }
 
 
+# "Alexa, play MobLand on TV from QR Music": Alexa+ keeps titles it knows from
+# its own catalog and only turns the TV on, so the custom skill also takes
+# "... on TV" and sends the title to QR TIME itself.
+TV_FIM = re.compile(r"\s+(?:on|in)\s+(?:the\s+)?(?:tv|television|qr\s*time)\s*$|\s+(?:على|في|ع)\s*(?:ال)?(?:تلفزيون|تلفاز|شاشة|تي\s*في)\s*$", re.I)
+
+
+def _tv(q):
+    """The title when `q` asks for the TV, else ''."""
+    m = TV_FIM.search(q or "")
+    return q[:m.start()].strip() if m else ""
+
+
+def _tocar_tv(q):
+    msg = {"acao": "tocar", "q": q, "tipo": ""}
+    ia = _titulo_ia(q)
+    if ia and ia.get("titulo"):
+        msg["q"], msg["q2"] = ia["titulo"], ia.get("arabe") or (q if ia["titulo"].lower() != q.lower() else "")
+        msg["tipo"] = ia.get("tipo") or ""
+    return msg
+
+
 def _skill(event):
     req = event.get("request", {})
     tipo = req.get("type")
@@ -404,6 +426,12 @@ def _skill(event):
         q = ((intent.get("slots") or {}).get("q") or {}).get("value") or ""
         if not q:
             return _fala(t("o_que"), fim=False)
+        titulo = _tv(q)
+        if titulo:
+            msg = _tocar_tv(titulo)
+            if not _ha(msg):
+                return _fala(t("sem_ha"))
+            return _fala(t("tocando") % msg["q"])
         onde = ONDE_POR_INTENT[nome]
         d = _entender(q, onde)
         if d:
