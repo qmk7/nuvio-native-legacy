@@ -3,20 +3,131 @@
     "languageModel": {
       "invocationName": "كيو ار ميوزك",
       "intents": [
-        { "name": "AMAZON.CancelIntent", "samples": [] },
-        { "name": "AMAZON.HelpIntent", "samples": [] },
-        { "name": "AMAZON.StopIntent", "samples": [] },
-        { "name": "AMAZON.PauseIntent", "samples": [] },
-        { "name": "AMAZON.ResumeIntent", "samples": [] },
-        { "name": "AMAZON.NextIntent", "samples": [] },
-        { "name": "AMAZON.PreviousIntent", "samples": [] },
-        { "name": "AMAZON.NavigateHomeIntent", "samples": [] },
-        { "name": "TocarIntent",
-          "slots": [ { "name": "q", "type": "AMAZON.SearchQuery" } ],
-          "samples": [ "شغل {q}", "شغلي {q}", "شغل لي {q}", "شغلي لي {q}", "ابي اسمع {q}", "ابغى اسمع {q}", "حط {q}" ] },
-        { "name": "TocarTodasIntent",
-          "slots": [ { "name": "q", "type": "AMAZON.SearchQuery" } ],
-          "samples": [ "شغل {q} في كل البيت", "شغلي {q} في كل البيت", "شغل {q} على كل السماعات", "شغلي {q} على كل السماعات" ] }
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.PauseIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.ResumeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NextIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.PreviousIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "TocarIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "شغل {q}",
+            "شغلي {q}",
+            "شغل لي {q}",
+            "شغلي لي {q}",
+            "ابي اسمع {q}",
+            "ابغى اسمع {q}",
+            "حط {q}"
+          ]
+        },
+        {
+          "name": "TocarTodasIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "شغل {q} في كل البيت",
+            "شغلي {q} في كل البيت",
+            "شغل {q} على كل السماعات",
+            "شغلي {q} على كل السماعات"
+          ]
+        },
+        {
+          "name": "PerguntaQuantoIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "كم {q}",
+            "قديش {q}"
+          ]
+        },
+        {
+          "name": "PerguntaEstadoIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "هل {q}",
+            "فيه {q}",
+            "في {q}"
+          ]
+        },
+        {
+          "name": "PerguntaOQueIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "وش {q}",
+            "ايش {q}",
+            "شو {q}",
+            "وين {q}",
+            "مين {q}",
+            "أي {q}"
+          ]
+        },
+        {
+          "name": "PerguntaGeralIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "قل لي {q}",
+            "قولي {q}",
+            "طمني على {q}",
+            "شيك على {q}",
+            "حالة {q}"
+          ]
+        }
       ],
       "types": []
     }

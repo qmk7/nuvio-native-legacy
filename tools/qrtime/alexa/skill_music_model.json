@@ -96,6 +96,69 @@
             "play {q} in party mode",
             "party mode {q}"
           ]
+        },
+        {
+          "name": "PerguntaQuantoIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "how long {q}",
+            "how much {q}",
+            "how many {q}",
+            "how hot {q}",
+            "how cold {q}"
+          ]
+        },
+        {
+          "name": "PerguntaEstadoIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "is {q}",
+            "are {q}",
+            "is there {q}",
+            "did {q}",
+            "has {q}"
+          ]
+        },
+        {
+          "name": "PerguntaOQueIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "what {q}",
+            "what's {q}",
+            "which {q}",
+            "where {q}",
+            "who {q}"
+          ]
+        },
+        {
+          "name": "PerguntaGeralIntent",
+          "slots": [
+            {
+              "name": "q",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "tell me {q}",
+            "check {q}",
+            "status of {q}",
+            "question {q}"
+          ]
         }
       ],
       "types": []

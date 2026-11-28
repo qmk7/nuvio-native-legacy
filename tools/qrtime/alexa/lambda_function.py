@@ -379,6 +379,72 @@ def _titulo_ia(frase):
         return None
 
 
+# ---- questions about the house: "Alexa, ask QR how long is the washer" ----
+# Alexa's smart home API has no place for a washer's time left or an oven's
+# state, so the custom skill answers any question with Home Assistant's live
+# states (GET /api/states, HA_TOKEN) read by Claude. Only names, states and a
+# few attributes leave Home Assistant; no tokens, no camera pictures.
+PERGUNTA_POR_INTENT = {
+    "PerguntaQuantoIntent": "how much / how long / how many",
+    "PerguntaEstadoIntent": "is / are",
+    "PerguntaOQueIntent": "what / which / where / who",
+    "PerguntaGeralIntent": "",
+}
+SEM_DOMINIO = ("update", "tts", "stt", "conversation", "zone", "sun", "event", "image", "wake_word",
+               "assist_satellite", "ai_task", "notify", "persistent_notification", "automation", "script", "tag")
+ATRIBUTOS = ("unit_of_measurement", "current_temperature", "temperature", "hvac_action", "fan_mode",
+             "preset_mode", "media_title", "media_artist", "source", "brightness", "device_class", "current_position")
+
+
+def _estados_casa():
+    """Home Assistant's states as short lines ("Kitchen AC (climate): cool; current_temperature=24"), '' when unreachable."""
+    url, tok = _casa_url(), os.environ.get("HA_TOKEN", "")
+    if not url or not tok:
+        return ""
+    req = urllib.request.Request(url.replace("/api/alexa/smart_home", "/api/states"),
+                                 headers={"Authorization": "Bearer " + tok})
+    try:
+        with urllib.request.urlopen(req, timeout=4) as r:
+            estados = json.loads(r.read().decode())
+    except Exception as e:
+        print("home assistant states: %s" % type(e).__name__)
+        return ""
+    linhas = []
+    for e in estados:
+        eid, st, at = e.get("entity_id", ""), e.get("state", ""), e.get("attributes") or {}
+        dom = eid.split(".", 1)[0]
+        if dom in SEM_DOMINIO or st in ("unavailable", "unknown", ""):
+            continue
+        extra = "; ".join("%s=%s" % (k, at[k]) for k in ATRIBUTOS if at.get(k) not in (None, ""))
+        linhas.append("%s (%s): %s%s" % (at.get("friendly_name") or eid, dom, st, "; " + extra if extra else ""))
+    return "\n".join(linhas)[:60000]
+
+
+def _pergunta(prefixo, q, ar):
+    """Claude's short spoken answer about the house, None when it cannot answer."""
+    casa = _estados_casa()
+    if not casa or not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    try:
+        import anthropic
+        cli = anthropic.Anthropic(timeout=5.0, max_retries=0)
+        r = cli.messages.create(
+            model=MODELO, max_tokens=300, output_config={"effort": "low"},
+            system="You answer a spoken question about a home from its Home Assistant states. Answer in one or two short "
+                   "sentences meant to be spoken by Alexa, " + ("in Gulf Arabic" if ar else "in English") + ", with no lists, "
+                   "markdown or entity ids. Times left: say them in minutes or hours. If the states do not say, say so briefly. "
+                   "The time now (UTC) is " + time.strftime("%H:%M", time.gmtime()) + ".",
+            messages=[{"role": "user", "content": "Home states:\n" + casa + "\n\nQuestion (speech recognition; it began with '"
+                       + prefixo + "'): " + q}],
+        )
+        if r.stop_reason == "refusal":
+            return None
+        return next((b.text for b in r.content if b.type == "text"), "").strip() or None
+    except Exception as e:
+        print("claude house: %s" % type(e).__name__)
+        return None
+
+
 def _fala(texto, fim=True):
     return {"version": "1.0", "response": {
         "outputSpeech": {"type": "PlainText", "text": texto}, "shouldEndSession": fim}}
@@ -388,6 +454,7 @@ FALAS = {
     "o_que": ("What should I play?", "شو أشغّل لك؟"),
     "sem_ha": ("Home Assistant did not answer.", "ما ردّ هوم أسيستنت."),
     "ok": ("OK.", "تمام."),
+    "casa_nao": ("I couldn't read the house right now.", "ما قدرت أقرا حالة البيت الحين."),
     "tocando": ("Playing %s.", "أشغّل %s."),
     "ajuda": ("Say, play a song or an artist, in a room, or everywhere.", "قل: شغّل أغنية أو فنان، في غرفة، أو في كل البيت."),
     "nao": ("Sorry, I can't do that yet.", "آسف، ما أقدر أسوي هذا للحين."),
@@ -482,6 +549,11 @@ def _skill(event):
         if not _ha(msg):
             return _fala(t("sem_ha"))
         return _fala(fala)
+    if nome in PERGUNTA_POR_INTENT:
+        q = ((intent.get("slots") or {}).get("q") or {}).get("value") or ""
+        if not q:
+            return _fala(t("o_que"), fim=False)
+        return _fala(_pergunta(PERGUNTA_POR_INTENT[nome], q, ar) or t("casa_nao"))
     if nome in TECLA_POR_INTENT:
         _ha({"acao": "musica_tecla", "onde": "casa", "k": TECLA_POR_INTENT[nome]})
         return _fala(t("ok"))

@@ -26,3 +26,10 @@ alexa:
         - vacuum
         - water_heater
         - scene
+        - lock
+        - valve
+        - input_boolean
+        - button
+        - input_button
+        - sensor          # Alexa takes the temperature ones (it has no place for the rest)
+        - binary_sensor   # doors, windows, motion: usable in Alexa routines
