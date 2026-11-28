@@ -476,8 +476,14 @@ static void appInjetada(const SDL_Event *e) { if (!sono_entrada(e)) app_evento(e
 // exactly like the injected test keys (same names, same path).
 static void teclasInjetadas(void (*entregar)(const SDL_Event *)) {
   for (char nome[16]; celapps_tecla_remota(nome, sizeof nome); ) {
-    SDL_Keycode k = codigoDaTecla(nome);
+    SDL_Keycode k;
     SDL_Event e;
+    // Voice (Alexa): straight to the player, not as keys.
+    if (!strcmp(nome, "nx")) { player_voz("proximo", 0); continue; }
+    if (!strcmp(nome, "rs")) { player_voz("inicio", 0); continue; }
+    if (nome[0] == 's' && nome[1] == ':') { player_voz("pular", atof(nome + 2)); continue; }
+    if (nome[0] == 'r' && nome[1] == ':') { player_voz("velocidade", atof(nome + 2)); continue; }
+    k = codigoDaTecla(nome);
     if (!k) continue;
     esmaecer_entrada(SDL_GetTicks(), 0);
     SDL_zero(e); e.type = SDL_KEYDOWN; e.key.keysym.sym = k; entregar(&e);

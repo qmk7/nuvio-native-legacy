@@ -8,9 +8,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define JANELA   (4L << 20)     // one Range request
 #define TETO_REDE (96L << 20)   // never more than this per sample
+#define TETO_SEG 40             // nor longer than this: a slow source answers "no answer", not silence
 #define TETO_SAIDA (3L << 20)   // the sample itself
 
 static char base[200] = "https://api.audd.io/";
@@ -28,12 +30,12 @@ int songid_definir_chave(const char *tok) {
 }
 
 // ---------------------------------------------------------------- reading the file in windows
-typedef struct { const char *url; unsigned char *b; long long ini; long n; long long baixado; int erro; } Leitor;
+typedef struct { const char *url; unsigned char *b; long long ini; long n; long long baixado; int erro; time_t t0; } Leitor;
 static int garantir(Leitor *L, long long off, long n) {
   long tam = 0;
   int st = 0, er = 0;
   if (L->b && off >= L->ini && off + n <= L->ini + L->n) return 1;
-  if (L->baixado > TETO_REDE) { L->erro = SID_REDE; return 0; }
+  if (L->baixado > TETO_REDE || (L->t0 && time(NULL) - L->t0 > TETO_SEG)) { L->erro = SID_REDE; return 0; }
   free(L->b); L->b = NULL; L->n = 0;
   {
     long pedir = n > JANELA ? n : JANELA;
@@ -204,7 +206,7 @@ static int blocoQuadros(Saida *s, const Faixa *f, int aac, int perfil, int fi, i
 }
 
 unsigned char *songid_amostra(const char *url, double seg, double segundos, size_t *nOut, char *codec, size_t nc, int *erro) {
-  Leitor L = { url, NULL, 0, 0, 0, 0 };
+  Leitor L = { url, NULL, 0, 0, 0, 0, time(NULL) };
   long long segIni = -1, cuesPos = -1, o;
   uint64_t escala = 1000000;
   Faixa fx[16];
@@ -395,7 +397,7 @@ int songid_reconhecer(const char *url, double seg, SidMusica *out) {
   if (!tok || !tok[0]) { free(tok); return SID_SEM_CHAVE; }
   tok[strcspn(tok, "\r\n")] = 0;
   a = songid_amostra(url, seg, 8.0, &n, cod, sizeof cod, &erro);
-  if (!a) { free(tok); return erro; }
+  if (!a) { free(tok); printf("[musica-id] sem amostra: %d\n", erro); fflush(stdout); return erro; }
   printf("[musica-id] amostra %s: %zu bytes\n", cod, n);
   fflush(stdout);
   b64 = b64url(a, n);
@@ -406,7 +408,7 @@ int songid_reconhecer(const char *url, double seg, SidMusica *out) {
   sprintf(corpo, "api_token=%s&audio=%s", tok, b64);
   free(b64);
   memset(tok, 0, strlen(tok)); free(tok);
-  r = rede_postar_st(base, 30, cabs, corpo, &st);
+  r = rede_postar_st(base, 20, cabs, corpo, &st);
   free(corpo);
   res = r ? songid_parse(r, out) : SID_REDE;
   printf("[musica-id] AudD HTTP %d -> %d\n", st, res);
@@ -445,6 +447,7 @@ int songid_iniciar(const char *url, double seg) {
   pthread_detach(t);
   return 1;
 }
+int songid_rodando(void) { int r; pthread_mutex_lock(&trava); r = rodando; pthread_mutex_unlock(&trava); return r; }
 int songid_resultado(SidMusica *out) {
   int r = -1;
   pthread_mutex_lock(&trava);

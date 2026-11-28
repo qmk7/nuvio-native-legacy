@@ -7520,6 +7520,39 @@ float player_osd_brilho(void) {
 // QR TIME sleep timer (sono.c): pause what is playing as the person's own
 // pause, so OK/Play resumes it. A live channel without a time window pauses
 // too: at that point nobody is watching, and OK picks it up again.
+// QR TIME voice (Alexa through Home Assistant): what the remote's buttons and
+// arrows do, by name. "pular" seeks `arg` seconds from here, "inicio" starts
+// over, "proximo" plays the next episode, "velocidade" sets `arg`%. 1 = done.
+int player_voz(const char *cmd, double arg) {
+  char t[48];
+  if (!player_aberto() || !aberto || saindo || !cmd) return 0;
+  if (!strcmp(cmd, "proximo")) return ativarBotao(PLR_PROXIMO, 0);
+  if (!strcmp(cmd, "inicio")) return ativarBotao(PLR_REINICIAR, 0);
+  if (!comVideo || ehCanal()) return 0;
+  if (!strcmp(cmd, "pular") && isfinite(arg) && arg != 0.0) {
+    double d = video_duracao(), p = video_pos() + arg;
+    if (p < 0.0) p = 0.0;
+    if (d > 5.0 && p > d - 3.0) p = d - 3.0;
+    buscarUsuario(p);
+    snprintf(t, sizeof t, "%s %d s", arg > 0 ? "+" : "-", (int)fabs(arg));
+    player_toast(t, 1500u);
+    printf("[voz] pular %+.0f s\n", arg);
+    return 1;
+  }
+  if (!strcmp(cmd, "velocidade") && video_velocidade_suportada()) {
+    int v = (int)arg;
+    if (v < 50) v = 50;
+    if (v > 200) v = 200;
+    video_velocidade(v);
+    velmem_gravar(player_serie_imdb(), v);
+    snprintf(t, sizeof t, "%.2gx", v / 100.0);
+    player_toast(t, 1500u);
+    printf("[voz] velocidade %d%%\n", v);
+    return 1;
+  }
+  return 0;
+}
+
 void player_sono_pausar(void) {
   if (!player_aberto() || !tocando) return;
   retomandoSalto = 0;

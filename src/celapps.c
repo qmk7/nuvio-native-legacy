@@ -118,10 +118,19 @@ static char *paginaControle(void) {
     "document.getElementById('campo').onclick=function(){txt('campo')};");
 }
 // Home Assistant (ajremoto.c "tecla" route): the same keys as the phone remote.
+// Voice (Alexa): "nx" next episode, "rs" start over, "s:<seconds>" seek
+// from here (-3600..3600), "r:<percent>" speed (50..200); main.c hands them
+// to player_voz on the main thread.
 int celapps_injetar_tecla(const char *k) {
-  static const char *const OK[] = { "up", "down", "left", "right", "ok", "back", "play", NULL };
+  static const char *const OK[] = { "up", "down", "left", "right", "ok", "back", "play", "nx", "rs", NULL };
+  char *fim;
+  long v;
   for (int i = 0; k && OK[i]; i++) if (!strcmp(k, OK[i])) { teclaRemota(k); return 1; }
-  return 0;
+  if (!k || (strncmp(k, "s:", 2) && strncmp(k, "r:", 2)) || !k[2]) return 0;
+  v = strtol(k + 2, &fim, 10);
+  if (*fim || (k[0] == 's' && (v < -3600 || v > 3600 || !v)) || (k[0] == 'r' && (v < 50 || v > 200))) return 0;
+  teclaRemota(k);
+  return 1;
 }
 static void pedidoControle(const LwPedido *p) {
   char k[16], t[512], modo[16];

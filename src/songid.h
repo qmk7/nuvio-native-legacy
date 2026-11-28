@@ -28,7 +28,8 @@ void songid_definir_base(const char *url);              // tests (default https:
 
 // Player button: start in the background, then poll on the app thread.
 int  songid_iniciar(const char *url, double seg);       // 1 started
-int  songid_resultado(SidMusica *out);                  // -1 running/none, else SID_*
+int  songid_resultado(SidMusica *out);
+int  songid_rodando(void);                              // 1 while listening                  // -1 running/none, else SID_*
 // songidui.c (app thread): the button, the result card, its YouTube search.
 void songidui_iniciar(const char *url, double seg);
 void songidui_passo(void);

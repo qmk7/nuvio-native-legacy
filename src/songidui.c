@@ -10,21 +10,35 @@
 #include <string.h>
 
 static char busca[340];
+#include <SDL.h>
+static Uint32 desde;
+// Every answer is a notice (ilha), not a player toast: it is seen even when the
+// player was closed while listening.
+static void avisar(const char *t, unsigned ms) { ilha_avisar("songid", ILHA_INFO, "aj_music", i18n(t), ms, 0); }
 void songidui_iniciar(const char *url, double seg) {
-  if (!songid_tem_chave()) { player_toast(i18n("Falta a chave do AudD (Celular > Configurar música)."), 4000); return; }
-  if (songid_iniciar(url, seg)) player_toast_ex(i18n("Ouvindo a música… (uns segundos)"), 4000, "aj_music", 0);
+  if (!songid_tem_chave()) { avisar("Falta a chave do AudD (Celular > Configurar música).", 4500u); return; }
+  if (songid_rodando()) { avisar("Ainda ouvindo a música…", 2500u); return; }
+  if (!url || !url[0]) { avisar("Não disponível nesta fonte (só arquivos MKV).", 4500u); return; }
+  if (songid_iniciar(url, seg)) { desde = SDL_GetTicks(); avisar("Ouvindo a música… (uns segundos)", 6000u); }
+  else avisar("Não foi possível começar. Tente de novo.", 3500u);
 }
 void songidui_passo(void) {
   SidMusica m;
   int r = songid_resultado(&m);
-  if (r < 0) return;
+  if (r < 0) {
+    if (desde && songid_rodando() && SDL_GetTicks() - desde > 15000u) { desde = 0; avisar("Ainda ouvindo… a fonte está lenta.", 6000u); }
+    return;
+  }
+  desde = 0;
   if (r != SID_OK) {
     const char *t = r == SID_NAO_ACHOU ? "Música não reconhecida. Tente num trecho sem diálogo." :
                     r == SID_NAO_MKV ? "Não disponível nesta fonte (só arquivos MKV)." :
                     r == SID_CODEC || r == SID_SEM_AUDIO ? "O áudio desta fonte não pode ser enviado." :
                     r == SID_SEM_CHAVE ? "Falta a chave do AudD (Celular > Configurar música)." :
                     r == SID_REDE ? "Sem resposta da rede." : "O AudD recusou o pedido (confira a chave).";
-    player_toast(i18n(t), 4500);
+    printf("[musica-id] resultado %d\n", r);
+    fflush(stdout);
+    avisar(t, 5000u);
     return;
   }
   {

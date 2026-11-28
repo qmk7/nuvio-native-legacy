@@ -191,7 +191,8 @@ def _discovery(directive):
                     cap("Alexa"),
                     cap("Alexa.PowerController", properties={"supported": [{"name": "powerState"}], "retrievable": False}),
                     cap("Alexa.RemoteVideoPlayer", configuration={"operations": ["SearchAndPlay"]}),
-                    cap("Alexa.PlaybackController", supportedOperations=["Play", "Pause", "Stop"]),
+                    cap("Alexa.PlaybackController", supportedOperations=["Play", "Pause", "Stop", "StartOver", "Next", "Rewind", "FastForward"]),
+                    cap("Alexa.SeekController"),
                     cap("Alexa.Launcher"),
                     cap("Alexa.StepSpeaker"),
                     cap("Alexa.EndpointHealth", properties={"supported": [{"name": "connectivity"}], "retrievable": False}),
@@ -399,6 +400,23 @@ FALAS = {
 TV_FIM = re.compile(r"\s+(?:on|in)\s+(?:the\s+)?(?:tv|television|qr\s*time)\s*$|\s+(?:على|في|ع)\s*(?:ال)?(?:تلفزيون|تلفاز|شاشة|تي\s*في)\s*$", re.I)
 
 
+VELOCIDADE = [
+    (re.compile(r"\b(?:normal|regular)\s+speed\b|\bspeed\s+(?:1|one)(?![.\d])(?!\s+and)|السرعة\s+(?:العادية|الطبيعية)", re.I), 100),
+    (re.compile(r"\b(?:much\s+faster|double\s+speed|speed\s+(?:2|two))\b|ضعف\s+السرعة", re.I), 200),
+    (re.compile(r"\bspeed\s+(?:1\.5|one\s+and\s+a\s+half)\b", re.I), 150),
+    (re.compile(r"\b(?:faster|speed\s+up)\b|أسرع|اسرع", re.I), 125),
+    (re.compile(r"\b(?:slower|slow\s+down)\b|أبطأ|ابطأ|أبطئ", re.I), 75),
+]
+
+
+def _velocidade(q):
+    """The speed % `q` asks for ("faster", "normal speed", "أسرع"), else 0."""
+    for rx, v in VELOCIDADE:
+        if rx.search(q or ""):
+            return v
+    return 0
+
+
 def _tv(q):
     """The title when `q` asks for the TV, else ''."""
     m = TV_FIM.search(q or "")
@@ -436,6 +454,11 @@ def _skill(event):
             if not _ha(msg):
                 return _fala(t("sem_ha"))
             return _fala(t("tocando") % msg["q"])
+        vel = _velocidade(q)
+        if vel and len(q.split()) <= 5:
+            if not _ha({"acao": "tecla", "k": "r:%d" % vel}):
+                return _fala(t("sem_ha"))
+            return _fala(t("ok"))
         onde = ONDE_POR_INTENT[nome]
         d = _entender(q, onde)
         lugar = ((d or {}).get("onde") or "").strip().lower()
@@ -501,8 +524,19 @@ def lambda_handler(event, context):
         if not _ha(msg):
             return _erro(d)
         return _ok(d)
+    if ns == "Alexa.SeekController" and name == "AdjustSeekPosition":
+        # "Alexa, rewind 30 seconds / skip ahead 2 minutes on TV"
+        ms = int((d.get("payload") or {}).get("deltaPositionMilliseconds") or 0)
+        seg = max(-3600, min(3600, int(round(ms / 1000.0))))
+        if not seg or not _ha({"acao": "tecla", "k": "s:%d" % seg}):
+            return _erro(d)
+        r = _ok(d)
+        r["event"]["header"]["namespace"], r["event"]["header"]["name"] = "Alexa.SeekController", "StateReport"
+        r["event"]["payload"] = {"properties": [{"name": "positionMilliseconds", "value": 0}]}
+        return r
     if ns == "Alexa.PlaybackController":
-        tecla = {"Play": "play", "Pause": "pause", "Stop": "stop"}.get(name)
+        tecla = {"Play": "play", "Pause": "pause", "Stop": "stop", "StartOver": "rs", "Next": "nx",
+                 "Rewind": "s:-10", "FastForward": "s:30"}.get(name)
         if tecla and not _ha({"acao": "tecla", "k": tecla}):
             return _erro(d)
         return _ok(d)

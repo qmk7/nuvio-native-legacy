@@ -264,6 +264,7 @@ def contexto(txt, i):
 # virar teste ela nao impede a proxima regressao.
 IGNORAR = {
     "QR TIME",                       # the app's own name (proper noun, same in every language)
+    "continuar assistindo",          # app.c haEhContinuar: a spoken Alexa phrase matched, never drawn
     "legenda-ar-*.srt", "legenda-ar-%08lx.srt",  # legtrad.c / qrdados.c: cache file names of translated subtitles
     "conta-", "epg-conta-",          # dados.c dados_e_secreto: credential filename prefixes, never UI text
     "catalogo-*.bin",                # androidcache.c: cache filename pattern, never UI text
